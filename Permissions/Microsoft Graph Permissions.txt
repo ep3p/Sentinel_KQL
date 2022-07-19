@@ -1,0 +1,38 @@
+let PermissionsData = materialize(
+    externaldata(delegatedScopesList: dynamic, applicationScopesList: dynamic)
+    [@'https://raw.githubusercontent.com/microsoftgraph/microsoft-graph-devx-content/master/permissions/permissions-descriptions.json']
+    with(format='multijson')
+);
+let DelegatedPermissions =
+    PermissionsData
+    | project delegatedScopesList
+    | mv-expand delegatedScopesList
+    | evaluate bag_unpack(delegatedScopesList)
+    | project
+        PermissionName = value,
+        AdminConsent = isAdmin,
+        DelegatedPermissionId = id,
+        ConsentDisplayName = consentDisplayName,
+        ConsentDescription = consentDescription,
+        AdminConsentDisplayName = adminConsentDisplayName,
+        AdminConsentDescription = adminConsentDescription
+;
+let ApplicationPermissions =
+    PermissionsData
+    | project applicationScopesList
+    | mv-expand applicationScopesList
+    | evaluate bag_unpack(applicationScopesList)
+    | project
+        PermissionName = value,
+        ApplicationPermissionId = id,
+        ApplicationConsentDisplayName = consentDisplayName,
+        ApplicationConsentDescription = consentDescription
+;
+ApplicationPermissions
+| join kind=fullouter DelegatedPermissions on PermissionName
+| extend
+    PermissionName = iff(isnotempty(PermissionName), PermissionName, PermissionName1),
+    PermissionAPI = "Microsoft Graph",
+    ConsentRisk = ""
+| project PermissionAPI, PermissionName, AdminConsent, ConsentRisk, ConsentDisplayName, ConsentDescription, AdminConsentDisplayName, AdminConsentDescription, DelegatedPermissionId, ApplicationConsentDisplayName, ApplicationConsentDescription, ApplicationPermissionId
+| sort by PermissionAPI asc, PermissionName asc
