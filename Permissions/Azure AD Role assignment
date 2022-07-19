@@ -1,0 +1,182 @@
+let PIM_id = ;
+let _AzureADRoles = toscalar(
+    _GetWatchlist('RegEx-PrivAADRoles')
+    | summarize RegEx = make_list(RegEx)
+    | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
+);
+let _RoleManagementCoreDirectory = materialize(
+    AuditLogs
+    | where LoggedByService == "Core Directory" and OperationName has_any ("to role","from role")
+    | mv-apply ModifiedProperties = TargetResources[0].modifiedProperties on (
+        summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties.displayName), replace_string(tostring(iff(OperationName has "remove", ModifiedProperties.oldValue, ModifiedProperties.newValue)),'"', "")))
+    )
+    | evaluate bag_unpack(BagToUnpack, columnsConflict='replace_source')
+    | project
+        TimeGenerated,
+        LoggedByService,
+        Category,
+        AADOperationType,
+        OperationName,
+        EligibleOperation = OperationName has "eligible",
+        RemoveOperation = OperationName has "remove",
+        Result,
+        // Information about the Privileged Role
+        RoleDisplayName = iff(not(OperationName has "role definition"), column_ifexists('Role.DisplayName', ''), column_ifexists('RoleDefinition.DisplayName', '')),
+        RoleObjectName = column_ifexists('Role.WellKnownObjectName', ''),
+        RoleTemplateId = iff(not(OperationName has "role definition"), column_ifexists('Role.TemplateId', ''), column_ifexists('RoleDefinition.ObjectID', '')),
+        // Information about the actor
+        ActorIdentity = Identity,
+        // Information about the actor, if it was a user
+        ActorUserPrincipalName = tolower(InitiatedBy.user.userPrincipalName),
+        ActorUserIPAddress = tostring(InitiatedBy.user.ipAddress),
+        ActorUserRoles = tostring(InitiatedBy.user.roles),
+        ActorUserId = tostring(InitiatedBy.user.id),
+        // Information about the actor, if it was an application
+        ActorAppName = tostring(InitiatedBy.app.displayName),
+        ActorAppId = tostring(InitiatedBy.app.appId),
+        ActorAppServicePrincipalName = tostring(InitiatedBy.app.servicePrincipalName),
+        ActorAppServicePrincipalId = tostring(InitiatedBy.app.servicePrincipalId),
+        // Information about the target object
+        TargetType = tostring(TargetResources[0].type),
+        TargetDisplayName = tostring(TargetResources[0].displayName), //In case of service principal added to role
+        TargetUserPrincipalName = tolower(TargetResources[0].userPrincipalName), //In case of user added to role
+        TargetId = tostring(TargetResources[0].id),
+        // JSONs containers
+        InitiatedBy,
+        TargetResources,
+        AdditionalDetails
+);
+let _RoleManagementPIM =
+    AuditLogs
+    | where LoggedByService == "PIM" and OperationName has_any ("to role","from role")
+    | mv-apply ModifiedProperties = TargetResources[0].modifiedProperties on (
+        summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties.displayName), replace_string(tostring(iff(OperationName has "remove", ModifiedProperties.oldValue, ModifiedProperties.newValue)),'"', "")))
+    )
+    | evaluate bag_unpack(BagToUnpack, columnsConflict='replace_source')
+    | mv-apply Details = AdditionalDetails on (
+        summarize take_any(*), ActorUserIPAddress = tostring(take_anyif(Details.value, Details.key == "ipaddr"))
+        | project-away Details
+    )
+    | project
+        TimeGenerated,
+        LoggedByService,
+        Category,
+        AADOperationType,
+        OperationName,
+        EligibleOperation = OperationName has "eligible",
+        RemoveOperation = OperationName has "remove",
+        PermanentOperation = OperationName has "permanent",
+        Result,
+        ResultReason,
+        // Information about the Privileged Role
+        RoleDisplayName = tostring(TargetResources[0].displayName),
+        RoleTemplateId = tostring(TargetResources[0].id),
+        // Information about the actor
+        ActorIdentity = Identity,
+        // Information about the actor, if it was a user
+        ActorUserPrincipalName = tolower(InitiatedBy.user.userPrincipalName),
+        ActorUserIPAddress,
+        ActorUserRoles = tostring(InitiatedBy.user.roles),
+        ActorUserId = tostring(InitiatedBy.user.id),
+        // Information about the actor, if it was an application
+        ActorAppName = tostring(InitiatedBy.app.displayName),
+        ActorAppId = tostring(InitiatedBy.app.appId),
+        ActorAppServicePrincipalName = tostring(InitiatedBy.app.servicePrincipalName),
+        ActorAppServicePrincipalId = tostring(InitiatedBy.app.servicePrincipalId),
+        // Information about the target object
+        TargetType = tostring(TargetResources[iff(AADOperationType == "RemoveActivatedRole", 3, 2)].type),
+        TargetDisplayName = tostring(TargetResources[iff(AADOperationType == "RemoveActivatedRole", 3, 2)].displayName),
+        TargetId = tostring(TargetResources[iff(AADOperationType == "RemoveActivatedRole", 3, 2)].id),
+        // JSONs containers
+        InitiatedBy,
+        TargetResources,
+        AdditionalDetails
+    | summarize
+        TimeGenerated = min(TimeGenerated),
+        RequestedTimeGenerated = make_list_if(TimeGenerated, OperationName has "requested"),
+        CompletedTimeGenerated = make_list_if(TimeGenerated, OperationName has "completed"),
+        CompletedRequests = countif(OperationName has "completed"),
+        arg_max(TimeGenerated, *)
+        by EligibleOperation, RemoveOperation, PermanentOperation, ActorIdentity, TargetId, TargetType, RoleTemplateId
+    | where not(OperationName has "to role" and CompletedRequests == 0)
+    | extend
+        RequestedTimeGenerated = iff(array_length(RequestedTimeGenerated) == 1, RequestedTimeGenerated[0], RequestedTimeGenerated),
+        CompletedTimeGenerated = iff(array_length(CompletedTimeGenerated) == 1, CompletedTimeGenerated[0], CompletedTimeGenerated)
+;
+union
+    (_RoleManagementCoreDirectory
+    | where ActorIdentity != "MS-PIM"
+    | extend PermanentOperation = true
+    | project-rename CoreDirectoryTargetResources = TargetResources),
+    (_RoleManagementPIM
+    | project-rename PIMTargetResources = TargetResources
+    | join kind=leftouter (
+        _RoleManagementCoreDirectory
+        | where ActorIdentity == "MS-PIM"
+        | extend LoggedByService = "PIM"
+        | project-rename CoreDirectoryTargetResources = TargetResources
+        | summarize
+            arg_max(TimeGenerated, CoreDirectoryTargetResources, TargetUserPrincipalName, RoleObjectName)
+            by LoggedByService, EligibleOperation, RemoveOperation, TargetId, TargetType, RoleTemplateId
+    ) on LoggedByService, EligibleOperation, RemoveOperation, TargetId, TargetType, RoleTemplateId
+    )
+| extend PrivilegedRole = RoleDisplayName matches regex _AzureADRoles
+| extend
+    AlertName = strcat_delim(" ",
+        iff(RemoveOperation, "Remove", "Add"),
+        iff(PermanentOperation, "permanent", "temporary"),
+        iff(EligibleOperation, "eligible", "active"),
+        "member",
+        iff(RemoveOperation, "from role", "to role")),
+    AlertSeverity = case(
+        // Automatic Remove operations by Azure AD PIM
+        not(PermanentOperation) and RemoveOperation and (ActorUserId == PIM_id or ActorAppServicePrincipalId == PIM_id), "Informational",
+        // Activate an eligible role
+        IsWorkingTime(TimeGenerated) and AADOperationType == "ActivateRole", "Informational",
+        not(IsWorkingTime(TimeGenerated)) and AADOperationType == "ActivateRole", "Medium",
+        // Other
+        not(IsWorkingTime(TimeGenerated)) and PermanentOperation, "High",
+        not(IsWorkingTime(TimeGenerated)) and not(PermanentOperation) and not(RemoveOperation), "High",
+        IsWorkingTime(TimeGenerated) and PermanentOperation and PrivilegedRole, "Medium",
+        IsWorkingTime(TimeGenerated) and PermanentOperation and not(PrivilegedRole), "Medium",
+        IsWorkingTime(TimeGenerated) and not(PermanentOperation) and PrivilegedRole, "Informational",
+        IsWorkingTime(TimeGenerated) and not(PermanentOperation) and not(PrivilegedRole), "Informational",
+        "High"
+    )
+| project
+    TimeGenerated,
+    LoggedByService,
+    Category,
+    AADOperationType,
+    OperationName,
+    EligibleOperation,
+    PermanentOperation,
+    RemoveOperation,
+    CompletedRequests,
+    RequestedTimeGenerated,
+    CompletedTimeGenerated,
+    Result,
+    ResultReason,
+    RoleDisplayName,
+    RoleObjectName,
+    RoleTemplateId,
+    PrivilegedRole,
+    ActorIdentity,
+    ActorUserPrincipalName,
+    ActorUserIPAddress,
+    ActorUserRoles,
+    ActorUserId,
+    ActorAppName,
+    ActorAppId,
+    ActorAppServicePrincipalName,
+    ActorAppServicePrincipalId,
+    TargetType,
+    TargetDisplayName,
+    TargetUserPrincipalName,
+    TargetId,
+    InitiatedBy,
+    CoreDirectoryTargetResources,
+    PIMTargetResources,
+    AdditionalDetails,
+    AlertName,
+    AlertSeverity
