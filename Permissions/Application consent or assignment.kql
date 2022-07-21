@@ -135,9 +135,12 @@ union isfuzzy=true _AppRoleAssignmentServicePrincipal, _AppRoleAssignmentUser, _
     where isnotempty(Permission)
     | extend ConsentRisk = iff(bag_has_key(_ConsentRiskDictionary, Permission), _ConsentRiskDictionary[Permission] , "UnknownPermission")
     | extend ConsentRisk = iff(isempty(ConsentRisk), "UnknownRisk", ConsentRisk)
-    | summarize ConsentRisks = make_set(ConsentRisk)
+    | summarize ConsentRisks = make_set(ConsentRisk), PermissionsExtended = make_bag(pack(Permission, ConsentRisk))
 )
-| extend ConsentRisks = iff(isempty(Permissions), dynamic(null), ConsentRisks)
+| extend
+    ConsentRisks = iff(isempty(Permissions), dynamic(null), ConsentRisks),
+    Permissions = iff(isempty(Permissions), dynamic(null), PermissionsExtended)
+| project-away PermissionsExtended
 //| where TimeGenerated > ago(query_frequency)
 | summarize
     TimeGenerated = min(TimeGenerated),
@@ -148,7 +151,7 @@ union isfuzzy=true _AppRoleAssignmentServicePrincipal, _AppRoleAssignmentUser, _
     take_anyif(OnBehalfOfAllUsers, not(OnBehalfOfAllUsers in ("", "False"))),
     take_anyif(ConsentType, isnotempty(ConsentType)),
     Permissions = make_bag(pack(PermissionsResourceDisplayName, Permissions)),
-    take_anyif(ConsentRisks, isnotempty(ConsentRisks)),
+    ConsentRisks = make_set_if(ConsentRisks, isnotempty(ConsentRisks)),
     AdditionalDetails = make_bag(pack(OperationName, AdditionalDetails)),
     TargetResources = make_bag(pack(OperationName, TargetResources)),
     PermissionsResourceIds = make_set_if(PermissionsResourceId, isnotempty(PermissionsResourceId))
