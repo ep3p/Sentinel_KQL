@@ -1,12 +1,12 @@
 let query_period = 14d;
 // CoreDirectory Resources
-let MicrosoftGraph_Id = "00000003-0000-0000-c000-000000000000"; // Microsoft Graph
-let WindowsAzureActiveDirectory_Id = "00000002-0000-0000-c000-000000000000"; // Windows Azure Active Directory
-let MicrosoftAppAccessPanel_Id = "0000000c-0000-0000-c000-000000000000"; // Microsoft App Access Panel
-let MicrosoftApprovalManagement_Id = "65d91a3d-ab74-42e6-8a2f-0add61688c74"; // Microsoft Approval Management
-let Microsofpasswordresetservice_Id = "93625bc8-bfe2-437a-97e0-3d0060024faa"; // Microsoft password reset service
+let MicrosoftGraph_id = "00000003-0000-0000-c000-000000000000"; // Microsoft Graph
+let WindowsAzureActiveDirectory_id = "00000002-0000-0000-c000-000000000000"; // Windows Azure Active Directory
+let MicrosoftAppAccessPanel_id = "0000000c-0000-0000-c000-000000000000"; // Microsoft App Access Panel
+let MicrosoftApprovalManagement_id = "65d91a3d-ab74-42e6-8a2f-0add61688c74"; // Microsoft Approval Management
+let Microsofpasswordresetservice_id = "93625bc8-bfe2-437a-97e0-3d0060024faa"; // Microsoft password reset service
 // Azure MFA Resources
-let AzureMultiFactorAuthConnector_Id = "1f5530b3-261a-47a9-b357-ded261e17918"; // Azure Multi-Factor Auth Connector
+let AzureMultiFactorAuthConnector_id = "1f5530b3-261a-47a9-b357-ded261e17918"; // Azure Multi-Factor Auth Connector
 let _HomeTenantIds = toscalar(
     _GetWatchlist('UUID-AADTenantIds')
     | where Notes has "[HomeTenant]"
@@ -53,7 +53,7 @@ let _AzureMFA_AuthMethodSignInLogs =
     | where ResultType == 0
         //and HomeTenantId in (_HomeTenantIds)
         //and UserId in (toscalar(_SecurityInfoChanges | summarize make_set(UserId)))
-        and ResourceIdentity in (AzureMultiFactorAuthConnector_Id)
+        and ResourceIdentity in (AzureMultiFactorAuthConnector_id)
     | lookup kind=inner (
         _SecurityInfoChanges
         | project
@@ -97,19 +97,19 @@ let _CoreDirectory_AuthMethodSignInLogs =
         //and HomeTenantId in (_HomeTenantIds)
         and UserId in (toscalar(_StrongAuthenticationMethodUpdates | summarize make_set(UserId)))
         and ResourceIdentity in (
-            //MicrosoftGraph_Id,
-            WindowsAzureActiveDirectory_Id,
-            MicrosoftAppAccessPanel_Id,
-            MicrosoftApprovalManagement_Id,
-            Microsofpasswordresetservice_Id
+            //MicrosoftGraph_id,
+            WindowsAzureActiveDirectory_id,
+            MicrosoftAppAccessPanel_id,
+            MicrosoftApprovalManagement_id,
+            Microsofpasswordresetservice_id
             )
     | summarize hint.strategy = shuffle
         arg_min(TimeGenerated, *),
-        //MicrosoftGraph_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftGraph_Id),
-        WindowsAzureActiveDirectory_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == WindowsAzureActiveDirectory_Id),
-        MicrosoftAppAccessPanel_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftAppAccessPanel_Id),
-        MicrosoftApprovalManagement_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftApprovalManagement_Id),
-        Microsofpasswordresetservice_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == Microsofpasswordresetservice_Id)
+        //MicrosoftGraph_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftGraph_id),
+        WindowsAzureActiveDirectory_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == WindowsAzureActiveDirectory_id),
+        MicrosoftAppAccessPanel_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftAppAccessPanel_id),
+        MicrosoftApprovalManagement_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftApprovalManagement_id),
+        Microsofpasswordresetservice_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == Microsofpasswordresetservice_id)
         by CorrelationId
     | where isnotempty(WindowsAzureActiveDirectory_TimeGenerated)
         and isnotempty(MicrosoftAppAccessPanel_TimeGenerated)
