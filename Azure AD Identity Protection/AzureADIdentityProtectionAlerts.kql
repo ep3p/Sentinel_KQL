@@ -1,0 +1,47 @@
+let product_name = "Azure Active Directory Identity Protection";
+let _SubstitutedAlert = toscalar(
+    _GetWatchlist('AlertName-SubstitutedDetections')
+    | where ProductName == product_name
+    | summarize make_list(AlertName)
+);
+let query_frequency = 5m;
+let query_period = 2d;
+SecurityAlert
+| where TimeGenerated > ago(query_period)
+| where ProductName has product_name
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend OriginalRequestId = tostring(ExtendedProperties["Request Id"])
+| summarize arg_min(TimeGenerated, *) by OriginalRequestId, AlertName, AlertSeverity
+| where TimeGenerated > ago(query_frequency)
+| where not(AlertName in (_SubstitutedAlert))
+| project TimeGenerated, ProductName, AlertName, Description, AlertSeverity, Entities, ExtendedProperties, OriginalRequestId
+| project-rename Alert_TimeGenerated = TimeGenerated
+| evaluate bag_unpack(ExtendedProperties, OutputColumnPrefix="Alert_", ignoredProperties=dynamic(["Alert generation status", "ProcessedBySentinel", "Request Id", "Tenant Login Source", "User Account", "User Name"]))
+| as _Alerts
+| lookup kind=leftouter (
+    union
+    (SigninLogs
+    | where TimeGenerated > ago(query_period)
+    | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+    | extend
+        DeviceDetail = tostring(DeviceDetail),
+        TimeReceived = _TimeReceived
+    ),
+    (AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period)
+    | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+    | extend TimeReceived = _TimeReceived
+    )
+    | summarize arg_max(TimeReceived, *) by OriginalRequestId
+    | project TimeGenerated, Type, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId
+) on OriginalRequestId
+| extend
+    AlertSeverity = case(
+        RiskLevelAggregated == "high" or RiskLevelDuringSignIn == "high", "High",
+        AlertSeverity
+    ),
+    IncidentName = case(
+        RiskLevelAggregated == "high" or RiskLevelDuringSignIn == "high", strcat(AlertName, " - User at risk"),
+        AlertName
+    )
+| project-reorder TimeGenerated, ProductName, AlertName, Description, Alert_*, Type, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, AlertSeverity, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, Entities, UserId, OriginalRequestId, CorrelationId
