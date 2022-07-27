@@ -1,0 +1,21 @@
+let _BenignFiles =
+    _GetWatchlist("File-BenignAzureExecution")
+    | project SubscriptionId = tostring(SubscriptionId), GroupName, FilePath
+;
+SecurityAlert
+| where AlertName has "Adaptive application control policy violation was audited" and ProviderName != "ASI Scheduled Alerts"
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend
+    FileProperties = extract_all(@"(Path: .*)", tostring(ExtendedProperties.File)),
+    ResourceType = tostring(ExtendedProperties.resourceType),
+    GroupName = tostring(ExtendedProperties.GroupName)
+| mv-expand FileProperties to typeof(string)
+| extend
+    FilePath = trim(@'\r', extract(@"Path: ([^;]*)", 1, FileProperties)),
+    FileSignature = extract(@"Signature : ([^;]*)", 1, FileProperties),
+    FileHitCount = extract(@"HitCount: ([^;]*)", 1, FileProperties),
+    AccountName = trim(@'\r', extract(@"User: ([^;]*)", 1, FileProperties)),
+    SubscriptionId = extract(@"^/subscriptions/([^/]+)/.+$", 1, ResourceId)
+| summarize arg_max(TimeGenerated, *) by SubscriptionId, GroupName, AccountName, FilePath
+| join kind=leftanti _BenignFiles on SubscriptionId, GroupName, FilePath
+| project TimeGenerated, CompromisedEntity, SubscriptionId, GroupName, AccountName, FilePath, ResourceType, ResourceId, AlertName, Description, ProviderName, ProductName, FileSignature, FileHitCount
