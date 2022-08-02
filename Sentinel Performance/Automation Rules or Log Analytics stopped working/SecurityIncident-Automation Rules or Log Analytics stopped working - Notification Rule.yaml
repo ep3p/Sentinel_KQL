@@ -1,0 +1,47 @@
+id: 4ef1ac85-282c-4e7c-964d-e7735e382c45
+name: Automation Rules or Log Analytics stopped working - Notification Rule
+description: |
+  'This rule detects an incident that unexpectedly has not been closed by Automation Rules, or when the event for the closed incident has not been received by Log Analytics. An alert from this rule should trigger a playbook to send a notification for the analysts.'
+severity: High
+requiredDataConnectors: []
+queryFrequency: 15m
+queryPeriod: 45m
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InhibitResponseFunction
+techniques:
+  - T0878
+query: |
+  let query_frequency = 15m;
+  let query_wait = 30m;
+  let alert_title = "Automation Rules stopped working";
+  SecurityIncident
+  | where CreatedTime > ago(query_frequency + query_wait)
+  | where Title == alert_title
+  | summarize arg_max(TimeGenerated, *) by CreatedTime
+  | where not(Classification == "BenignPositive" and ModifiedBy has_any ("Automation rule", "Alert updated"))
+  | where CreatedTime between (ago(query_frequency + query_wait) .. ago(query_wait))
+  | project
+      CreatedTime,
+      ProviderIncidentId,
+      Title,
+      Severity,
+      Classification,
+      Labels,
+      IncidentUrl,
+      ModifiedBy
+incidentConfiguration:
+  createIncident: false
+  groupingConfiguration:
+    enabled: false
+    reopenClosedIncident: false
+    lookbackDuration: 5h
+    matchingMethod: AllEntities
+    groupByEntities: []
+    groupByAlertDetails: []
+    groupByCustomDetails: []
+alertDetailsOverride:
+  alertDisplayNameFormat: Automation Rules or Log Analytics stopped working
+version: 1.0.0
+kind: Scheduled
