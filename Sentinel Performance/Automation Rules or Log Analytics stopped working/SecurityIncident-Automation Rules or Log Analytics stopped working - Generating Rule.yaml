@@ -1,5 +1,5 @@
 id: 3615939d-500b-4a36-96de-47b3303937d5
-name: Automation Rules stopped working - Generating Rule
+name: Automation Rules or Log Analytics stopped working - Generating Rule
 description: |
   'This rule generates incidents that should be closed automatically by Automation Rules. If these incidents are not closed, or if the closing action is not reflected on the events of table SecurityIncident, that could mean Automation Rules are not being triggered by new incidents, or Log Analytics is not receiving the expected events.\n\nAnother rule that monitors these incidents will be responsible to notify the analysts through an alert-triggered playbook.\n\nBenign incidents might not be closed, and playbooks might not be triggered.'
 severity: High
