@@ -163,4 +163,23 @@ union isfuzzy=true _AppRoleAssignmentServicePrincipal, _AppRoleAssignmentUser, _
     ConsentRisks has "Low", "Low",
     "High"
 )
-| project TimeGenerated, Actor, ActorIPAddress, Operations, AppDisplayName, Target, AdminConsent, OnBehalfOfAllUsers, ConsentType, Permissions, ConsentRisks, AppServicePrincipalId, CorrelationId, InitiatedBy, AdditionalDetails, TargetResources, PermissionsResourceIds, TargetId, AlertSeverity
+| project
+    TimeGenerated,
+    Actor,
+    ActorIPAddress,
+    Operations,
+    AppDisplayName,
+    Target,
+    AdminConsent,
+    OnBehalfOfAllUsers,
+    ConsentType,
+    Permissions,
+    ConsentRisks,
+    AppServicePrincipalId,
+    CorrelationId,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    PermissionsResourceIds,
+    TargetId,
+    AlertSeverity
