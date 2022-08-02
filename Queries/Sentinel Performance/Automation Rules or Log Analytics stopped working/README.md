@@ -18,4 +18,4 @@ In this folder there is a "generating" rule and a "notification" rule, both are 
 #### Remarks:
 - The "notification" rule does not need to create incidents, only alerts.
 - The query frequency of both rules should be the same.
-- The generating rule will stop generating incidents for a specified period, if the last created incident does not appear as closed automatically in the table SecurityIncident (an incident may have been closed but you may not have the SecurityIncident event of the closed incident).
+- The generating rule will stop generating incidents for a specified period, if the last created incident does not appear as automatically closed in the table SecurityIncident (an incident may have been closed but you may not have the SecurityIncident event of the closed incident).
