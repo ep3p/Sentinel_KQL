@@ -15,4 +15,25 @@ AADServicePrincipalRiskEvents
 | summarize arg_min(TimeGenerated, *) by ServicePrincipalId, RiskEventType, DetectionTimingType, RiskLevel, RiskState
 | where TimeGenerated > ago(query_frequency)
 | extend AlertSeverity = strcat(toupper(substring(RiskLevel, 0, 1)), substring(RiskLevel, 1))
-| project TimeGenerated, ServicePrincipalDisplayName, IpAddress, Location, OperationName, RiskEventType, RiskLevel, DetectionTimingType, RiskState, RiskDetail, AdditionalInfo, Activity, ServicePrincipalId, AppId, CorrelationId, RequestId, ActivityDateTime, DetectedDateTime, LastUpdatedDateTime, Id, AlertSeverity
+| project
+    TimeGenerated,
+    ServicePrincipalDisplayName, 
+    IpAddress,
+    Location,
+    OperationName,
+    RiskEventType,
+    RiskLevel,
+    DetectionTimingType,
+    RiskState,
+    RiskDetail,
+    AdditionalInfo,
+    Activity,
+    ServicePrincipalId,
+    AppId,
+    CorrelationId,
+    RequestId,
+    ActivityDateTime,
+    DetectedDateTime,
+    LastUpdatedDateTime,
+    Id,
+    AlertSeverity
