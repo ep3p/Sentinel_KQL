@@ -13,7 +13,7 @@ In this folder there is a "generating" rule and a "notification" rule, both are 
 2. Create an Automation Rule that will close incidents from the "generating" rule, in an enabled state.
 3. Enable the "generating" rule, check the incidents are being automatically closed.
 4. Create the "notification" rule, in an enabled state, and in the settings attach to it the "Microsoft Sentinel Alert"-trigger playbook.
-5. Wait for a malfunction to happen, or disable temporarily the Automation rule to check if the notification happens.
+5. Wait for a malfunction to happen, or disable temporarily the Automation Rule, to check if the notification happens.
 
 #### Remarks:
 - The "notification" rule does not need to create incidents, only alerts.
