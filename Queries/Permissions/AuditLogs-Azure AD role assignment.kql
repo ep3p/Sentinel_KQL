@@ -1,4 +1,8 @@
-let PIM_id = ;
+let PIM_id = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "PrivilegedIdentityManagement"
+    | summarize make_list(ActorId)
+);
 let _AzureADRoles = toscalar(
     _GetWatchlist('RegEx-PrivAADRoles')
     | summarize RegEx = make_list(RegEx)
@@ -130,7 +134,7 @@ union
         iff(RemoveOperation, "from role", "to role")),
     AlertSeverity = case(
         // Automatic Remove operations by Azure AD PIM
-        not(PermanentOperation) and RemoveOperation and (ActorUserId == PIM_id or ActorAppServicePrincipalId == PIM_id), "Informational",
+        not(PermanentOperation) and RemoveOperation and (ActorUserId in (PIM_id) or ActorAppServicePrincipalId in (PIM_id)), "Informational",
         // Activate an eligible role
         IsWorkingTime(TimeGenerated) and AADOperationType == "ActivateRole", "Informational",
         not(IsWorkingTime(TimeGenerated)) and AADOperationType == "ActivateRole", "Medium",
