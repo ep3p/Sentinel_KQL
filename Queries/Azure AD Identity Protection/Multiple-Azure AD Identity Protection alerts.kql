@@ -44,4 +44,30 @@ SecurityAlert
         RiskLevelAggregated == "high" or RiskLevelDuringSignIn == "high", strcat(AlertName, " - User at risk"),
         AlertName
     )
-| project-reorder TimeGenerated, ProductName, AlertName, Description, Alert_*, Type, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, AlertSeverity, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, Entities, UserId, OriginalRequestId, CorrelationId
+| project-reorder
+    TimeGenerated,
+    ProductName, 
+    AlertName,
+    Description,
+    Alert_*,
+    Type,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    ResultType,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    AuthenticationDetails,
+    AlertSeverity,
+    RiskEventTypes,
+    RiskLevelDuringSignIn,
+    RiskLevelAggregated,
+    Entities,
+    UserId,
+    OriginalRequestId,
+    CorrelationId
