@@ -163,5 +163,24 @@ let _SignInEvents =
         by Type, DeviceId = tostring(DeviceDetail.deviceId), UserId
 ;
 union _DeviceEvents, _SignInEvents
-| project-reorder TimeGenerated, Type, InitiatedByApp, OperationName, Result, DeviceName, DeviceTrustType, UserPrincipalName, ObjectId, DeviceId, AutoPilotZTDID, AccountObjectId, IntuneOrderId, AzureResourceId, AdditionalDetails, InitiatedBy, TargetResources, CorrelationId, IncludedUpdatedProperties
 | sort by DeviceId asc, TimeGenerated asc
+| project-reorder
+    TimeGenerated,
+    Type,
+    InitiatedByApp,
+    OperationName,
+    Result, 
+    DeviceName,
+    DeviceTrustType,
+    UserPrincipalName,
+    ObjectId,
+    DeviceId,
+    AutoPilotZTDID,
+    AccountObjectId,
+    IntuneOrderId,
+    AzureResourceId,
+    AdditionalDetails,
+    InitiatedBy,
+    TargetResources,
+    CorrelationId,
+    IncludedUpdatedProperties
