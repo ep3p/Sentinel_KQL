@@ -18,4 +18,18 @@ SecurityAlert
     SubscriptionId = extract(@"^/subscriptions/([^/]+)/.+$", 1, ResourceId)
 | summarize arg_max(TimeGenerated, *) by SubscriptionId, GroupName, AccountName, FilePath
 | join kind=leftanti _BenignFiles on SubscriptionId, GroupName, FilePath
-| project TimeGenerated, CompromisedEntity, SubscriptionId, GroupName, AccountName, FilePath, ResourceType, ResourceId, AlertName, Description, ProviderName, ProductName, FileSignature, FileHitCount
+| project
+    TimeGenerated,
+    CompromisedEntity,
+    SubscriptionId,
+    GroupName,
+    AccountName,
+    FilePath,
+    ResourceType,
+    ResourceId,
+    AlertName,
+    Description,
+    ProviderName,
+    ProductName,
+    FileSignature,
+    FileHitCount
