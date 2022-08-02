@@ -112,7 +112,7 @@ let _AppRoleAssignmentServicePrincipal =
         Target = AppDisplayName,
         AdminConsent = "True"
 ;
-union isfuzzy=true _AppRoleAssignmentServicePrincipal, _AppRoleAssignmentUser, _DelegatedPermissionGrant, _ConsentToApplication
+union _AppRoleAssignmentServicePrincipal, _AppRoleAssignmentUser, _DelegatedPermissionGrant, _ConsentToApplication
 | project TimeGenerated, Actor, ActorIPAddress, OperationName, Result, AppDisplayName, Target, AdminConsent, OnBehalfOfAllUsers, ConsentType, Permissions, PermissionsResourceDisplayName, AppServicePrincipalId, CorrelationId, InitiatedBy, AdditionalDetails, TargetResources, PermissionsResourceId, TargetId
 | as Results
 | project-away PermissionsResourceDisplayName
