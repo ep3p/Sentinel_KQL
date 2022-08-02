@@ -1,0 +1,53 @@
+id: 3615939d-500b-4a36-96de-47b3303937d5
+name: Automation Rules stopped working - Generating Rule
+description: |
+  'This rule generates incidents that should be closed automatically by Automation Rules. If these incidents are not closed, or if the closing action is not reflected on the events of table SecurityIncident, that could mean Automation Rules are not being triggered by new incidents, or Log Analytics is not receiving the expected events.\n\nAnother rule that monitors these incidents will be responsible to notify the analysts through an alert-triggered playbook.\n\nBenign incidents might not be closed, and playbooks might not be triggered.'
+severity: High
+requiredDataConnectors: []
+queryFrequency: 15m
+queryPeriod: 6h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InhibitResponseFunction
+techniques:
+  - T0878
+query: |
+  let query_frequency = 15m;
+  let query_period = 6h;
+  let alert_title = "Automation Rules stopped working";
+  let _Example = datatable (
+      CreatedTime: datetime,
+      ProviderIncidentId: string,
+      Title: string,
+      Severity: string,
+      Classification: string,
+      Labels: dynamic,
+      IncidentUrl: string,
+      ModifiedBy: string
+  )
+  [datetime(3000-01-01), "0", "Automation Rules stopped working", "High", "BenignPositive", dynamic(null), "https://portal.azure.com/", ""]
+  ;
+  let _LastIncidentsNotAutoClosed =
+      SecurityIncident
+      | where CreatedTime > ago(query_period)
+      | where Title == alert_title
+      | summarize arg_max(TimeGenerated, *) by CreatedTime
+      | summarize arg_max(CreatedTime, *)
+      | where not(Classification == "BenignPositive" and ModifiedBy has_any ("Automation rule", "Alert updated"))
+      | project
+          CreatedTime,
+          ProviderIncidentId,
+          Title,
+          Severity,
+          Classification,
+          Labels,
+          IncidentUrl,
+          ModifiedBy
+  ;
+  _Example
+  | join kind=leftanti _LastIncidentsNotAutoClosed on Title
+alertDetailsOverride:
+  alertDisplayNameFormat: {{Title}}
+version: 1.0.0
+kind: Scheduled
