@@ -34,5 +34,17 @@ ApplicationPermissions
     PermissionName = iff(isnotempty(PermissionName), PermissionName, PermissionName1),
     PermissionAPI = "Microsoft Graph",
     ConsentRisk = ""
-| project PermissionAPI, PermissionName, AdminConsent, ConsentRisk, ConsentDisplayName, ConsentDescription, AdminConsentDisplayName, AdminConsentDescription, DelegatedPermissionId, ApplicationConsentDisplayName, ApplicationConsentDescription, ApplicationPermissionId
 | sort by PermissionAPI asc, PermissionName asc
+| project
+    PermissionAPI,
+    PermissionName,
+    AdminConsent,
+    ConsentRisk,
+    ConsentDisplayName,
+    ConsentDescription,
+    AdminConsentDisplayName,
+    AdminConsentDescription,
+    DelegatedPermissionId,
+    ApplicationConsentDisplayName,
+    ApplicationConsentDescription,
+    ApplicationPermissionId
