@@ -1,4 +1,4 @@
-# Functions
+## Functions
 
 Functions can be saved in a Log Analytics workspace, to be used in any KQL query just by calling the function name.
 They can be reused in Scheduled Analytics Rules, you could edit the code of a function that is called in several rules, and the rules won't have to be edited.
