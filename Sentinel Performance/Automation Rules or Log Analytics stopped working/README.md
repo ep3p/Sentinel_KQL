@@ -1,6 +1,6 @@
 # Automation Rules or Log Analytics stopped working
 
-These queries can help you to detect when the Automation Rules or the Log Analytics workspace from a Microsoft Sentinel resource are not working as expected. Microsoft Sentinel may have brief moments where it does not work correctly, and then resumes its activity. Microsoft might acknowledge later the malfunction through Service Health Alert (setting up notifications of these health alerts is recommended).
+These queries can help you to detect when the Automation Rules or the Log Analytics workspace from a Microsoft Sentinel resource are not working as expected. Microsoft Sentinel may have brief moments where it does not work correctly, and then resumes its activity. Microsoft might acknowledge later the malfunction through a Service Health Alert (setting up notifications of these health alerts is recommended).
 
 In this folder there is a "generating" rule and a "notification" rule, both are needed and use SecurityIncident table events. Additionally (and not included here) for this use case to work you will need:
 
