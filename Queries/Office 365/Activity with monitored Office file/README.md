@@ -15,7 +15,7 @@ OfficeActivity
 ```
 There will be a unique ```Site_``` value for each ```Site_Url``` value.
 
-You have an [example of the used Watchlist example here](https://github.com/ep3p/Sentinel_KQL/blob/main/Watchlists/UUID-AuditOfficeFiles.csv), that matches several columns of ```OfficeActivity``` table.
+You have an [example of the used Watchlist here](https://github.com/ep3p/Sentinel_KQL/blob/main/Watchlists/UUID-AuditOfficeFiles.csv), that matches several columns of ```OfficeActivity``` table.
 
 ![image](https://user-images.githubusercontent.com/2527990/183267217-9e8c1f99-30e3-4f9f-9bf9-df2178731d18.png)
 
