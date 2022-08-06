@@ -1,6 +1,6 @@
 ActorId,ActorSID,ActorPrincipalName,Activity,DestinationResource,DestinationAddress,SourceResource,SourceAddress,Auxiliar,Notes
 -,,-,SecretRetrieval,-,,,,,
 -,,,AppServiceCredentialModification,,,,,,[App] Managed Service Identity
-,,Microsoft\ServiceOperator,SharePointAdministrator,,,,,,
-,,app@sharepoint,SharePointAdministrator,,,,,,
-,,SHAREPOINT\system,SharePointAdministrator,,,,,,
+,,Microsoft\ServiceOperator,SharePointAdministrator,,,,,,[Default]
+,,app@sharepoint,SharePointAdministrator,,,,,,[Default]
+,,SHAREPOINT\system,SharePointAdministrator,,,,,,[Default]
