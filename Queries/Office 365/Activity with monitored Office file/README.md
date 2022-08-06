@@ -21,6 +21,6 @@ You have an [example of the used Watchlist here](https://github.com/ep3p/Sentine
 
 If you want to monitor a full folder or Site, you can simply omit the folder or file name columns (```SourceRelativeUrl``` & ```SourceFileName```), the query will try to detect operations only with the filled path columns.
 
-If you want to monitor only the operation ```FileDownloaded``` with a certain file, you should specify that in the Watchlist column ```MonitoredOperation```. Or if you want to monitor all operations but ```FilePreviewed```, you could write ```"-FilePreviewed"```.
+If you want to monitor only the operation ```FileDownloaded``` with a certain file, you should specify that in the Watchlist column ```MonitoredOperation```. Or if you want to monitor all operations but ```FilePreviewed```, you could write the negated operation ```"-FilePreviewed"```.
 
-You may specify an ```Auditor``` column for reporting purposes, and later forward a notification depending on this value.
+You may aslo specify an ```Auditor``` column for reporting purposes, and later forward a notification depending on this value.
