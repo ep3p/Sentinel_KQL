@@ -14,10 +14,10 @@
     // If empty, take current time
     let parsed_date_time = iff(isnull(date_time), now(), date_time);
     // Start and end hours of daily work schedule
-    let schedule_start_hour = ;
-    let schedule_end_hour = ;
-    let schedule_intensive_end_hour = ;
-    let schedule_friday_end_hour = ;
+    let schedule_start_hour = ;//8
+    let schedule_end_hour = ;//17
+    let schedule_intensive_end_hour = ;//15
+    let schedule_friday_end_hour = ;//14
     // Start date of intensive working time
     let IntensiveStartTime = make_datetime(getyear(parsed_date_time), 6, 16);
     // End date of intensive working time
