@@ -1,0 +1,50 @@
+let benign_files = dynamic(["/SiteAssets/__siteIcon__.jpg"]);
+let _BenignUsers = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "SharePointAdministrator" and Notes has "[Default]"
+    | summarize make_list(ActorPrincipalName)
+);
+let _MonitoredOfficeFiles =
+    _GetWatchlist("UUID-AuditOfficeFiles")
+    | project Site_ = tostring(Site_), Site_Url, SourceRelativeUrl, SourceFileName, Auditor, MonitoredOperation, Severity, OfficeObjectId, Notes
+    | mv-apply split(MonitoredOperation, " ") to typeof(string) on (
+        summarize
+            take_any(*),
+            ValidOperations = make_list_if(MonitoredOperation, isnotempty(MonitoredOperation) and not(MonitoredOperation startswith "-")),
+            ExcludedOperations = make_list_if(replace_string(MonitoredOperation, "-", ""), isnotempty(MonitoredOperation) and MonitoredOperation startswith "-")
+    )
+;
+OfficeActivity
+| where OfficeWorkload == "SharePoint"
+| where not(UserId in (_BenignUsers))
+| where not(OfficeObjectId has_any (benign_files))
+| lookup kind=inner _MonitoredOfficeFiles on Site_
+| where not(array_length(ValidOperations) > 0 and not(ValidOperations has Operation))
+| where not(array_length(ExcludedOperations) > 0 and ExcludedOperations has Operation)
+| where not(isnotempty(SourceRelativeUrl1) and SourceRelativeUrl != SourceRelativeUrl1)
+| where not(isnotempty(SourceFileName1) and SourceFileName != SourceFileName1)
+//| as Activities
+//| extend Auditors = toscalar(Activities | summarize strcat_array(array_sort_asc(make_set(split(Auditor, " & "))), " & "))
+| mv-expand Auditor = split(Auditor, " & ") to typeof(string)
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    ClientIPs = make_set(ClientIP, 250),
+    Operations = make_set(Operation, 250),
+    Files = make_set(OfficeObjectId, 250),
+    UserAgents = make_set(UserAgent, 250),
+    MachineIds = make_set(MachineId, 250),
+    take_any(Site_Url)//, Auditors)
+    by OfficeWorkload, UserId, Site_, Severity, Auditor
+| project
+    TimeGenerated,
+    OfficeWorkload,
+    UserId,
+    ClientIP = tostring(ClientIPs[0]),
+    ClientIPs,
+    Operations,
+    Site_Url,
+    Files,
+    UserAgents,
+    MachineIds,
+    Severity,
+    Auditor//, Auditors
