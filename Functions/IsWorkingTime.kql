@@ -1,3 +1,5 @@
+// This query can help you to compute if a date (or the current time) happens during a predefined working schedule, it returns true or false.
+//
 // This should be adapted for each working schedule and location time.
 // This is currently configured for Central European Time and European Daylight Saving Times.
 // Click "Save as function", in Parameters write in the fields: "datetime" "date_time" "datetime(null)"
