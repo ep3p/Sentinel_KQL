@@ -4,6 +4,7 @@ let _SubstitutedAlert = toscalar(
     | where ProductName == product_name
     | summarize make_list(AlertName)
 );
+let untolerated_risks = dynamic(["high"]);
 let query_frequency = 5m;
 let query_period = 2d;
 SecurityAlert
@@ -37,11 +38,11 @@ SecurityAlert
 ) on OriginalRequestId
 | extend
     AlertSeverity = case(
-        RiskLevelAggregated == "high" or RiskLevelDuringSignIn == "high", "High",
+        RiskLevelAggregated in (untolerated_risks) or RiskLevelDuringSignIn in (untolerated_risks), "High",
         AlertSeverity
     ),
     IncidentName = case(
-        RiskLevelAggregated == "high" or RiskLevelDuringSignIn == "high", strcat(AlertName, " - User at risk"),
+        RiskLevelAggregated in (untolerated_risks), strcat(AlertName, " - User at risk"),
         AlertName
     )
 | project-reorder
