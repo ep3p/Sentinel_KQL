@@ -1,3 +1,4 @@
+// This query checks Azure AD Identity Protection risk detections for workload identities, and tries to summarize them, because Identity Protection does not trigger always a SecurityAlert for those events.
 let query_period = 7d;
 let query_frequency = 1h;
 AADServicePrincipalRiskEvents
