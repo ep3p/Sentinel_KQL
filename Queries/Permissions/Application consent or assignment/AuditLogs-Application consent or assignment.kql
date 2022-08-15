@@ -86,7 +86,7 @@ let _AppRoleAssignmentUser =
 ;
 let _AppRoleAssignmentServicePrincipal =
     AuditLogs
-    | where TimeGenerated > ago(90d)
+    | where TimeGenerated > ago(query_period)
     | where OperationName has ("Add app role assignment to service principal")
     | where not(Result == "failure" and ResultDescription == "Microsoft.Online.DirectoryServices.UniqueKeyPropertyException")
     | extend
