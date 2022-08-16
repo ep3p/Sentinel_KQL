@@ -4,3 +4,5 @@ ActorId,ActorSID,ActorPrincipalName,Activity,DestinationResource,DestinationAddr
 ,,Microsoft\ServiceOperator,SharePointAdministrator,,,,,,[Default]
 ,,app@sharepoint,SharePointAdministrator,,,,,,[Default]
 ,,SHAREPOINT\system,SharePointAdministrator,,,,,,[Default]
+-,,PrivilegedIdentityManagement,,,,,,[Azure AD PIM]
+-,,PrivilegedIdentityManagement,,,,,,[MS-PIM]
