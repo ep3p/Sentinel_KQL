@@ -3,14 +3,14 @@ let PIM_id = toscalar(
     | where Activity == "PrivilegedIdentityManagement"
     | summarize make_list(ActorId)
 );
-let _AzureADRoles = toscalar(
+let _PrivAzureADRoles = toscalar(
     _GetWatchlist('RegEx-PrivAADRoles')
     | summarize RegEx = make_list(RegEx)
     | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
 );
 let _RoleManagementCoreDirectory = materialize(
     AuditLogs
-    | where LoggedByService == "Core Directory" and OperationName has_any ("to role","from role")
+    | where LoggedByService == "Core Directory" and OperationName has_any ("to role", "from role")
     | mv-apply ModifiedProperties = TargetResources[0].modifiedProperties on (
         summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties.displayName), replace_string(tostring(iff(OperationName has "remove", ModifiedProperties.oldValue, ModifiedProperties.newValue)),'"', "")))
     )
@@ -23,6 +23,7 @@ let _RoleManagementCoreDirectory = materialize(
         OperationName,
         EligibleOperation = OperationName has "eligible",
         RemoveOperation = OperationName has "remove",
+        PermanentOperation = iff(Identity != "MS-PIM", true, bool(null)),
         Result,
         // Information about the Privileged Role
         RoleDisplayName = iff(not(OperationName has "role definition"), column_ifexists('Role.DisplayName', ''), column_ifexists('RoleDefinition.DisplayName', '')),
@@ -48,7 +49,8 @@ let _RoleManagementCoreDirectory = materialize(
         // JSONs containers
         InitiatedBy,
         TargetResources,
-        AdditionalDetails
+        AdditionalDetails,
+        CorrelationId
 );
 let _RoleManagementPIM =
     AuditLogs
@@ -94,57 +96,69 @@ let _RoleManagementPIM =
         // JSONs containers
         InitiatedBy,
         TargetResources,
-        AdditionalDetails
+        AdditionalDetails,
+        CorrelationId
     | summarize
-        TimeGenerated = min(TimeGenerated),
         RequestedTimeGenerated = make_list_if(TimeGenerated, OperationName has "requested"),
-        CompletedTimeGenerated = make_list_if(TimeGenerated, OperationName has "completed"),
-        CompletedRequests = countif(OperationName has "completed"),
+        CompletedTimeGenerated = make_list_if(TimeGenerated, not(OperationName has "requested")),
+        RequestsCount = countif(OperationName has "requested"),
+        CompletedRequestsCount = countif(OperationName has "completed"),
         arg_max(TimeGenerated, *)
-        by EligibleOperation, RemoveOperation, PermanentOperation, ActorIdentity, TargetId, TargetType, RoleTemplateId
-    | where not(OperationName has "to role" and CompletedRequests == 0)
-    | extend
-        RequestedTimeGenerated = iff(array_length(RequestedTimeGenerated) == 1, RequestedTimeGenerated[0], RequestedTimeGenerated),
-        CompletedTimeGenerated = iff(array_length(CompletedTimeGenerated) == 1, CompletedTimeGenerated[0], CompletedTimeGenerated)
+        by CorrelationId, EligibleOperation, RemoveOperation, PermanentOperation
+    | extend CompletedRequestsCount = iff(RequestsCount == 1, CompletedRequestsCount, 0)
+    | lookup kind=leftouter (
+        _RoleManagementCoreDirectory
+        | where ActorIdentity == "MS-PIM"
+        | extend LoggedByService = "PIM"
+        | project-rename CoreDirectory_TargetResources = TargetResources
+        | summarize
+            arg_max(TimeGenerated, CoreDirectory_TargetResources, TargetUserPrincipalName, RoleObjectName)
+            by LoggedByService, EligibleOperation, RemoveOperation, TargetId, TargetType, RoleTemplateId
+        | project-away TimeGenerated
+    ) on LoggedByService, EligibleOperation, RemoveOperation, TargetId, TargetType, RoleTemplateId
 ;
 union
     (_RoleManagementCoreDirectory
     | where ActorIdentity != "MS-PIM"
-    | extend PermanentOperation = true
-    | project-rename CoreDirectoryTargetResources = TargetResources),
+    | project-rename CoreDirectory_TargetResources = TargetResources
+    ),
     (_RoleManagementPIM
-    | project-rename PIMTargetResources = TargetResources
-    | join kind=leftouter (
-        _RoleManagementCoreDirectory
-        | where ActorIdentity == "MS-PIM"
-        | extend LoggedByService = "PIM"
-        | project-rename CoreDirectoryTargetResources = TargetResources
-        | summarize
-            arg_max(TimeGenerated, CoreDirectoryTargetResources, TargetUserPrincipalName, RoleObjectName)
-            by LoggedByService, EligibleOperation, RemoveOperation, TargetId, TargetType, RoleTemplateId
-    ) on LoggedByService, EligibleOperation, RemoveOperation, TargetId, TargetType, RoleTemplateId
+    | summarize
+        RequestedTimeGenerated = make_list(RequestedTimeGenerated),
+        CompletedTimeGenerated = make_list(CompletedTimeGenerated),
+        RequestsCount = sum(RequestsCount),
+        CompletedRequestsCount = sum(CompletedRequestsCount),
+        CorrelationIds = make_list(CorrelationId),
+        arg_max(TimeGenerated, *)
+        by EligibleOperation, RemoveOperation, PermanentOperation, AADOperationType, ActorIdentity, TargetId, TargetType, RoleTemplateId
+    | extend
+        RequestedTimeGenerated = iff(array_length(RequestedTimeGenerated) == 1, RequestedTimeGenerated[0], RequestedTimeGenerated),
+        CompletedTimeGenerated = iff(array_length(CompletedTimeGenerated) == 1, CompletedTimeGenerated[0], CompletedTimeGenerated)
+    | project-rename PIM_TargetResources = TargetResources
     )
-| extend PrivilegedRole = RoleDisplayName matches regex _AzureADRoles
 | extend
+    PrivilegedRole = RoleDisplayName matches regex _PrivAzureADRoles,
+    WorkingTime = IsWorkingTime(TimeGenerated),
     AlertName = strcat_delim(" ",
         iff(RemoveOperation, "Remove", "Add"),
         iff(PermanentOperation, "permanent", "temporary"),
         iff(EligibleOperation, "eligible", "active"),
         "member",
-        iff(RemoveOperation, "from role", "to role")),
+        iff(RemoveOperation, "from role", "to role"))
+| extend
     AlertSeverity = case(
         // Automatic Remove operations by Azure AD PIM
-        not(PermanentOperation) and RemoveOperation and (ActorUserId in (PIM_id) or ActorAppServicePrincipalId in (PIM_id)), "Informational",
+        not(PermanentOperation) and RemoveOperation and (ActorUserId == PIM_id or ActorAppServicePrincipalId == PIM_id), "Informational",
         // Activate an eligible role
-        IsWorkingTime(TimeGenerated) and AADOperationType == "ActivateRole", "Informational",
-        not(IsWorkingTime(TimeGenerated)) and AADOperationType == "ActivateRole", "Medium",
+        WorkingTime and AADOperationType == "ActivateRole", "Informational",
+        not(WorkingTime) and AADOperationType == "ActivateRole", "Medium",
         // Other
-        not(IsWorkingTime(TimeGenerated)) and PermanentOperation, "High",
-        not(IsWorkingTime(TimeGenerated)) and not(PermanentOperation) and not(RemoveOperation), "High",
-        IsWorkingTime(TimeGenerated) and PermanentOperation and PrivilegedRole, "Medium",
-        IsWorkingTime(TimeGenerated) and PermanentOperation and not(PrivilegedRole), "Medium",
-        IsWorkingTime(TimeGenerated) and not(PermanentOperation) and PrivilegedRole, "Informational",
-        IsWorkingTime(TimeGenerated) and not(PermanentOperation) and not(PrivilegedRole), "Informational",
+        not(WorkingTime) and PermanentOperation, "High",
+        not(WorkingTime) and not(PermanentOperation) and not(RemoveOperation), "High",
+        WorkingTime and PermanentOperation and PrivilegedRole, "Medium",
+        WorkingTime and PermanentOperation and not(PrivilegedRole), "Medium",
+        WorkingTime and not(PermanentOperation) and PrivilegedRole, "Informational",
+        WorkingTime and not(PermanentOperation) and not(PrivilegedRole), "Informational",
         "High"
     )
 | project
@@ -156,7 +170,8 @@ union
     EligibleOperation,
     PermanentOperation,
     RemoveOperation,
-    CompletedRequests,
+    RequestsCount,
+    CompletedRequestsCount,
     RequestedTimeGenerated,
     CompletedTimeGenerated,
     Result,
@@ -179,8 +194,8 @@ union
     TargetUserPrincipalName,
     TargetId,
     InitiatedBy,
-    CoreDirectoryTargetResources,
-    PIMTargetResources,
     AdditionalDetails,
+    PIM_TargetResources,
+    CoreDirectory_TargetResources,
     AlertName,
     AlertSeverity
