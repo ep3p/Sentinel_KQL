@@ -16,7 +16,7 @@ A example set of checked operations:
 The events are grouped by several characteristics to try to summarize information, the query will group:
 - *PIM* events with their associated *CoreDirectory* events
 - *requested* events and *completed* events by ```CorrelationId```
-- events with the same role and account (for example an admin that activates repeatedly the same eligible role for a few hours)
+- events with the same role and account (for example an admin that activates repeatedly the same eligible role for a few hours over months)
 
 When several events are grouped the query will display the variable information of the last event. This may limit information of some columns like ```ResultReason```, but you can always modify the summarize operation according to your needs.
 
