@@ -1,4 +1,4 @@
-let PIM_id = toscalar(
+let _PIM_ids = toscalar(
     _GetWatchlist('Activity-ExpectedSignificantActivity')
     | where Activity == "PrivilegedIdentityManagement"
     | summarize make_list(ActorId)
@@ -23,7 +23,7 @@ let _RoleManagementCoreDirectory = materialize(
         OperationName,
         EligibleOperation = OperationName has "eligible",
         RemoveOperation = OperationName has "remove",
-        PermanentOperation = iff(Identity != "MS-PIM", true, bool(null)),
+        PermanentOperation = iff(not(Identity == "MS-PIM" and bag_has_key(InitiatedBy, "app")), true, bool(null)), //not(ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids))
         Result,
         // Information about the Privileged Role
         RoleDisplayName = iff(not(OperationName has "role definition"), column_ifexists('Role.DisplayName', ''), column_ifexists('RoleDefinition.DisplayName', '')),
@@ -108,7 +108,7 @@ let _RoleManagementPIM =
     | extend CompletedRequestsCount = iff(RequestsCount == 1, CompletedRequestsCount, 0)
     | lookup kind=leftouter (
         _RoleManagementCoreDirectory
-        | where ActorIdentity == "MS-PIM"
+        | where ActorIdentity == "MS-PIM" and bag_has_key(InitiatedBy, "app") //(ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids))
         | extend LoggedByService = "PIM"
         | project-rename CoreDirectory_TargetResources = TargetResources
         | summarize
@@ -119,7 +119,7 @@ let _RoleManagementPIM =
 ;
 union
     (_RoleManagementCoreDirectory
-    | where ActorIdentity != "MS-PIM"
+    | where not(ActorIdentity == "MS-PIM" and bag_has_key(InitiatedBy, "app")) //not(ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids))
     | project-rename CoreDirectory_TargetResources = TargetResources
     ),
     (_RoleManagementPIM
@@ -148,7 +148,7 @@ union
 | extend
     AlertSeverity = case(
         // Automatic Remove operations by Azure AD PIM
-        not(PermanentOperation) and RemoveOperation and (ActorUserId in (PIM_id) or ActorAppServicePrincipalId in (PIM_id)), "Informational",
+        not(PermanentOperation) and RemoveOperation and (ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids)), "Informational",
         // Activate an eligible role
         WorkingTime and AADOperationType == "ActivateRole", "Informational",
         not(WorkingTime) and AADOperationType == "ActivateRole", "Medium",
