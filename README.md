@@ -1,4 +1,4 @@
-# Sentinel_KQL
+# <p align="center">Sentinel KQL</p>
 
 In this repository you may find KQL (Kusto Query Language) queries and Watchlist schemes for data sources related to Microsoft Sentinel (a SIEM tool).
 
