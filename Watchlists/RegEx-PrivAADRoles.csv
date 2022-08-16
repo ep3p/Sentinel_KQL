@@ -1,0 +1,6 @@
+TemplateId,RegEx,Notes
+f2ef992c-3afb-46b9-b7cf-a126ee74c451,Global Reader,
+790c1fb9-7f7d-4f88-86a1-ef1f95c05c1b,Message Center Reader,
+,.+(?i)Admin(?-i).+,
+5f2222b1-57c3-48ba-8ad5-d4759f1fde6f,Security Operator,
+5d6b6bb7-de71-4623-b4af-96380a352509,Security Reader,
