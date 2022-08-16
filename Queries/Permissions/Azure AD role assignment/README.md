@@ -1,6 +1,6 @@
 ### Azure AD role assignment
 
-This query can help you to detect and group Azure AD role assignments made through PIM or CoreDirectory services (PIM will use CoreDirectory internally).
+This query can help you to detect and group Azure AD role assignments made through PIM or CoreDirectory services (PIM uses CoreDirectory internally).
 
 A partial view of example results:
 
