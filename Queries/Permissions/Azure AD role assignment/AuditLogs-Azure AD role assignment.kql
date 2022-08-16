@@ -148,7 +148,7 @@ union
 | extend
     AlertSeverity = case(
         // Automatic Remove operations by Azure AD PIM
-        not(PermanentOperation) and RemoveOperation and (ActorUserId == PIM_id or ActorAppServicePrincipalId == PIM_id), "Informational",
+        not(PermanentOperation) and RemoveOperation and (ActorUserId in (PIM_id) or ActorAppServicePrincipalId in (PIM_id)), "Informational",
         // Activate an eligible role
         WorkingTime and AADOperationType == "ActivateRole", "Informational",
         not(WorkingTime) and AADOperationType == "ActivateRole", "Medium",
