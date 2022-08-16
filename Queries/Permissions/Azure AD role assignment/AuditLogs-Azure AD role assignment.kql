@@ -54,7 +54,7 @@ let _RoleManagementCoreDirectory = materialize(
 );
 let _RoleManagementPIM =
     AuditLogs
-    | where LoggedByService == "PIM" and OperationName has_any ("to role","from role")
+    | where LoggedByService == "PIM" and OperationName has_any ("to role", "from role")
     | mv-apply ModifiedProperties = TargetResources[0].modifiedProperties on (
         summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties.displayName), replace_string(tostring(iff(OperationName has "remove", ModifiedProperties.oldValue, ModifiedProperties.newValue)),'"', "")))
     )
