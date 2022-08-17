@@ -21,14 +21,14 @@ let _RoleManagementCoreDirectory = materialize(
         Category,
         AADOperationType,
         OperationName,
-        EligibleOperation = OperationName has "eligible",
+        EligibleOperation = OperationName contains "eligible",
         RemoveOperation = OperationName has "remove",
         PermanentOperation = iff(not(Identity == "MS-PIM" and bag_has_key(InitiatedBy, "app")), true, bool(null)), //not(ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids))
         Result,
         // Information about the Privileged Role
-        RoleDisplayName = iff(not(OperationName has "role definition"), column_ifexists('Role.DisplayName', ''), column_ifexists('RoleDefinition.DisplayName', '')),
+        RoleDisplayName = iff(not(OperationName has_any ("role definition", "roledefinition")), column_ifexists('Role.DisplayName', ''), column_ifexists('RoleDefinition.DisplayName', '')),
         RoleObjectName = column_ifexists('Role.WellKnownObjectName', ''),
-        RoleTemplateId = iff(not(OperationName has "role definition"), column_ifexists('Role.TemplateId', ''), column_ifexists('RoleDefinition.ObjectID', '')),
+        RoleTemplateId = iff(not(OperationName has_any ("role definition", "roledefinition")), column_ifexists('Role.TemplateId', ''), column_ifexists('RoleDefinition.ObjectID', '')),
         // Information about the actor
         ActorIdentity = Identity,
         // Information about the actor, if it was a user
