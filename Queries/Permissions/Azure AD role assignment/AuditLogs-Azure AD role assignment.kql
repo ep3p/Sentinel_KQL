@@ -10,7 +10,7 @@ let _PrivAzureADRoles = toscalar(
 );
 let _RoleManagementCoreDirectory = materialize(
     AuditLogs
-    | where LoggedByService == "Core Directory" and OperationName has_any ("to role", "from role")
+    | where Category == "RoleManagement" and LoggedByService == "Core Directory" and AADOperationType in ("Assign", "Unassign")
     | mv-apply ModifiedProperties = TargetResources[0].modifiedProperties on (
         summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties.displayName), replace_string(tostring(iff(OperationName has "remove", ModifiedProperties.oldValue, ModifiedProperties.newValue)),'"', "")))
     )
@@ -50,11 +50,11 @@ let _RoleManagementCoreDirectory = materialize(
         InitiatedBy,
         TargetResources,
         AdditionalDetails,
-        CorrelationId
+        CorrelationId = todynamic(CorrelationId)
 );
 let _RoleManagementPIM =
     AuditLogs
-    | where LoggedByService == "PIM" and OperationName has_any ("to role", "from role")
+    | where Category == "RoleManagement" and LoggedByService == "PIM" and OperationName has_any ("to role", "from role", "role assignment")
     | mv-apply ModifiedProperties = TargetResources[0].modifiedProperties on (
         summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties.displayName), replace_string(tostring(iff(OperationName has "remove", ModifiedProperties.oldValue, ModifiedProperties.newValue)),'"', "")))
     )
@@ -104,7 +104,7 @@ let _RoleManagementPIM =
         RequestsCount = countif(OperationName has "requested"),
         CompletedRequestsCount = countif(OperationName has "completed"),
         arg_max(TimeGenerated, *)
-        by CorrelationId, EligibleOperation, RemoveOperation, PermanentOperation
+        by CorrelationId, EligibleOperation, RemoveOperation, PermanentOperation, TargetId, TargetType, RoleTemplateId
     | extend CompletedRequestsCount = iff(RequestsCount == 1, CompletedRequestsCount, 0)
     | lookup kind=leftouter (
         _RoleManagementCoreDirectory
@@ -128,7 +128,7 @@ union
         CompletedTimeGenerated = make_list(CompletedTimeGenerated),
         RequestsCount = sum(RequestsCount),
         CompletedRequestsCount = sum(CompletedRequestsCount),
-        CorrelationIds = make_list(CorrelationId),
+        CorrelationId = make_list(CorrelationId),
         arg_max(TimeGenerated, *)
         by EligibleOperation, RemoveOperation, PermanentOperation, AADOperationType, ActorIdentity, TargetId, TargetType, RoleTemplateId
     | extend
@@ -149,6 +149,7 @@ union
     AlertSeverity = case(
         // Automatic Remove operations by Azure AD PIM
         not(PermanentOperation) and RemoveOperation and (ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids)), "Informational",
+        OperationName has "role assignment" and RemoveOperation and (ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids)), "Informational",
         // Activate an eligible role
         WorkingTime and AADOperationType == "ActivateRole", "Informational",
         not(WorkingTime) and AADOperationType == "ActivateRole", "Medium",
@@ -197,5 +198,6 @@ union
     AdditionalDetails,
     PIM_TargetResources,
     CoreDirectory_TargetResources,
+    CorrelationId,
     AlertName,
     AlertSeverity
