@@ -11,13 +11,13 @@ triggerThreshold: 0
 tactics: []
 techniques: []
 query: |
+  let query_frequency = 1h;
+  let query_lookback = 3d;
   let _MonitoredRules = toscalar(
       _GetWatchlist('AlertName-SubstitutedDetections')
       | where ProductName == "Anomalies"
       | summarize make_list(AlertName)
-  );
-  let query_frequency = 1h;
-  let query_lookback = 3d;
+  );  
   Anomalies
   | where TimeGenerated > ago(query_frequency)
   | where not(RuleName has_any (_MonitoredRules))
