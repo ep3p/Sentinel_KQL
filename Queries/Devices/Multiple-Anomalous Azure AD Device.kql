@@ -1,6 +1,6 @@
-let query_frequency = 1h;
+let query_frequency = 1h; // Time frame to query device addition or deletion.
 let query_period = 14d;
-let query_wait = 1h;
+let query_wait = 0h; // Wait x time for other relevant events to happen. Use 0h for immediate results.
 // TrustType possible values: Workplace (indicates bring your own personal devices), AzureAd (Cloud only joined devices), ServerAd (on-premises domain joined devices joined to Azure AD)
 let _ExpectedTrustTypes = toscalar(
     _GetWatchlist('Activity-ExpectedSignificantActivity')
@@ -33,7 +33,7 @@ let _UserInfo =
 let _AddDeleteDeviceEvents =
     AuditLogs
     | where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
-    | where OperationName in ("Add device", "Delete device")
+    | where Category == "Device" and LoggedByService == "Core Directory" and AADOperationType in ("Add", "Delete")
     | where not(ResultDescription == "Microsoft.Online.Workflows.ObjectAlreadyExistsException")
     | extend
         ObjectId = tostring(TargetResources[0].id),
@@ -63,7 +63,7 @@ let _UpdateDeviceEvents =
     AuditLogs
     | where TimeGenerated > ago(query_frequency + query_wait)
     //| where OperationName in ("Update device", "Add member to group", "Remove member from group", "Device no longer compliant", "Device no longer managed")
-    | where not(OperationName in ("Add device", "Delete device"))
+    | where not(Category == "Device" and LoggedByService == "Core Directory" and AADOperationType in ("Add", "Delete", "Assign", "Unassign"))
     | where TargetResources[0].type == "Device"
         and isnotempty(_AddObjectIds)
         and TargetResources[0].id in (_AddObjectIds)
@@ -94,7 +94,7 @@ let _UpdateDeviceEvents =
 let _RegisterUserToDeviceEvents =
     AuditLogs
     | where TimeGenerated > ago(query_frequency + query_wait)
-    | where OperationName has_any ("registered owner", "registered users") and OperationName has_any ("to device", "from device")
+    | where Category == "Device" and LoggedByService == "Core Directory" and AADOperationType in ("Assign", "Unassign")
     | where not(ResultDescription == "Microsoft.Online.Workflows.ObjectAlreadyExistsException")
     | where isnotempty(_AddObjectIds) and TargetResources[1].id in (_AddObjectIds)
     | extend
