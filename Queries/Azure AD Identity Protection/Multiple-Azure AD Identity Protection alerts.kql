@@ -1,12 +1,12 @@
+let query_frequency = 5m;
+let query_period = 2d;
+let untolerated_risks = dynamic(["high"]);
 let product_name = "Azure Active Directory Identity Protection";
 let _SubstitutedAlert = toscalar(
     _GetWatchlist('AlertName-SubstitutedDetections')
     | where ProductName == product_name
     | summarize make_list(AlertName)
 );
-let untolerated_risks = dynamic(["high"]);
-let query_frequency = 5m;
-let query_period = 2d;
 SecurityAlert
 | where TimeGenerated > ago(query_period)
 | where ProductName has product_name
