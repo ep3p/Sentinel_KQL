@@ -30,7 +30,7 @@
     // Compute hour and day integer values of timezone date versus UTC
     let FirstEuropeDST = startofweek(endofmonth(make_datetime(getyear(parsed_date_time), 3, 1))); // First European Daylight Saving Time
     let SecondEuropeDST = startofweek(endofmonth(make_datetime(getyear(parsed_date_time), 10, 1))); // Second European Daylight Saving Time
-    let corrected_date_time = parsed_date_time + iff(parsed_date_time between (FirstEuropeDST..SecondEuropeDST), summer_UTC_offset, winter_UTC_offset);
+    let corrected_date_time = parsed_date_time + iff(parsed_date_time between (FirstEuropeDST .. SecondEuropeDST), summer_UTC_offset, winter_UTC_offset);
     let hour_of_day = hourofday(corrected_date_time);
     let day_of_week = dayofweek(corrected_date_time - 1d)/1d + 1;
     let Intensive = corrected_date_time between (IntensiveStartTime..IntensiveEndTime);
@@ -38,7 +38,8 @@
     case(
         day_of_week < 5 and not(Intensive) and hour_of_day between (schedule_start_hour..(schedule_end_hour - 1)), true, // Monday to Thursday
         day_of_week < 5 and Intensive and hour_of_day between (schedule_start_hour..(schedule_intensive_end_hour - 1)), true, // Intensive Monday to Thursday
-        day_of_week == 5 and hour_of_day between (schedule_start_hour..(schedule_friday_end_hour - 1)), true, // Friday
-        false)
+        day_of_week == 5 and hour_of_day between (schedule_start_hour .. (schedule_friday_end_hour - 1)), true, // Friday
+        false
+    )
 //};
 //Function(date_time)
