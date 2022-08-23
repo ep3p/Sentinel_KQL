@@ -1,18 +1,19 @@
 AzureDiagnostics
 | where Category in ("AzureFirewallNetworkRule", "AzureFirewallApplicationRule")
-//| where msg_s has "1.1.1.1" // Recommended to previously filter here
+//| where msg_s has_all ("10.0.0.0", "1.1.1.1") // Recommended to previously filter here
 | parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort:int " to " DestinationAddress1 ":" DestinationPort:int *
 | parse msg_s with * ". Action: " Action1a "." *
-| parse msg_s with * " was " Action1b " to " NatDestination
+| parse msg_s with * " was " Action1b " to " NatDestination ":" NatDestinationPort:int "." *
 | parse msg_s with Protocol2 " request from " SourceAddress2 " to " DestinationAddress2 ". Action: " Action2 "." *
 | extend
     SourcePort = tostring(SourcePort),
-    DestinationPort = tostring(DestinationPort)
+    DestinationPort = tostring(DestinationPort),
+    NatDestinationPort = tostring(NatDestinationPort)
 | extend
     Firewall_Action = case(isnotempty(Action1a), Action1a, isnotempty(Action1b), Action1b, Action2),
     Protocol = iff(isnotempty(Protocol), Protocol, Protocol2),
     SourceAddress = iff(isnotempty(SourceAddress1), SourceAddress1, SourceAddress2),
     DestinationAddress = iff(isnotempty(DestinationAddress1), DestinationAddress1, DestinationAddress2),
     NatDestinationAddress = iff(isnotempty(NatDestination), NatDestination, "")
-| project TimeGenerated, OperationName, Protocol, SourceAddress, SourcePort, DestinationAddress, DestinationPort, Firewall_Action, NatDestination, msg_s
+| project TimeGenerated, OperationName, Protocol, SourceAddress, SourcePort, DestinationAddress, DestinationPort, Firewall_Action, NatDestination, NatDestinationPort, msg_s
 | limit 1000
