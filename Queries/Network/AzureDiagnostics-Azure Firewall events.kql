@@ -1,5 +1,5 @@
 AzureDiagnostics
-| where Category in ("AzureFirewallNetworkRule", "AzureFirewallApplicationRule")
+| where ResourceProvider == "MICROSOFT.NETWORK" and ResourceType == "AZUREFIREWALLS" and Category in ("AzureFirewallNetworkRule", "AzureFirewallApplicationRule")
 //| where msg_s has_all ("10.0.0.0", "1.1.1.1") // Recommended to previously filter here
 | parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort:int " to " DestinationAddress1 ":" DestinationPort:int *
 | parse msg_s with * ". Action: " Action1a "." *
