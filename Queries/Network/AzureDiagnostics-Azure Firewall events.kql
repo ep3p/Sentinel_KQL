@@ -15,5 +15,5 @@ AzureDiagnostics
     SourceAddress = iff(isnotempty(SourceAddress1), SourceAddress1, SourceAddress2),
     DestinationAddress = iff(isnotempty(DestinationAddress1), DestinationAddress1, DestinationAddress2),
     NatDestinationAddress = iff(isnotempty(NatDestination), NatDestination, "")
-| project TimeGenerated, OperationName, Protocol, SourceAddress, SourcePort, DestinationAddress, DestinationPort, Firewall_Action, NatDestination, NatDestinationPort, msg_s
+| project TimeGenerated, OperationName, Protocol, SourceAddress, SourcePort, DestinationAddress, DestinationPort, Firewall_Action, NatDestination, NatDestinationPort, msg_s, Category, ResourceId, ResourceType
 | limit 1000
