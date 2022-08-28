@@ -114,15 +114,15 @@ let _AppRoleAssignmentServicePrincipal =
 ;
 union _AppRoleAssignmentServicePrincipal, _AppRoleAssignmentUser, _DelegatedPermissionGrant, _ConsentToApplication
 | project TimeGenerated, Actor, ActorIPAddress, OperationName, Result, AppDisplayName, Target, AdminConsent, OnBehalfOfAllUsers, ConsentType, Permissions, PermissionsResourceDisplayName, AppServicePrincipalId, CorrelationId, InitiatedBy, AdditionalDetails, TargetResources, PermissionsResourceId, TargetId
-| as Results
+| as _Results
 | project-away PermissionsResourceDisplayName
 | lookup kind=leftouter (
-    Results
+    _Results
     | distinct PermissionsResourceDisplayName, PermissionsResourceId
     | where isnotempty(PermissionsResourceDisplayName) and isnotempty(PermissionsResourceId)
 ) on PermissionsResourceId
 | lookup kind=leftouter (
-    Results
+    _Results
     | distinct AppDisplayName, AppServicePrincipalId
     | where isnotempty(AppDisplayName) and isnotempty(AppServicePrincipalId)
     | project-rename Secondary_AppDisplayName = AppDisplayName
