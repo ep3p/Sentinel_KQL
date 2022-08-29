@@ -8,8 +8,8 @@ let home_tenant_domain = toscalar(
     | where Notes has "[HomeTenant]"
     | project trim_end(@"\.onmicrosoft\.com", OnMicrosoftDomain)
 );
-let onedrive_url = strcat("https://", home_tenant_domain, "-my.sharepoint.com/");
-let sharepoint_url = strcat("https://", home_tenant_domain, ".sharepoint.com/");
+let onedrive_url = strcat("https://", home_tenant_domain, "-my.sharepoint.com/"); // https://contoso365-my.sharepoint.com/
+let sharepoint_url = strcat("https://", home_tenant_domain, ".sharepoint.com/"); // https://contoso365.sharepoint.com/
 let _DefaultSharePointAdministrators = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "SharePointAdministrator" and Notes has "[Default]"
