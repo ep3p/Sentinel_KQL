@@ -1,0 +1,90 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let query_lookback_end = 1d;
+let score_threshold = 10000;
+let home_tenant_domain = toscalar(
+    _GetWatchlist("UUID-AADTenantIds")
+    | where Notes has "[HomeTenant]"
+    | project trim_end(@"\.onmicrosoft\.com", OnMicrosoftDomain)
+);
+let onedrive_url = strcat("https://", home_tenant_domain, "-my.sharepoint.com/");
+let sharepoint_url = strcat("https://", home_tenant_domain, ".sharepoint.com/");
+let _DefaultSharePointAdministrators = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "SharePointAdministrator" and Notes has "[Default]"
+    | summarize make_list(ActorPrincipalName)
+);
+OfficeActivity
+| where TimeGenerated > ago(2 * query_frequency)
+| where not(isempty(Site_Url)) and not(UserId in (_DefaultSharePointAdministrators))
+// Don't consider sites that were visited in the previous days
+| join kind=leftanti(
+    OfficeActivity
+    | where TimeGenerated between (ago(query_period) .. ago(query_lookback_end))
+    | where not(isempty(Site_Url)) and not(UserId in (_DefaultSharePointAdministrators))
+    )
+    on Site_Url, UserId//, OfficeObjectId
+// Remove operations where site is the default SharePoint site, OfficeObjectIds usually will be default images/files
+| where not(Site_Url == sharepoint_url and Operation in ("FileAccessed", "FilePreviewed"))
+// Remove operations where the user accesses default images of a site
+| where not(OfficeObjectId has "/siteassets/")
+// Remove operations where the user accesses themes files of a site
+| where not(SourceFileExtension in ("spcolor", "sptheme"))
+// Remove operations where the user visualizes thumbnails
+| where not(SourceFileName endswith "Thumb.jpg")
+// Remove operations where the user accesses JavaScript default files from sites/apps
+| where not(OfficeWorkload == "SharePoint" and Operation in ("FileAccessed", "FileAccessedExtended")
+    and SourceFileExtension == "js" and SourceRelativeUrl startswith "ClientSideAssets/")
+// Remove operations where the user accesses the default view of a site/folder
+| where not(OfficeWorkload == "SharePoint" and Operation == "FileAccessed" and SourceFileName == "AllItems.aspx")
+// Remove presumably benign operations with high noise potential
+| where not(OfficeWorkload == "SharePoint" and Operation in ("FileSyncUploadedFull"))
+// Remove operations where the user visited his OneDrive personal folder
+| where not(OfficeWorkload == "OneDrive" and Site_Url endswith strcat(replace(@'[@\.]', @'_', UserId), "/"))
+// Remove operations where the user previews files from 1:1 Teams chats
+| where not(OfficeWorkload == "OneDrive" and Operation == "FilePreviewed"
+    and OfficeObjectId has strcat("_", replace(@'\.', '_', tostring(split(UserId, "@")[-1])))
+    and SourceRelativeUrl has_any ("Documents/Microsoft Teams Chat Files", "Documents/Archivos de chat de Microsoft Teams")
+    )
+// Custom enterprise filters
+// It is recommended you filter a few specific site/operation pairs of your tenant that might generate noise for this query
+// One example could be a welcome SharePoint site that is visited automatically by all users when opening a browser
+| mv-expand QueryRange = range(now() - query_frequency + 10m, now(), 10m) to typeof(datetime)
+| where TimeGenerated between ((QueryRange - 1h) .. QueryRange)
+| summarize
+    StartTime = min(TimeGenerated),
+    DistinctSites = dcount(Site_),
+    DistinctObjects = dcount(OfficeObjectId),
+    OperationsCount = count(),
+    Site_Urls = make_set(Site_Url, 200),
+    OfficeObjectIds = make_set(OfficeObjectId, 200),
+    Operations = make_set(Operation, 200),
+    ClientIPs = make_set(ClientIP)
+    by UserId, QueryRange
+| where DistinctSites > 1
+| where not(array_length(Operations) == 1 and Operations[0] == "FilePreviewed")
+| extend Score = toint(pow(DistinctObjects, 2) * pow(DistinctSites, 2) / tolong(OperationsCount))
+| where Score > score_threshold
+| summarize
+    StartTime = min(StartTime),
+    DistinctSites = max(DistinctSites),
+    DistinctObjects = max(DistinctObjects),
+    OperationsCount = max(OperationsCount),
+    Site_Urls = make_set(Site_Urls, 200),
+    OfficeObjectIds = make_set(OfficeObjectIds, 200),
+    Operations = make_set(Operations, 200),
+    ClientIPs = make_set(ClientIPs),
+    Score = max(Score)
+    by UserId
+| sort by Score desc
+| project
+    StartTime,
+    UserId,
+    ClientIPs,
+    Score,
+    Operations,
+    OperationsCount,
+    DistinctSites,
+    DistinctObjects,
+    Site_Urls,
+    OfficeObjectIds
