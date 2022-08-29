@@ -51,7 +51,7 @@ OfficeActivity
 // It is recommended you filter a few specific site/operation pairs of your tenant that might generate noise for this query
 // One example could be a welcome SharePoint site that is visited automatically by all users when opening a browser
 | mv-expand QueryRange = range(now() - query_frequency + 10m, now(), 10m) to typeof(datetime)
-| where TimeGenerated between ((QueryRange - 1h) .. QueryRange)
+| where TimeGenerated between ((QueryRange - query_frequency) .. QueryRange)
 | summarize
     StartTime = min(TimeGenerated),
     DistinctSites = dcount(Site_),
