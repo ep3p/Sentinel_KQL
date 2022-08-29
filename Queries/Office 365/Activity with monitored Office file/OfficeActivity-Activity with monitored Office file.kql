@@ -9,7 +9,6 @@ let _MonitoredOfficeFiles =
     | project Site_ = tostring(Site_), Site_Url, SourceRelativeUrl, SourceFileName, Auditor, MonitoredOperation, Severity, OfficeObjectId, Notes
     | mv-apply split(MonitoredOperation, " ") to typeof(string) on (
         summarize
-            take_any(*),
             ValidOperations = make_list_if(MonitoredOperation, isnotempty(MonitoredOperation) and not(MonitoredOperation startswith "-")),
             ExcludedOperations = make_list_if(replace_string(MonitoredOperation, "-", ""), isnotempty(MonitoredOperation) and MonitoredOperation startswith "-")
     )
