@@ -23,8 +23,8 @@ OfficeActivity
 | where not(array_length(ExcludedOperations) > 0 and ExcludedOperations has Operation)
 | where not(isnotempty(SourceRelativeUrl1) and SourceRelativeUrl != SourceRelativeUrl1)
 | where not(isnotempty(SourceFileName1) and SourceFileName != SourceFileName1)
-//| as Activities
-//| extend Auditors = toscalar(Activities | summarize strcat_array(array_sort_asc(make_set(split(Auditor, " & "))), " & "))
+//| as _Activities
+//| extend Auditors = toscalar(_Activities | summarize strcat_array(array_sort_asc(make_set(split(Auditor, " & "))), " & "))
 | mv-expand Auditor = split(Auditor, " & ") to typeof(string)
 | summarize
     TimeGenerated = min(TimeGenerated),
