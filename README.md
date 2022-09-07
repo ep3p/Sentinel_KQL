@@ -16,3 +16,6 @@ You could check other resources like:
 - https://github.com/OTRF/Microsoft-Sentinel2Go
 - https://github.com/eshlomo1/Microsoft-Sentinel-4-SecOps
 - ...
+
+Other links:
+- [Microsoft Sentinel Ninja Training](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/become-a-microsoft-sentinel-ninja-the-complete-level-400/ba-p/1246310)
