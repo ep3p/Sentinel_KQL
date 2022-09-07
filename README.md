@@ -18,7 +18,10 @@ You could check other resources like:
 - ...
 
 Other links:
+- [Kusto Query Language (KQL) Shortcuts](https://docs.microsoft.com/en-us/azure/data-explorer/kusto/tools/kusto-explorer-shortcuts)
 - [Microsoft Sentinel Ninja Training](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/become-a-microsoft-sentinel-ninja-the-complete-level-400/ba-p/1246310)
 - [LookUp Microsoft SignInLogs Error Codes (ResultType)](https://login.microsoftonline.com/error) [Tool][SignInLogs]
   - [acalarch/azure-signinlog-results](https://github.com/acalarch/azure-signinlog-results/blob/main/signinlog-results.txt)
 - [graphpermissions.merill.net Microsoft Graph Permission Explorer](https://graphpermissions.merill.net/index.html) (Old permissions may appear if you write them in the URI path)
+- [Data ingestion with Azure Storage and KQL](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/using-external-data-sources-to-enrich-network-logs-using-azure/ba-p/1450345)
+- 
