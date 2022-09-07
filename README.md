@@ -14,4 +14,5 @@ You could check other resources like:
 - https://github.com/Bert-JanP/Hunting-Queries-Detection-Rules
 - https://github.com/alexverboon/Azure-Threat-Research-Matrix-KQL
 - https://github.com/OTRF/Microsoft-Sentinel2Go
+- https://github.com/eshlomo1/Microsoft-Sentinel-4-SecOps
 - ...
