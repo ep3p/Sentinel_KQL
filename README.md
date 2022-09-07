@@ -24,4 +24,5 @@ Other links:
   - [acalarch/azure-signinlog-results](https://github.com/acalarch/azure-signinlog-results/blob/main/signinlog-results.txt)
 - [graphpermissions.merill.net Microsoft Graph Permission Explorer](https://graphpermissions.merill.net/index.html) (Old permissions may appear if you write them in the URI path)
 - [Data ingestion with Azure Storage and KQL](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/using-external-data-sources-to-enrich-network-logs-using-azure/ba-p/1450345)
--
+- [Query LogAnalytics from LogicApp](https://adr.iaan.be/blog/querying-log-analytics-from-logic-apps/)
+- 
