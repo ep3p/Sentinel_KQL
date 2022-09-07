@@ -21,4 +21,4 @@ Other links:
 - [Microsoft Sentinel Ninja Training](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/become-a-microsoft-sentinel-ninja-the-complete-level-400/ba-p/1246310)
 - [LookUp Microsoft SignInLogs Error Codes (ResultType)](https://login.microsoftonline.com/error) [Tool][SignInLogs]
   - [acalarch/azure-signinlog-results](https://github.com/acalarch/azure-signinlog-results/blob/main/signinlog-results.txt)
-- [graphpermissions.merill.net Microsoft Graph Permission Explorer (Old permissions may appear if you write them in the URI path)](https://graphpermissions.merill.net/index.html) [Azure]
+- [graphpermissions.merill.net Microsoft Graph Permission Explorer](https://graphpermissions.merill.net/index.html) (Old permissions may appear if you write them in the URI path)
