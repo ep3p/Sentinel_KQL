@@ -1,0 +1,38 @@
+resources
+| where type == 'microsoft.storage/storageaccounts'
+| extend DynamicProperties = todynamic(properties)
+//| evaluate bag_unpack(DynamicProperties, columnsConflict='replace_source') // Could not make this work
+| extend
+    creationTime = todatetime(DynamicProperties.creationTime),
+    allowBlobPublicAccess = tostring(DynamicProperties.allowBlobPublicAccess),
+    supportsHttpsTrafficOnly = tostring(DynamicProperties.supportsHttpsTrafficOnly),
+    minimumTlsVersion = tostring(DynamicProperties.minimumTlsVersion),
+    primaryEndpoints = DynamicProperties.primaryEndpoints,
+    privateEndpointConnections = DynamicProperties.privateEndpointConnections,
+    networkAcls = DynamicProperties.networkAcls
+| extend
+    networkAcls_defaultAction = tostring(networkAcls.defaultAction),
+    networkAcls_bypass = tostring(networkAcls.bypass),
+    networkAcls_ipRules = networkAcls.ipRules,
+    networkAcls_virtualNetworkRules = networkAcls.virtualNetworkRules
+// | where allowBlobPublicAccess == "true"
+// | where networkAcls_defaultAction == "Allow"
+// | where networkAcls_ipRules == "[]"
+// | where networkAcls_virtualNetworkRules == "[]"
+| project
+    subscriptionId,
+    resourceGroup,
+    id,
+    tags,
+    creationTime,
+    allowBlobPublicAccess,
+    supportsHttpsTrafficOnly,
+    minimumTlsVersion,
+    primaryEndpoints,
+    privateEndpointConnections,
+    networkAcls_bypass,
+    networkAcls_defaultAction,
+    networkAcls_ipRules,
+    networkAcls_virtualNetworkRules,
+    networkAcls,
+    properties
