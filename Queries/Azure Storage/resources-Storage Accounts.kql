@@ -1,3 +1,4 @@
+// Use here: https://portal.azure.com/#view/HubsExtension/ArgQueryBlade
 resources
 | where type == 'microsoft.storage/storageaccounts'
 | extend DynamicProperties = todynamic(properties)
