@@ -27,6 +27,7 @@ Other links:
 - [microsoft/msticpy](https://github.com/microsoft/msticpy)
 - [techcommunity.microsoft.com Microsoft Sentinel Ninja Training](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/become-a-microsoft-sentinel-ninja-the-complete-level-400/ba-p/1246310)
 - [techcommunity.microsoft.com Data ingestion with Azure Storage and KQL](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/using-external-data-sources-to-enrich-network-logs-using-azure/ba-p/1450345)
+- [OTRF/Microsoft-Sentinel2Go](https://github.com/OTRF/Microsoft-Sentinel2Go)
 - [garybushey.com Blog Gary Bushey](https://garybushey.com/)
 - [adr.iaan.be Query LogAnalytics from LogicApp](https://adr.iaan.be/blog/querying-log-analytics-from-logic-apps/)
 - 
