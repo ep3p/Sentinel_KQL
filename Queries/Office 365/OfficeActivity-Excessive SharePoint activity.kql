@@ -38,6 +38,8 @@ OfficeActivity
     and SourceFileExtension == "js" and SourceRelativeUrl startswith "ClientSideAssets/")
 // Remove operations where the user accesses the default view of a site/folder
 | where not(OfficeWorkload == "SharePoint" and Operation == "FileAccessed" and SourceFileName == "AllItems.aspx")
+// Remove operations where the user accesses the default view of a site/folder
+| where not(OfficeWorkload == "OneDrive" and Operation == "FileAccessed" and SourceFileName == "All.aspx")
 // Remove presumably benign operations with high noise potential
 | where not(OfficeWorkload == "SharePoint" and Operation in ("FileSyncUploadedFull"))
 // Remove operations where the user visited his OneDrive personal folder
