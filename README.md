@@ -31,6 +31,7 @@ Other links:
 - [OTRF/Microsoft-Sentinel2Go](https://github.com/OTRF/Microsoft-Sentinel2Go)
 - [garybushey.com Blog Gary Bushey](https://garybushey.com/)
   - [Markdown in Analytics Rules description](https://garybushey.com/2022/08/07/use-an-analytic-rules-description-for-remediation-steps/)
+- [medium.com/@tokesisr Mitigate High Ingestion times](https://medium.com/@tokesisr/ingestion-time-will-tell-df7845170e53)
 - [adr.iaan.be Query LogAnalytics from LogicApp](https://adr.iaan.be/blog/querying-log-analytics-from-logic-apps/)
 - [Accelerynt-Security/AS-IP-Blocklist LogicApp IP Address Alert to Conditional Access](https://github.com/Accelerynt-Security/AS-IP-Blocklist)
 - [Accelerynt-Security/AS-Teams-Integration LogicApp to Teams channel](https://github.com/Accelerynt-Security/AS-Teams-Integration)
