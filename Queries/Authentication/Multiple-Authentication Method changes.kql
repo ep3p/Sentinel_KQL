@@ -100,7 +100,7 @@ let _CoreDirectory_AuthMethodSignInLogs =
             //MicrosoftGraph_id,
             WindowsAzureActiveDirectory_id,
             MicrosoftAppAccessPanel_id,
-            MicrosoftApprovalManagement_id,
+            //MicrosoftApprovalManagement_id,
             Microsofpasswordresetservice_id
             )
     | summarize hint.strategy = shuffle
@@ -108,12 +108,12 @@ let _CoreDirectory_AuthMethodSignInLogs =
         //MicrosoftGraph_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftGraph_id),
         WindowsAzureActiveDirectory_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == WindowsAzureActiveDirectory_id),
         MicrosoftAppAccessPanel_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftAppAccessPanel_id),
-        MicrosoftApprovalManagement_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftApprovalManagement_id),
+        //MicrosoftApprovalManagement_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftApprovalManagement_id),
         Microsofpasswordresetservice_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == Microsofpasswordresetservice_id)
         by CorrelationId
     | where isnotempty(WindowsAzureActiveDirectory_TimeGenerated)
         and isnotempty(MicrosoftAppAccessPanel_TimeGenerated)
-        and isnotempty(MicrosoftApprovalManagement_TimeGenerated)
+        //and isnotempty(MicrosoftApprovalManagement_TimeGenerated)
         and isnotempty(Microsofpasswordresetservice_TimeGenerated)
         //and isnotempty(MicrosoftGraph_TimeGenerated)
     | lookup kind=inner (
