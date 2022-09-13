@@ -29,6 +29,8 @@ Other links:
 - [techcommunity.microsoft.com Microsoft Sentinel Ninja Training](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/become-a-microsoft-sentinel-ninja-the-complete-level-400/ba-p/1246310)
 - [techcommunity.microsoft.com Data ingestion with Azure Storage and KQL](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/using-external-data-sources-to-enrich-network-logs-using-azure/ba-p/1450345)
 - [OTRF/Microsoft-Sentinel2Go](https://github.com/OTRF/Microsoft-Sentinel2Go)
+- [techcommunity.microsoft.com Blog Microsoft Sentinel](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/bg-p/MicrosoftSentinelBlog)
+- [azurecloudai.blog Blog Microsoft](https://azurecloudai.blog/)
 - [garybushey.com Blog Gary Bushey](https://garybushey.com/)
   - [Markdown in Analytics Rules description](https://garybushey.com/2022/08/07/use-an-analytic-rules-description-for-remediation-steps/)
 - [medium.com/@tokesisr Mitigate High Ingestion times](https://medium.com/@tokesisr/ingestion-time-will-tell-df7845170e53)
