@@ -1,0 +1,186 @@
+// This query can help you to check accounts that changed their MFA or Authentication Methods in Azure AD
+//
+// Click "Save as function", in Parameters write in the fields:
+// "timespan" "query_period"  "1d"
+// "dynamic"  "query_userids" "dynamic([])"
+//
+// If you name the function "AuthenticationMethodChanges", you can check the function with queries like the following:
+//
+// AuthenticationMethodChanges()
+//
+// AuthenticationMethodChanges(2d, dynamic("00000000-0000-0000-0000-000000000000"))
+//
+//let Function = (query_period:timespan = 1d, query_userids:dynamic = dynamic([])){
+// CoreDirectory Resources
+let MicrosoftGraph_id = "00000003-0000-0000-c000-000000000000"; // Microsoft Graph
+let WindowsAzureActiveDirectory_id = "00000002-0000-0000-c000-000000000000"; // Windows Azure Active Directory
+let MicrosoftAppAccessPanel_id = "0000000c-0000-0000-c000-000000000000"; // Microsoft App Access Panel
+let MicrosoftApprovalManagement_id = "65d91a3d-ab74-42e6-8a2f-0add61688c74"; // Microsoft Approval Management
+let Microsofpasswordresetservice_id = "93625bc8-bfe2-437a-97e0-3d0060024faa"; // Microsoft password reset service
+// Azure MFA Resources
+let AzureMultiFactorAuthConnector_id = "1f5530b3-261a-47a9-b357-ded261e17918"; // Azure Multi-Factor Auth Connector
+// let _HomeTenantIds = toscalar(
+//     _GetWatchlist('UUID-AADTenantIds')
+//     | where Notes has "[HomeTenant]"
+//     | summarize make_list(TenantId)
+// );
+// "Security Info" authentication method changes (LoggedByService: "Azure MFA", "Authentication Methods", etc)
+let _SecurityInfoChanges =
+    AuditLogs
+    | where TimeGenerated > ago(query_period)
+    | where OperationName has "security info"
+        and OperationName has_any ("User", "Admin")
+        and OperationName has_any ("changed", "registered", "updated", "reviewed", "deleted")
+        //and Result == "success"
+    | extend UserId = tolower(TargetResources[0].id)
+    | where array_length(query_userids) == 0 or UserId in (query_userids)
+    // The below code will implicitly remove failure events
+    // "Security Info" changes have associated a "Update user" event
+    | join kind=leftouter (
+        AuditLogs
+        | where OperationName == "Update user"
+        // Remove synchronization update user events
+        | where not(TargetResources has "LastDirSyncTime")
+        | extend UserId = tolower(TargetResources[0].id)
+        | project
+            UpdateUser_TimeGenerated = TimeGenerated,
+            UpdateUser_TargetResources = TargetResources,
+            UpdateUser_CorrelationId = CorrelationId,
+            UserId
+    ) on UserId
+    | project-away UserId1
+    | where not(isnotempty(UpdateUser_TimeGenerated) and UpdateUser_TimeGenerated > TimeGenerated)
+    | mv-apply ModifiedProperty = UpdateUser_TargetResources[0].modifiedProperties on (
+        summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperty.displayName), translate(@'["\]', "", tostring(ModifiedProperty.newValue))))
+    )
+    | evaluate bag_unpack(BagToUnpack, columnsConflict = 'keep_source')
+    // Remove empty updates
+    | where not(column_ifexists("Included Updated Properties", "") == "")
+    // Take the most recent update user event
+    | summarize arg_max(UpdateUser_TimeGenerated, *) by CorrelationId
+;
+// "Azure MFA" authentication method change attempts may leave a trace at AADNonInteractiveUserSignInLogs
+let _AzureMFA_AuthMethodSignInLogs =
+    AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period)
+    | where ResultType == 0
+        //and HomeTenantId in (_HomeTenantIds)
+        and UserId in (toscalar(_SecurityInfoChanges | summarize make_set(UserId)))
+        and ResourceIdentity in (AzureMultiFactorAuthConnector_id)
+    | lookup kind=inner (
+        _SecurityInfoChanges
+        | project
+            SecurityInfo_TimeGenerated = TimeGenerated,
+            SecurityInfo_CorrelationId = CorrelationId,
+            UserId
+    ) on UserId
+    | where TimeGenerated < SecurityInfo_TimeGenerated
+    | summarize arg_max(TimeGenerated, *) by SecurityInfo_CorrelationId
+    | summarize arg_max(TimeGenerated, *) by CorrelationId
+    | project TimeGenerated, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, RiskState, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId
+    | project-rename
+        SignInLogs_TimeGenerated = TimeGenerated,
+        SignInLogs_IPAddress = IPAddress,
+        SignInLogs_ResultDescription = ResultDescription,
+        SignInLogs_CorrelationId = CorrelationId
+;
+let _SecurityInfoChanges_CorrelationIds = toscalar(
+    _SecurityInfoChanges
+    | summarize make_list(UpdateUser_CorrelationId)
+);
+// Some authentication method changes do not trigger a "Security Info" event (LoggedByService: CoreDirectory)
+let _StrongAuthenticationMethodUpdates =
+    AuditLogs
+    | where TimeGenerated > ago(query_period)
+    | where OperationName == "Update user" //and Result == "success"
+    | where not(CorrelationId in (_SecurityInfoChanges_CorrelationIds))
+    | mv-expand modifiedProperty = TargetResources[0].modifiedProperties
+    | where modifiedProperty.displayName == "StrongAuthenticationMethod"
+    | project-away modifiedProperty
+    | extend
+        UserId = tolower(TargetResources[0].id),
+        UpdateUser_CorrelationId = CorrelationId
+    | where array_length(query_userids) == 0 or UserId in (query_userids)
+    | project-rename UpdateUser_TargetResources = TargetResources
+;
+// CoreDirectory authentication method change attempts may leave a trace at AADNonInteractiveUserSignInLogs
+let _CoreDirectory_AuthMethodSignInLogs =
+    AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period)
+    | where ResultType == 0
+        //and HomeTenantId in (_HomeTenantIds)
+        and UserId in (toscalar(_StrongAuthenticationMethodUpdates | summarize make_set(UserId)))
+        and ResourceIdentity in (
+            //MicrosoftGraph_id,
+            WindowsAzureActiveDirectory_id,
+            MicrosoftAppAccessPanel_id,
+            //MicrosoftApprovalManagement_id,
+            Microsofpasswordresetservice_id
+            )
+    | summarize hint.strategy = shuffle
+        arg_min(TimeGenerated, *),
+        //MicrosoftGraph_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftGraph_id),
+        WindowsAzureActiveDirectory_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == WindowsAzureActiveDirectory_id),
+        MicrosoftAppAccessPanel_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftAppAccessPanel_id),
+        //MicrosoftApprovalManagement_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == MicrosoftApprovalManagement_id),
+        Microsofpasswordresetservice_TimeGenerated = take_anyif(TimeGenerated, ResourceIdentity == Microsofpasswordresetservice_id)
+        by CorrelationId
+    | where isnotempty(WindowsAzureActiveDirectory_TimeGenerated)
+        and isnotempty(MicrosoftAppAccessPanel_TimeGenerated)
+        //and isnotempty(MicrosoftApprovalManagement_TimeGenerated)
+        and isnotempty(Microsofpasswordresetservice_TimeGenerated)
+        //and isnotempty(MicrosoftGraph_TimeGenerated)
+    | lookup kind=inner (
+        _StrongAuthenticationMethodUpdates
+        | project
+            UpdateUser_TimeGenerated = TimeGenerated,
+            UpdateUser_CorrelationId = CorrelationId,
+            UserId
+    ) on UserId
+    | where TimeGenerated < UpdateUser_TimeGenerated
+    | summarize arg_max(TimeGenerated, *) by UpdateUser_CorrelationId
+    | summarize arg_max(TimeGenerated, *) by CorrelationId
+    | project TimeGenerated, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, RiskState, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId
+    | project-rename
+        SignInLogs_TimeGenerated = TimeGenerated,
+        SignInLogs_IPAddress = IPAddress,
+        SignInLogs_ResultDescription = ResultDescription,
+        SignInLogs_CorrelationId = CorrelationId
+;
+union
+    (_SecurityInfoChanges
+    | project TimeGenerated, OperationName, Result, ResultDescription, LoggedByService, InitiatedBy, UpdateUser_TargetResources, UserId, CorrelationId
+    | join kind=leftouter _AzureMFA_AuthMethodSignInLogs on UserId
+    ),
+    (_StrongAuthenticationMethodUpdates
+    | project TimeGenerated, OperationName, Result, ResultDescription, LoggedByService, InitiatedBy, UpdateUser_TargetResources, UserId, CorrelationId
+    | join kind=leftouter _CoreDirectory_AuthMethodSignInLogs on UserId
+    )
+| project-away UserId1
+| where not(isnotempty(SignInLogs_TimeGenerated) and SignInLogs_TimeGenerated > TimeGenerated)
+| summarize arg_max(SignInLogs_TimeGenerated, *) by CorrelationId
+| extend
+    ActorPrincipalName = tolower(InitiatedBy.user.userPrincipalName),
+    TargetUserPrincipalName = tolower(UpdateUser_TargetResources[0].userPrincipalName),
+    IPAddress = iff(isnotempty(tostring(InitiatedBy.user.ipAddress)), tostring(InitiatedBy.user.ipAddress), SignInLogs_IPAddress),
+    ModifiedProperty = UpdateUser_TargetResources[0].modifiedProperties
+| mv-apply ModifiedProperty on (
+    summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperty.displayName), pack("oldValue", ModifiedProperty.oldValue, "newValue", ModifiedProperty.newValue)))
+)
+| extend BagToUnpack = bag_remove_keys(BagToUnpack, set_difference(bag_keys(BagToUnpack), split(trim(@'\"', tostring(BagToUnpack["Included Updated Properties"].newValue)), ", ")))
+| evaluate bag_unpack(BagToUnpack, columnsConflict = 'keep_source')
+| project-reorder
+    TimeGenerated,
+    ActorPrincipalName,
+    IPAddress,
+    OperationName,
+    TargetUserPrincipalName,
+    Result,
+    ResultDescription,
+    Strong*,
+    LoggedByService,
+    InitiatedBy,
+    UpdateUser_TargetResources,
+    UserId
+//};
+//Function(query_period, query_userids)
