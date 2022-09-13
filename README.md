@@ -30,4 +30,6 @@ Other links:
 - [OTRF/Microsoft-Sentinel2Go](https://github.com/OTRF/Microsoft-Sentinel2Go)
 - [garybushey.com Blog Gary Bushey](https://garybushey.com/)
 - [adr.iaan.be Query LogAnalytics from LogicApp](https://adr.iaan.be/blog/querying-log-analytics-from-logic-apps/)
-- 
+- [Accelerynt-Security/AS-IP-Blocklist LogicApp IP Address Alert to Conditional Access](https://github.com/Accelerynt-Security/AS-IP-Blocklist)
+- [Accelerynt-Security/AS-Teams-Integration LogicApp to Teams channel](https://github.com/Accelerynt-Security/AS-Teams-Integration)
+- [Accelerynt-Security/AS-Domain-Watchlist LogicApp Alert Entity to Watchlist](https://github.com/Accelerynt-Security/AS-Domain-Watchlist)
