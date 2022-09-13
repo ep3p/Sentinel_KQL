@@ -1,4 +1,4 @@
-let query_period = 14d;
+let query_period = 1d;
 // CoreDirectory Resources
 let MicrosoftGraph_id = "00000003-0000-0000-c000-000000000000"; // Microsoft Graph
 let WindowsAzureActiveDirectory_id = "00000002-0000-0000-c000-000000000000"; // Windows Azure Active Directory
