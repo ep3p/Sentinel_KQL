@@ -1,0 +1,258 @@
+EventID,Field,Value,Hexadecimal,Translation
+,,"%%1801",,"Granted by"
+,,"%%1802",,"Denied by"
+,,"%%1803",,"Denied by"
+,,"%%1804",,"Granted by"
+,,"%%1805",,"Not granted"
+,,"%%1806",,"Granted by"
+,,"%%1807",,"Denied by"
+,,"%%1808",,"Granted by"
+,,"%%1809",,"Unknown or unchecked"
+,,"%%1810",,"Not granted due to missing"
+,,"%%1811",,"Granted by ACE on parent folder"
+,,"%%1812",,"Denied by ACE on parent folder"
+,,"%%1841",,"Denied by Process Trust Label ACE"
+,,"%%1842",,Yes
+,,"%%1843",,No
+,,"%%1844",,System
+,,"%%1845",,"Not Available"
+,,"%%1846",,Default
+,,"%%1847",,DisallowMmConfig
+,,"%%1848",,Off
+,,"%%1849",,Auto
+,,"%%1872",,"REG_NONE"
+,,"%%1873",,"REG_SZ"
+,,"%%1874",,"REG_EXPAND_SZ"
+,,"%%1875",,"REG_BINARY"
+,,"%%1876",,"REG_DWORD"
+,,"%%1877",,"REG_DWORD_BIG_ENDIAN"
+,,"%%1878",,"REG_LINK"
+,,"%%1879",,"REG_MULTI_SZ"
+,,"%%1880",,"REG_RESOURCE_LIST"
+,,"%%1881",,"REG_FULL_RESOURCE_DESCRIPTOR"
+,,"%%1882",,"REG_RESOURCE_REQUIREMENTS_LIST"
+,,"%%1883",,"REG_QWORD"
+,,"%%1904",,"New registry value created"
+,,"%%1905",,"Existing registry value modified"
+,,"%%1906",,"Registry value deleted"
+,,"%%2048",,"Account Enabled"
+,,"%%2049",,"Home Directory Required - Disabled"
+,,"%%2050",,"Password Not Required - Disabled"
+,,"%%2051",,"Temp Duplicate Account - Disabled"
+,,"%%2052",,"Normal Account - Disabled"
+,,"%%2053",,"MNS Logon Account - Disabled"
+,,"%%2054",,"Interdomain Trust Account - Disabled"
+,,"%%2055",,"Workstation Trust Account - Disabled"
+,,"%%2056",,"Server Trust Account - Disabled"
+,,"%%2057",,"Don't Expire Password - Disabled"
+,,"%%2058",,"Account Unlocked"
+,,"%%2059",,"Encrypted Text Password Allowed - Disabled"
+,,"%%2060",,"Smartcard Required - Disabled"
+,,"%%2061",,"Trusted For Delegation - Disabled"
+,,"%%2062",,"Not Delegated - Disabled"
+,,"%%2063",,"Use DES Key Only - Disabled"
+,,"%%2064",,"Don't Require Preauth - Disabled"
+,,"%%2065",,"Password Expired - Disabled"
+,,"%%2066",,"Trusted To Authenticate For Delegation - Disabled"
+,,"%%2067",,"Exclude Authorization Information - Disabled"
+,,"%%2068",,"Undefined UserAccountControl Bit 20 - Disabled"
+,,"%%2069",,"Protect Kerberos Service Tickets with AES Keys - Disabled"
+,,"%%2080",0x000001,"Account Disabled"
+,,"%%2081",0x000002,"Home Directory Required - Enabled"
+,,"%%2082",0x000004,"Password Not Required - Enabled"
+,,"%%2083",0x000008,"Temp Duplicate Account - Enabled"
+,,"%%2084",0x000010,"Normal Account - Enabled"
+,,"%%2085",0x000020,"MNS Logon Account - Enabled"
+,,"%%2086",0x000040,"Interdomain Trust Account - Enabled"
+,,"%%2087",0x000080,"Workstation Trust Account - Enabled"
+,,"%%2088",0x000100,"Server Trust Account - Enabled"
+,,"%%2089",0x000200,"Don't Expire Password - Enabled"
+,,"%%2090",0x000400,"Account Locked"
+,,"%%2091",0x000800,"Encrypted Text Password Allowed - Enabled"
+,,"%%2092",0x001000,"Smartcard Required - Enabled"
+,,"%%2093",0x002000,"Trusted For Delegation - Enabled"
+,,"%%2094",0x004000,"Not Delegated - Enabled"
+,,"%%2095",0x008000,"Use DES Key Only - Enabled"
+,,"%%2096",0x010000,"Don't Require Preauth - Enabled"
+,,"%%2097",0x020000,"Password Expired - Enabled"
+,,"%%2098",0x040000,"Trusted To Authenticate For Delegation - Enabled"
+,,"%%2099",0x080000,"Exclude Authorization Information - Enabled"
+,,"%%2100",0x100000,"Undefined UserAccountControl Bit 20 - Enabled"
+,,"%%2101",0x200000,"Protect Kerberos Service Tickets with AES Keys - Enabled"
+,,"%%4416",0x000001,"ReadData (or ListDirectory)"
+,,"%%4417",0x000002,"WriteData (or AddFile)"
+,,"%%4418",0x000004,"AppendData (or AddSubdirectory or CreatePipeInstance)"
+,,"%%4419",0x000008,ReadEA
+,,"%%4420",0x000010,WriteEA
+,,"%%4421",0x000020,"Execute/Traverse"
+,,"%%4422",0x000040,DeleteChild
+,,"%%4423",0x000080,ReadAttributes
+,,"%%4424",0x000100,WriteAttributes
+,,"%%4432",0x000001,"Query key value"
+,,"%%4433",0x000002,"Set key value"
+,,"%%4434",0x000004,"Create sub-key"
+,,"%%4435",0x000008,"Enumerate sub-keys"
+,,"%%4436",0x000010,"Notify about changes to keys"
+,,"%%4437",0x000020,"Create Link"
+,,"%%4480",0x000001,Terminate
+,,"%%4481",0x000002,"Create Thread"
+,,"%%4482",0x000004,"Set Session ID"
+,,"%%4483",0x000008,"Memory Operations"
+,,"%%4484",0x000010,"Read Memory"
+,,"%%4485",0x000020,"Write Memory"
+,,"%%4486",0x000040,"Duplicate Handle"
+,,"%%4487",0x000080,"Create Process"
+,,"%%4488",0x000100,"Set Quota"
+,,"%%4489",0x000200,"Set Information"
+,,"%%4490",0x000400,"Query Information"
+,,"%%4491",0x000800,"Suspend/Resume"
+,,"%%4492",0x001000,"Query Limited Information"
+,,"%%4493",0x002000,"Set Limited Information"
+,,"%%5424",0x000001,AddMember
+,,"%%5425",0x000002,RemoveMember
+,,"%%5426",0x000004,ListMembers
+,,"%%5427",0x000008,ReadInformation
+,,"%%5428",0x000010,WriteAccount
+,,"%%5440",0x000001,ReadGeneralInformation
+,,"%%5441",0x000002,ReadPreferences
+,,"%%5442",0x000004,WritePreferences
+,,"%%5443",0x000008,ReadLogon
+,,"%%5444",0x000010,ReadAccount
+,,"%%5445",0x000020,WriteAccount
+,,"%%5446",0x000040,"ChangePassword (with knowledge of old password)"
+,,"%%5447",0x000080,"SetPassword (without knowledge of old password)"
+,,"%%5448",0x000100,ListGroups
+,,"%%5449",0x000200,ReadGroupMembership
+,,"%%5450",0x000400,ChangeGroupMembership
+,,"%%7168",0x000001,"Connect to service controller"
+,,"%%7169",0x000002,"Create a new service"
+,,"%%7170",0x000004,"Enumerate services"
+,,"%%7171",0x000008,"Lock service database for exclusive access"
+,,"%%7172",0x000010,"Query service database lock state"
+,,"%%7173",0x000020,"Set last-known-good state of service database"
+,,"%%7174",0x000040,"Query service configuration information"
+,,"%%7185",0x000080,"Set service configuration information"
+,,"%%7186",0x000100,"Query status of service"
+,,"%%7187",0x000200,"Enumerate dependencies of service"
+,,"%%7188",0x000400,"Start the service"
+,,"%%7189",0x000800,"Stop the service"
+,,"%%7190",0x001000,"Pause or continue the service"
+,,"%%7191",0x002000,"Query information from service"
+,,"%%7192",0x004000,"Issue service-specific control commands"
+,"AccessList AccessMask","%%1537",0x010000,DELETE
+,"AccessList AccessMask","%%1538",0x020000,"READ_CONTROL"
+,"AccessList AccessMask","%%1539",0x040000,"WRITE_DAC"
+,"AccessList AccessMask","%%1540",0x080000,"WRITE_OWNER"
+,"AccessList AccessMask","%%1541",0x100000,SYNCHRONIZE
+,"AccessList AccessMask","%%1542",0x200000,"ACCESS_SYS_SEC"
+,"AccessList AccessMask","%%1543",0x400000,"MAX_ALLOWED"
+4656,AccessMask,"%%5392",0x000001,ReadPasswordParameters
+4656,AccessMask,"%%5393",0x000002,WritePasswordParameters
+4656,AccessMask,"%%5394",0x000004,ReadOtherParameters
+4656,AccessMask,"%%5395",0x000008,WriteOtherParameters
+4656,AccessMask,"%%5396",0x000010,CreateUser
+4656,AccessMask,"%%5397",0x000020,CreateGlobalGroup
+4656,AccessMask,"%%5398",0x000040,CreateLocalGroup
+4656,AccessMask,"%%5399",0x000080,GetLocalGroupMembership
+4656,AccessMask,"%%5400",0x000100,ListAccounts
+4656,AccessMask,"%%5401",0x000200,LookupIDs
+4656,AccessMask,"%%5402",0x000400,AdministerServer
+,"Control Access Rights","00299570-246d-11d0-a768-00aa006e0529",,"User-Force-Change-Password"
+,"Control Access Rights","014bf69c-7b3b-11d1-85f6-08002be74fab",,"Change-Domain-Master"
+,"Control Access Rights","05c74c5e-4deb-43b4-bd9f-86664c2a7fd5",,"Enable-Per-User-Reversibly-Encrypted-Password"
+,"Control Access Rights","06bd3200-df3e-11d1-9c86-006008764d0e",,"msmq-Receive"
+,"Control Access Rights","06bd3201-df3e-11d1-9c86-006008764d0e",,"msmq-Peek"
+,"Control Access Rights","06bd3202-df3e-11d1-9c86-006008764d0e",,"msmq-Send"
+,"Control Access Rights","06bd3203-df3e-11d1-9c86-006008764d0e",,"msmq-Receive-journal"
+,"Control Access Rights","084c93a2-620d-4879-a836-f0ae47de0e89",,"DS-Read-Partition-Secrets"
+,"Control Access Rights","0bc1554e-0a99-11d1-adbb-00c04fd8d5cd",,"Recalculate-Hierarchy"
+,"Control Access Rights","0e10c968-78fb-11d2-90d4-00c04f79dc55",,"Certificate-Enrollment"
+,"Control Access Rights","1131f6aa-9c07-11d1-f79f-00c04fc2dcd2",,"DS-Replication-Get-Changes"
+,"Control Access Rights","1131f6ab-9c07-11d1-f79f-00c04fc2dcd2",,"DS-Replication-Synchronize"
+,"Control Access Rights","1131f6ac-9c07-11d1-f79f-00c04fc2dcd2",,"DS-Replication-Manage-Topology"
+,"Control Access Rights","1131f6ad-9c07-11d1-f79f-00c04fc2dcd2",,"DS-Replication-Get-Changes-All"
+,"Control Access Rights","1131f6ae-9c07-11d1-f79f-00c04fc2dcd2",,"Read-Only-Replication-Secret-Synchronization"
+,"Control Access Rights","1a60ea8d-58a6-4b20-bcdc-fb71eb8a9ff8",,"Reload-SSL-Certificate"
+,"Control Access Rights","1abd7cf8-0a99-11d1-adbb-00c04fd8d5cd",,"Allocate-Rids"
+,"Control Access Rights","280f369c-67c7-438e-ae98-1d46f3c6f541",,"Update-Password-Not-Required-Bit"
+,"Control Access Rights","2f16c4a5-b98e-432c-952a-cb388ba33f2e",,"DS-Execute-Intentions-Script"
+,"Control Access Rights","3e0f7e18-2c7a-4c10-ba82-4d926db99a3e",,"DS-Clone-Domain-Controller"
+,"Control Access Rights","4125c71f-7fac-4ff0-bcb7-f09a41325286",,"DS-Set-Owner"
+,"Control Access Rights","440820ad-65b4-11d1-a3da-0000f875ae0d",,"Add-GUID"
+,"Control Access Rights","45ec5156-db7e-47bb-b53f-dbeb2d03c40f",,"Reanimate-Tombstones"
+,"Control Access Rights","4b6e08c0-df3c-11d1-9c86-006008764d0e",,"msmq-Receive-Dead-Letter"
+,"Control Access Rights","4b6e08c1-df3c-11d1-9c86-006008764d0e",,"msmq-Peek-Dead-Letter"
+,"Control Access Rights","4b6e08c2-df3c-11d1-9c86-006008764d0e",,"msmq-Receive-computer-Journal"
+,"Control Access Rights","4b6e08c3-df3c-11d1-9c86-006008764d0e",,"msmq-Peek-computer-Journal"
+,"Control Access Rights","4ecc03fe-ffc0-4947-b630-eb672a8a9dbc",,"DS-Query-Self-Quota"
+,"Control Access Rights","62dd28a8-7f46-11d2-b9ad-00c04f79f805",,"Recalculate-Security-Inheritance"
+,"Control Access Rights","68b1d179-0d15-4d4f-ab71-46152e79a7bc",,"Allowed-To-Authenticate"
+,"Control Access Rights","69ae6200-7f46-11d2-b9ad-00c04f79f805",,"DS-Check-Stale-Phantoms"
+,"Control Access Rights","7726b9d5-a4b4-4288-a6b2-dce952e80a7f",,"Run-Protect_Admin_Groups-Task"
+,"Control Access Rights","7c0e2a7c-a419-48e4-a995-10180aad54dd",,"Manage-Optional-Features"
+,"Control Access Rights","88a9933e-e5c8-4f2a-9dd7-2527416b8092",,"DS-Bypass-Quota"
+,"Control Access Rights","89e95b76-444d-4c62-991a-0facbeda640c",,"DS-Replication-Get-Changes-In-Filtered-Set"
+,"Control Access Rights","91d67418-0135-4acc-8d79-c08e857cfbec",,"SAM-Enumerate-Entire-Domain"
+,"Control Access Rights","9432c620-033c-4db7-8b58-14ef6d0bf477",,"Refresh-Group-Cache"
+,"Control Access Rights","94825a8d-b171-4116-8146-1e34d8f54401",,"DS-Write-Partition-Secrets"
+,"Control Access Rights","9923a32a-3607-11d2-b9be-0000f87a36b2",,"DS-Install-Replica"
+,"Control Access Rights","9b026da6-0d3c-465c-8bee-5199d7165cba",,"DS-Validated-Write-Computer"
+,"Control Access Rights","a05b8cc2-17bc-4802-a710-e7c15ab866a2",,"Certificate-AutoEnrollment"
+,"Control Access Rights","a1990816-4298-11d1-ade2-00c04fd8d5cd",,"Open-Address-Book"
+,"Control Access Rights","ab721a52-1e2f-11d0-9819-00aa0040529b",,"Domain-Administer-Server"
+,"Control Access Rights","ab721a53-1e2f-11d0-9819-00aa0040529b",,"User-Change-Password"
+,"Control Access Rights","ab721a54-1e2f-11d0-9819-00aa0040529b",,"Send-As"
+,"Control Access Rights","ab721a55-1e2f-11d0-9819-00aa0040529b",,"Send-To"
+,"Control Access Rights","ab721a56-1e2f-11d0-9819-00aa0040529b",,"Receive-As"
+,"Control Access Rights","b4e60130-df3f-11d1-9c86-006008764d0e",,"msmq-Open-Connector"
+,"Control Access Rights","b7b1b3dd-ab09-4242-9e30-9980e5d322f7",,"Generate-RSoP-Planning"
+,"Control Access Rights","b7b1b3de-ab09-4242-9e30-9980e5d322f7",,"Generate-RSoP-Logging"
+,"Control Access Rights","ba33815a-4f93-4c76-87f3-57574bff8109",,"Migrate-SID-History"
+,"Control Access Rights","bae50096-4752-11d1-9052-00c04fc2d4cf",,"Change-PDC"
+,"Control Access Rights","be2bb760-7f46-11d2-b9ad-00c04f79f805",,"Update-Schema-Cache"
+,"Control Access Rights","cc17b1fb-33d9-11d2-97d4-00c04fd8d5cd",,"Change-Infrastructure-Master"
+,"Control Access Rights","ccc2dc7d-a6ad-4a7a-8846-c04e3cc53501",,"Unexpire-Password"
+,"Control Access Rights","d58d5f36-0a98-11d1-adbb-00c04fd8d5cd",,"Change-Rid-Master"
+,"Control Access Rights","e12b56b6-0a95-11d1-adbb-00c04fd8d5cd",,"Change-Schema-Master"
+,"Control Access Rights","e2a36dc9-ae17-47c3-b58b-be34c55ba633",,"Create-Inbound-Forest-Trust"
+,"Control Access Rights","edacfd8f-ffb3-11d1-b41d-00a0c968f939",,"Apply-Group-Policy"
+,"Control Access Rights","ee914b82-0a98-11d1-adbb-00c04fd8d5cd",,"Abandon-Replication"
+,"Control Access Rights","f98340fb-7c5b-4cdb-a00b-2ebdfa115a96",,"DS-Replication-Monitor-Topology"
+,"Control Access Rights","fec364e0-0a98-11d1-adbb-00c04fd8d5cd",,"Do-Garbage-Collection"
+4624,ImpersonationLevel,"%%1832",,Identification
+4624,ImpersonationLevel,"%%1833",,Impersonation
+4624,ImpersonationLevel,"%%1840",,Delegation
+4624,LogonType,0,,System
+4624,LogonType,2,,Interactive
+4624,LogonType,3,,Network
+4624,LogonType,4,,Batch
+4624,LogonType,5,,Service
+4624,LogonType,6,,Proxy
+4624,LogonType,7,,Unlock
+4624,LogonType,8,,NetworkCleartext
+4624,LogonType,9,,NewCredentials
+4624,LogonType,10,,RemoteInteractive
+4624,LogonType,11,,CachedInteractive
+4624,LogonType,12,,CashedRemoteInteractive
+4624,LogonType,13,,CashedUnlock
+4625,Status,0xC000005E,,"There are currently no logon servers available to service the logon request"
+4625,Status,0xC0000064,,"User logon with misspelled or bad user account"
+4625,Status,0xC000006A,,"User logon with misspelled or bad password"
+4625,Status,0xC000006D,,"The cause is either a bad username or authentication information"
+4625,Status,0xC000006E,,"Indicates a referenced user name and authentication information are valid, but some user account restriction has prevented successful authentication (such as time-of-day restrictions)."
+4625,Status,0xC000006F,,"User logon outside authorized hours"
+4625,Status,0xC0000070,,"User logon from unauthorized workstation"
+4625,Status,0xC0000071,,"User logon with expired password"
+4625,Status,0xC0000072,,"User logon to account disabled by administrator"
+4625,Status,0xC00000DC,,"Indicates the Sam Server was in the wrong state to perform the desired operation."
+4625,Status,0xC0000133,,"Clocks between DC and other computer too far out of sync"
+4625,Status,0xC000015B,,"The user has not been granted the requested logon type (also called the logon right) at this machine"
+4625,Status,0xC000018C,,"The logon request failed because the trust relationship between the primary domain and the trusted domain failed."
+4625,Status,0xC0000192,,"An attempt was made to logon, but the Netlogon service was not started."
+4625,Status,0xC0000193,,"User logon with expired account"
+4625,Status,0xC0000224,,"User is required to change password at next logon"
+4625,Status,0xC0000225,,"Evidently a bug in Windows and not a risk"
+4625,Status,0xC0000234,,"User logon with account locked"
+4625,Status,0xC00002EE,,"Failure Reason: An Error occurred during Logon"
+4625,Status,0xC0000413,,"Logon Failure: The machine you are logging on to is protected by an authentication firewall. The specified account is not allowed to authenticate to the machine."
+4625,Status,0x0,,
