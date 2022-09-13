@@ -21,7 +21,7 @@ Other links:
 - [docs.microsoft.com Kusto Query Language (KQL) Shortcuts](https://docs.microsoft.com/en-us/azure/data-explorer/kusto/tools/kusto-explorer-shortcuts)
 - [docs.microsoft.com Azure AD audit activity reference](https://docs.microsoft.com/en-us/azure/active-directory/reports-monitoring/reference-audit-activities)
 - [docs.microsoft.com Azure AD security operations guide](https://docs.microsoft.com/en-us/azure/active-directory/fundamentals/security-operations-introduction)
-- [LookUp Microsoft SignInLogs Error Codes (ResultType)](https://login.microsoftonline.com/error) [Tool][SignInLogs]
+- [LookUp Microsoft SignInLogs Error Codes (ResultType)](https://login.microsoftonline.com/error)
   - [acalarch/azure-signinlog-results](https://github.com/acalarch/azure-signinlog-results/blob/main/signinlog-results.txt)
 - [graphpermissions.merill.net Microsoft Graph Permission Explorer](https://graphpermissions.merill.net/index.html) (Old permissions may appear if you write them in the URI path)
 - [microsoft/msticpy](https://github.com/microsoft/msticpy)
