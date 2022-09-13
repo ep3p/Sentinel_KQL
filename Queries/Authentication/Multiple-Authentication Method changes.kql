@@ -1,4 +1,7 @@
 let query_period = 1d;
+let query_userids = dynamic([
+//"00000000-0000-0000-0000-000000000000",
+]);
 // CoreDirectory Resources
 let MicrosoftGraph_id = "00000003-0000-0000-c000-000000000000"; // Microsoft Graph
 let WindowsAzureActiveDirectory_id = "00000002-0000-0000-c000-000000000000"; // Windows Azure Active Directory
@@ -21,6 +24,7 @@ let _SecurityInfoChanges =
         and OperationName has_any ("changed", "registered", "updated", "reviewed", "deleted")
         //and Result == "success"
     | extend UserId = tolower(TargetResources[0].id)
+    | where array_length(query_userids) == 0 or UserId in (query_userids)
     // The below code will implicitly remove failure events
     // "Security Info" changes have associated a "Update user" event
     | join kind=leftouter (
@@ -52,7 +56,7 @@ let _AzureMFA_AuthMethodSignInLogs =
     | where TimeGenerated > ago(query_period)
     | where ResultType == 0
         //and HomeTenantId in (_HomeTenantIds)
-        //and UserId in (toscalar(_SecurityInfoChanges | summarize make_set(UserId)))
+        and UserId in (toscalar(_SecurityInfoChanges | summarize make_set(UserId)))
         and ResourceIdentity in (AzureMultiFactorAuthConnector_id)
     | lookup kind=inner (
         _SecurityInfoChanges
@@ -87,6 +91,7 @@ let _StrongAuthenticationMethodUpdates =
     | extend
         UserId = tolower(TargetResources[0].id),
         UpdateUser_CorrelationId = CorrelationId
+    | where array_length(query_userids) == 0 or UserId in (query_userids)
     | project-rename UpdateUser_TargetResources = TargetResources
 ;
 // CoreDirectory authentication method change attempts may leave a trace at AADNonInteractiveUserSignInLogs
