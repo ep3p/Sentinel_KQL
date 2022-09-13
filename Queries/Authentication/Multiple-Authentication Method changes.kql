@@ -7,11 +7,11 @@ let MicrosoftApprovalManagement_id = "65d91a3d-ab74-42e6-8a2f-0add61688c74"; // 
 let Microsofpasswordresetservice_id = "93625bc8-bfe2-437a-97e0-3d0060024faa"; // Microsoft password reset service
 // Azure MFA Resources
 let AzureMultiFactorAuthConnector_id = "1f5530b3-261a-47a9-b357-ded261e17918"; // Azure Multi-Factor Auth Connector
-let _HomeTenantIds = toscalar(
-    _GetWatchlist('UUID-AADTenantIds')
-    | where Notes has "[HomeTenant]"
-    | summarize make_list(TenantId)
-);
+// let _HomeTenantIds = toscalar(
+//     _GetWatchlist('UUID-AADTenantIds')
+//     | where Notes has "[HomeTenant]"
+//     | summarize make_list(TenantId)
+// );
 // "Security Info" authentication method changes (LoggedByService: "Azure MFA", "Authentication Methods", etc)
 let _SecurityInfoChanges =
     AuditLogs
