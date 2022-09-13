@@ -29,6 +29,7 @@ Other links:
 - [techcommunity.microsoft.com Data ingestion with Azure Storage and KQL](https://techcommunity.microsoft.com/t5/microsoft-sentinel-blog/using-external-data-sources-to-enrich-network-logs-using-azure/ba-p/1450345)
 - [OTRF/Microsoft-Sentinel2Go](https://github.com/OTRF/Microsoft-Sentinel2Go)
 - [garybushey.com Blog Gary Bushey](https://garybushey.com/)
+  - [Markdown in Analytics Rules description](https://garybushey.com/2022/08/07/use-an-analytic-rules-description-for-remediation-steps/)
 - [adr.iaan.be Query LogAnalytics from LogicApp](https://adr.iaan.be/blog/querying-log-analytics-from-logic-apps/)
 - [Accelerynt-Security/AS-IP-Blocklist LogicApp IP Address Alert to Conditional Access](https://github.com/Accelerynt-Security/AS-IP-Blocklist)
 - [Accelerynt-Security/AS-Teams-Integration LogicApp to Teams channel](https://github.com/Accelerynt-Security/AS-Teams-Integration)
