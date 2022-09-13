@@ -20,6 +20,7 @@ You could check other resources like:
 
 Other links:
 - [docs.microsoft.com Kusto Query Language (KQL) Shortcuts](https://docs.microsoft.com/en-us/azure/data-explorer/kusto/tools/kusto-explorer-shortcuts)
+- [docs.microsoft.com Kusto Query Language (KQL) Regular Expressions Library](https://docs.microsoft.com/en-us/azure/data-explorer/kusto/query/re2-library)
 - [docs.microsoft.com Azure AD audit activity reference](https://docs.microsoft.com/en-us/azure/active-directory/reports-monitoring/reference-audit-activities)
 - [docs.microsoft.com Azure AD security operations guide](https://docs.microsoft.com/en-us/azure/active-directory/fundamentals/security-operations-introduction)
 - [LookUp Microsoft SignInLogs Error Codes (ResultType)](https://login.microsoftonline.com/error)
