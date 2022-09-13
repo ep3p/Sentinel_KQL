@@ -15,6 +15,7 @@ You could check other resources like:
 - https://github.com/alexverboon/Azure-Threat-Research-Matrix-KQL
 - https://github.com/OTRF/Microsoft-Sentinel2Go
 - https://github.com/eshlomo1/Microsoft-Sentinel-4-SecOps
+- https://github.com/Kaidja/Azure-Sentinel
 - ...
 
 Other links:
