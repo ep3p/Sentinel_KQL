@@ -1,3 +1,3 @@
 Site_,Site_Url,SourceRelativeUrl,SourceFileName,Auditor,MonitoredOperation,Severity,OfficeObjectId,Notes
-00000000-0000-0000-0000-000000000001,https://exampletenant.sharepoint.com/teams/ExampleTeams/,,,Security Architecture Department,FileDownloaded,Informational,,
-00000000-0000-0000-0000-000000000002,https://exampletenant.sharepoint.com/teams/OtherTeams/,Shared files/Honeytokenfolder,,SOC,,High,,
+00000000-0000-0000-0000-000000000001,https://exampletenant.sharepoint.com/sites/ExampleSite/,,,Security Architecture Department,FileDownloaded,Informational,,
+00000000-0000-0000-0000-000000000002,https://exampletenant.sharepoint.com/teams/ExampleTeams/,Shared files/Honeytokenfolder,,SOC,,High,,
