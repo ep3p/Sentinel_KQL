@@ -24,6 +24,7 @@ Other links:
 - [docs.microsoft.com Azure AD audit activity reference](https://docs.microsoft.com/en-us/azure/active-directory/reports-monitoring/reference-audit-activities)
 - [docs.microsoft.com Azure AD security operations guide](https://docs.microsoft.com/en-us/azure/active-directory/fundamentals/security-operations-introduction)
 - [docs.microsoft.com Azure Logic Apps functions reference](https://docs.microsoft.com/en-us/azure/logic-apps/workflow-definition-language-functions-reference)
+- [docs.microsoft.com Incident Response Playbooks](https://docs.microsoft.com/en-us/security/compass/incident-response-playbooks)
 - [LookUp Microsoft SignInLogs Error Codes (ResultType)](https://login.microsoftonline.com/error)
   - [acalarch/azure-signinlog-results](https://github.com/acalarch/azure-signinlog-results/blob/main/signinlog-results.txt)
 - [graphpermissions.merill.net Microsoft Graph Permission Explorer](https://graphpermissions.merill.net/index.html) (Old permissions may appear if you write them in the URI path)
