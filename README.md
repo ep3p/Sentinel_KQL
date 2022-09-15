@@ -43,3 +43,4 @@ Other links:
 - [Accelerynt-Security/AS-Teams-Integration Logic App to Teams channel](https://github.com/Accelerynt-Security/AS-Teams-Integration)
 - [Accelerynt-Security/AS-Domain-Watchlist Logic App Alert Entity to Watchlist](https://github.com/Accelerynt-Security/AS-Domain-Watchlist)
 - [sreedharande/MS-Sentinel-Bulk-Delete-Threat-Indicators](https://github.com/sreedharande/MS-Sentinel-Bulk-Delete-Threat-Indicators)
+- [sreedharande/Microsoft-Sentinel-As-A-Code](https://github.com/sreedharande/Microsoft-Sentinel-As-A-Code)
