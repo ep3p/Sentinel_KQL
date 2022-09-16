@@ -46,3 +46,4 @@ Other links:
 - [sreedharande/Microsoft-Sentinel-As-A-Code](https://github.com/sreedharande/Microsoft-Sentinel-As-A-Code)
 - [sreedharande/IngestOffice365AuditLogs](https://github.com/sreedharande/IngestOffice365AuditLogs)
 - [www.infernux.no Create templates from your Analytics Rules to start a repository](https://www.infernux.no/MicrosoftSentinel-TemplateAnalyticRules/)
+- [https://detective.kusto.io/ Game Azure Data Explorer Kusto KQL](https://detective.kusto.io/)
