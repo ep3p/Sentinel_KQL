@@ -1,0 +1,75 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let UUID_regex = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "UUID"
+    | project RegEx
+);
+let MicrosoftAzureCLI_appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
+let _HomeTenantId = toscalar(
+    _GetWatchlist('UUID-AADTenantIds')
+    | where Notes has "[HomeTenant]"
+    | summarize make_list(TenantId)
+);
+let _ShellApps = toscalar(
+    _GetWatchlist('UUID-PowerShellAADApps')
+    | summarize make_list(AppId)
+);
+let _ExpectedResultTypes = toscalar(
+    _GetWatchlist('ResultType-SignInLogsErrorCodes')
+    | where Notes has_all ("[Success]", "[Interrupt]", "[MFA]") or Notes has_all ("[Success]", "[Interrupt]", "[NotCompliant]")
+    | summarize make_list(ResultType)
+);
+let _ExpectedADGroups = toscalar(
+    _GetWatchlist('RegEx-PrivDomainGroups')
+    | where Notes has "[PowerShell]"
+    | summarize RegEx = make_list(RegEx)
+    | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
+);
+let _ExpectedAADRoles = toscalar(
+    _GetWatchlist('RegEx-PrivAADRoles')
+    | where Notes has "[PowerShell]"
+    | summarize RegEx = make_list(RegEx)
+    | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
+);
+// User info before the signinlogs events
+let _Users =
+    IdentityInfo
+    | where TimeGenerated between (ago(query_period) .. ago(query_frequency))
+    | summarize arg_max(TimeGenerated, *) by AccountObjectId
+    | project-away TimeGenerated
+;
+let _ExpectedUsers =
+    _Users
+    | mv-expand GroupMembership, AssignedRoles
+    | where GroupMembership matches regex _ExpectedADGroups or AssignedRoles matches regex _ExpectedAADRoles
+    | distinct AccountObjectId
+;
+union SigninLogs, AADNonInteractiveUserSignInLogs
+| where TimeGenerated > ago(query_frequency)
+//| where ResourceTenantId == _HomeTenantId
+| where AppId in (_ShellApps)
+// Remove unsuccessful guest signins from app "Microsoft Azure CLI", when they use this app we assume a signin event happens in all tenants where they are a guest
+| where not(AppId == MicrosoftAzureCLI_appid and ResultType in (_ExpectedResultTypes) and (UserType != "Member" or not(HomeTenantId in (_HomeTenantId))))
+// Remove expected users
+| where not(UserId in (_ExpectedUsers))
+| summarize arg_max(TimeGenerated, *) by CorrelationId
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    CorrelationIds = make_list(CorrelationId),
+    ResultTypes = make_set(ResultType),
+    take_anyif(UserPrincipalName, not(UserPrincipalName matches regex UUID_regex))
+    by UserId, IPAddress, AppDisplayName
+| join kind=leftouter _Users on $left.UserId == $right.AccountObjectId
+| extend UserPrincipalName = tolower(case(isnotempty(UserPrincipalName), UserPrincipalName, isnotempty(MailAddress), MailAddress, AccountUPN))
+| project-reorder
+    TimeGenerated,
+    IPAddress,
+    UserPrincipalName,
+    UserType,
+    AccountDisplayName,
+    AppDisplayName,
+    ResultTypes,
+    GroupMembership,
+    AssignedRoles,
+    CorrelationIds
