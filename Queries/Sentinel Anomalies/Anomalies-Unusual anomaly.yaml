@@ -20,10 +20,10 @@ query: |
   );  
   Anomalies
   | where TimeGenerated > ago(query_frequency)
-  | where not(RuleName has_any (_MonitoredRules))
+  | where not(replace_string(RuleName, "(Preview) ", "") in (_MonitoredRules))
   | join kind = leftanti (
       Anomalies
-      | where TimeGenerated between (ago(query_frequency + query_lookback)..ago(query_frequency))
+      | where TimeGenerated between (ago(query_frequency + query_lookback) .. ago(query_frequency))
       | distinct RuleName
   ) on RuleName
 incidentConfiguration:
