@@ -42,7 +42,6 @@ eventGroupingSettings:
 alertDetailsOverride:
   alertDisplayNameFormat: Unusual Anomaly - {{RuleName}}
   alertTacticsColumnName: Tactics
-entityMappings: []
 sentinelEntitiesMappings:
   - columnName: Entities
 version: 1.0.0
