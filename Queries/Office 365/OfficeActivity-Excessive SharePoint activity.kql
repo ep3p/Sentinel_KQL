@@ -2,6 +2,7 @@
 let query_frequency = 1h;
 let query_period = 14d;
 let query_lookback_end = 1d;
+let query_window_checks = 6;
 let score_threshold = 10000;
 let home_tenant_domain = toscalar(
     _GetWatchlist("UUID-AADTenantIds")
@@ -52,10 +53,11 @@ OfficeActivity
 // Custom enterprise filters
 // It is recommended you filter a few specific site/operation pairs of your tenant that might generate noise for this query
 // One example could be a welcome SharePoint site that is visited automatically by all users when opening a browser
-| mv-expand QueryRange = range(now() - query_frequency + 10m, now(), 10m) to typeof(datetime)
+| mv-expand QueryRange = range(now() - query_frequency + query_frequency/query_window_checks, now(), query_frequency/query_window_checks) to typeof(datetime)
 | where TimeGenerated between ((QueryRange - query_frequency) .. QueryRange)
 | summarize
-    StartTime = min(TimeGenerated),
+    StartTime = min(TimeGenerated),    
+    EndTime = max(TimeGenerated),
     DistinctSites = dcount(Site_),
     DistinctObjects = dcount(OfficeObjectId),
     OperationsCount = count(),
@@ -66,6 +68,7 @@ OfficeActivity
     by UserId, QueryRange
 | where DistinctSites > 1
 | where not(array_length(Operations) == 1 and Operations[0] == "FilePreviewed")
+| where EndTime > ago(query_frequency)
 | extend Score = toint(pow(DistinctObjects, 2) * pow(DistinctSites, 2) / tolong(OperationsCount))
 | where Score > score_threshold
 | summarize
