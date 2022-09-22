@@ -45,8 +45,8 @@ OfficeActivity
 | where not(OfficeWorkload == "SharePoint" and Operation in ("FileSyncUploadedFull"))
 // Remove operations where the user visited his OneDrive personal folder
 | where not(OfficeWorkload == "OneDrive" and Site_Url endswith strcat(replace(@'[@\.]', @'_', UserId), "/"))
-// Remove operations where the user previews files from 1:1 Teams chats
-| where not(OfficeWorkload == "OneDrive" and Operation == "FilePreviewed"
+// Remove operations where the user previews or recycles files from 1:1 Teams chats
+| where not(OfficeWorkload == "OneDrive" and Operation in ("FilePreviewed", "FileRecycled")
     and OfficeObjectId has strcat("_", replace(@'\.', '_', tostring(split(UserId, "@")[-1])))
     and SourceRelativeUrl has_any ("Documents/Microsoft Teams Chat Files", "Documents/Archivos de chat de Microsoft Teams")
     )
