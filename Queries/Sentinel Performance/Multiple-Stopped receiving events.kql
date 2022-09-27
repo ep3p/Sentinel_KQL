@@ -1,0 +1,20 @@
+let query_frequency = 1h;
+let query_period = 3d;
+let _ExpectedFrequencies =
+    _GetWatchlist('DataType-IngestedTables')
+    | project Type, Critical, ExpectedIngestionFrequency = totimespan(Frequency)
+;
+union withsource=_Type
+    //This is a comment
+    * // withsource= is just used to bypass the Analytics rule wizard
+| where TimeGenerated > ago(query_period)
+| summarize IngestionTime = max(ingestion_time()) by Type
+| lookup kind=leftouter _ExpectedFrequencies on Type
+| where IngestionTime between (ago(ExpectedIngestionFrequency + query_frequency) .. ago(ExpectedIngestionFrequency))
+| extend
+    TimespanWithoutIngestion = now() - IngestionTime,
+    AlertSeverity = case(
+        Critical == "true", "Medium",
+        "Informational"
+        )
+| project Type, Critical, ExpectedIngestionFrequency, TimespanWithoutIngestion, AlertSeverity
