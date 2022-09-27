@@ -1,0 +1,13 @@
+let query_period = 7d;
+union *
+| where TimeGenerated > ago(query_period)
+| distinct Type, bin(IngestionTime = ingestion_time(), 30m)
+| sort by Type asc, IngestionTime asc
+| extend Difference = iff(Type == prev(Type), IngestionTime - prev(IngestionTime), 0s)
+| summarize Frequency = max(Difference) by Type
+| extend Frequency = iff(Frequency == 0s, query_period, Frequency)
+| lookup kind=leftouter (
+    union *
+    | where TimeGenerated > ago(query_period)
+    | summarize percentiles(IngestionDelay = ingestion_time() - TimeGenerated, 50, 80, 95, 99) by Type
+) on Type
