@@ -8,7 +8,7 @@
 //
 // AuthenticationMethodChanges()
 //
-// AuthenticationMethodChanges(2d, dynamic("00000000-0000-0000-0000-000000000000"))
+// AuthenticationMethodChanges(2d, dynamic(["00000000-0000-0000-0000-000000000000"]))
 //
 //let Function = (query_period:timespan = 1d, query_userids:dynamic = dynamic([])){
 // CoreDirectory Resources
