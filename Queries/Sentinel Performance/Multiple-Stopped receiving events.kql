@@ -14,7 +14,7 @@ union withsource=_Type
 | extend
     TimespanWithoutIngestion = now() - IngestionTime,
     AlertSeverity = case(
-        Critical == "true", "Medium",
+        Critical == "true", "High",
         "Informational"
         )
 | project Type, Critical, ExpectedIngestionFrequency, TimespanWithoutIngestion, AlertSeverity
