@@ -140,7 +140,7 @@ let _CoreDirectory_AuthMethodSignInLogs =
 ;
 union
     (_SecurityInfoChanges
-    | project TimeGenerated, OperationName, Result, ResultDescription, LoggedByService, InitiatedBy, UpdateUser_TargetResources, UserId, CorrelationId
+    | project TimeGenerated, OperationName, Result, ResultDescription, LoggedByService, InitiatedBy, UpdateUser_TargetResources, UserId, CorrelationId, SecurityInfo_TargetResources = TargetResources
     | join kind=leftouter _AzureMFA_AuthMethodSignInLogs on UserId
     ),
     (_StrongAuthenticationMethodUpdates
@@ -172,4 +172,5 @@ union
     LoggedByService,
     InitiatedBy,
     UpdateUser_TargetResources,
+    SecurityInfo_TargetResources,
     UserId
