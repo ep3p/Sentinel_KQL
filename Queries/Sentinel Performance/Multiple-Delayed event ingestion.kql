@@ -1,0 +1,22 @@
+let query_frequency = 1h;
+let query_period = 1d;
+let percentile_threshold = 90;
+let _ExpectedDelays =
+    _GetWatchlist('DataType-IngestedTables')
+    | project Type, Critical, ExpectedIngestionDelay = totimespan(IngestionDelay), DelayType, Notes
+;
+union withsource=_Type
+    //This is a comment
+    * // withsource= is just used to bypass the Analytics rule wizard
+| where TimeGenerated > ago(query_period)
+| where ingestion_time() between (ago(query_frequency) .. now())
+| summarize IngestionDelay = percentile(ingestion_time() - TimeGenerated, percentile_threshold) by Type
+| lookup kind=leftouter _ExpectedDelays on Type
+| where not(DelayType == "offline" and Notes has "[LowVolume]")
+| where IngestionDelay > ExpectedIngestionDelay * iff(DelayType == "offline", 2, 1)
+| extend
+    AlertSeverity = case(
+    Critical == "true", "High",
+    "Informational"
+    )
+| project Type, Critical, IngestionDelay, ExpectedIngestionDelay, AlertSeverity
