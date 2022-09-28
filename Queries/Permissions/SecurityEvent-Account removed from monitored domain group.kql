@@ -1,0 +1,53 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let wait_for_addition = 30m;
+let _DomainGroups =
+    _GetWatchlist("SID-AuditDomainGroups")
+    | where Notes has "[Removal]"
+    | project GroupSID, SAMAccountName, Auditor, Severity, Notes
+;
+SecurityEvent
+| where TimeGenerated > ago(query_frequency + wait_for_addition)
+| where EventID in (4728, 4732, 4756, 4729, 4733, 4757)
+| lookup kind=inner _DomainGroups on $left.TargetSid == $right.GroupSID
+| extend MemberAccount = extract("[Cc][Nn]=([^,]*).*$", 1, MemberName)
+| summarize
+    GroupAddition_TimeGenerated = maxif(TimeGenerated, EventID in (4728, 4732, 4756)),
+    GroupRemoval_TimeGenerated = maxif(TimeGenerated, EventID in (4729, 4733, 4757)),
+    arg_max(TimeGenerated, *)
+    by MemberSid, MemberAccount
+| where GroupRemoval_TimeGenerated between (ago(query_frequency + wait_for_addition) .. ago(wait_for_addition))
+| where not(isnotempty(GroupAddition_TimeGenerated) and GroupAddition_TimeGenerated > GroupRemoval_TimeGenerated)
+| join kind=leftouter (
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID in (4722, 4725, 4726)
+    | summarize
+        AccountEnable_TimeGenerated = maxif(TimeGenerated, EventID == 4722),
+        AccountDisable_TimeGenerated = maxif(TimeGenerated, EventID == 4725),
+        AccountDeletion_TimeGenerated = maxif(TimeGenerated, EventID == 4726)
+        by TargetSid
+    ) on $left.MemberSid == $right.TargetSid
+// Custom exclusions
+| where isempty(AccountDeletion_TimeGenerated)
+| where not(isnotempty(AccountDisable_TimeGenerated) and isnotempty(AccountEnable_TimeGenerated) and AccountDisable_TimeGenerated > GroupRemoval_TimeGenerated and AccountDisable_TimeGenerated > AccountEnable_TimeGenerated)
+| where not(isnotempty(AccountDisable_TimeGenerated) and isempty(AccountEnable_TimeGenerated) and AccountDisable_TimeGenerated > GroupRemoval_TimeGenerated)
+| project
+    TimeGenerated,
+    Computer,
+    ActorAccount = Account,
+    Activity = trim_end(@"\.", Activity),
+    GroupName = TargetUserName,
+    MemberAccount,
+    GroupAddition_TimeGenerated,
+    GroupRemoval_TimeGenerated,
+    AccountEnable_TimeGenerated,
+    AccountDisable_TimeGenerated,
+    AccountDeletion_TimeGenerated,
+    ActorAccountSid = SubjectUserSid,
+    GroupSid = TargetSid,
+    MemberSid,
+    AlertSeverity = Severity,
+    Auditor,
+    Notes,
+    EventData
