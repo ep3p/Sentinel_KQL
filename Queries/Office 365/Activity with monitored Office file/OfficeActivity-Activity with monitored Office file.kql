@@ -6,7 +6,7 @@ let _BenignUsers = toscalar(
 );
 let _MonitoredOfficeFiles =
     _GetWatchlist("UUID-AuditOfficeFiles")
-    | project Site_ = tostring(Site_), Site_Url, SourceRelativeUrl, SourceFileName, Auditor, MonitoredOperation, Severity, OfficeObjectId, Notes
+    | project Site_ = tostring(Site_), Site_Url, SourceRelativeUrl, SourceFileName, Auditor, MonitoredOperation, AlertSeverity = Severity, OfficeObjectId, Notes
     | mv-apply split(MonitoredOperation, " ") to typeof(string) on (
         summarize
             ValidOperations = make_list_if(MonitoredOperation, isnotempty(MonitoredOperation) and not(MonitoredOperation startswith "-")),
@@ -30,10 +30,24 @@ OfficeActivity
     ClientIPs = make_set(ClientIP, 250),
     Operations = make_set(Operation, 250),
     Files = make_set(OfficeObjectId, 250),
+    FileNames = make_set(strcat(SourceRelativeUrl, SourceFileName), 250),
     UserAgents = make_set(UserAgent, 250),
     MachineIds = make_set(MachineId, 250),
     take_any(Site_Url)//, Auditors)
-    by OfficeWorkload, UserId, Site_, Severity, Auditor
+    by OfficeWorkload, UserId, Site_, AlertSeverity, Auditor
+| extend File = iff(array_length(FileNames) == 1, tostring(FileNames[0]), "")
+| extend AlertDescription = strcat(
+    ```This rule detects operations with specified SharePoint files. This description presents only the information from one of the detected events. The information of the rest of the events may appear at the Entities table.
+This activity was performed by the account: "```, UserId,
+    ```".
+This activity affected the SharePoint files from: "```, Site_Url, '".',
+    iff(isnotempty(File),
+        strcat(```
+The file "```, File, '" was "', tostring(Operations[0]), '".'
+        ),
+        ""
+        )
+    )
 | project
     TimeGenerated,
     OfficeWorkload,
@@ -42,8 +56,11 @@ OfficeActivity
     ClientIPs,
     Operations,
     Site_Url,
+    File,
     Files,
     UserAgents,
     MachineIds,
-    Severity,
-    Auditor//, Auditors
+    AlertSeverity,
+    AlertDescription,
+    Auditor//,
+    //Auditors
