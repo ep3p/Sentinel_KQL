@@ -14,7 +14,7 @@ let _MonitoredOfficeFiles =
     )
 ;
 OfficeActivity
-| where OfficeWorkload == "SharePoint"
+| where OfficeWorkload in ("SharePoint", "OneDrive")
 | where not(UserId in (_BenignUsers))
 | where not(OfficeObjectId has_any (benign_files))
 | lookup kind=inner _MonitoredOfficeFiles on Site_
