@@ -5,7 +5,7 @@ These queries can help you to detect when the Automation Rules or the Log Analyt
 In this folder there is a "generating" rule and a "notification" rule, both are needed and use SecurityIncident table events. Additionally (and not included here) for this use case to work **you will need**:
 
 - An Automation Rule that automatically closes the incidents from the "generating" rule.
-- A playbook with the trigger kind "Microsoft Sentinel Alert", with the actions/notifications you want to happen should this malfunction occur, that will be attached to the "notification" rule.
+- A playbook with the trigger kind "Microsoft Sentinel Alert", with the actions/notifications you want to happen should this malfunction happen, that will be attached to the "notification" rule.
 
 #### The assumed steps to set up this use case should be:
 
