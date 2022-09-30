@@ -5,7 +5,6 @@ let UUID_regex = toscalar(
     | where UseCase == "UUID"
     | project RegEx
 );
-let MicrosoftAzureCLI_appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
 let _HomeTenantId = toscalar(
     _GetWatchlist('UUID-AADTenantIds')
     | where Notes has "[HomeTenant]"
@@ -17,7 +16,13 @@ let _ShellApps = toscalar(
 );
 let _ExpectedResultTypes = toscalar(
     _GetWatchlist('ResultType-SignInLogsErrorCodes')
-    | where Notes has_all ("[Success]", "[Interrupt]", "[MFA]") or Notes has_all ("[Success]", "[Interrupt]", "[NotCompliant]")
+    | where not(Notes has_any ("[Success]", "[Expired]"))
+    | summarize make_list(ResultType)
+);
+let MicrosoftAzureCLI_appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
+let _MicrosoftAzureCLIExpectedResultTypes = toscalar(
+    _GetWatchlist('ResultType-SignInLogsErrorCodes')
+    | where Notes has_all ("[Success]", "[Interrupt]") and Notes has_any ("[MFA]", "[NotCompliant]")
     | summarize make_list(ResultType)
 );
 let _ExpectedADGroups = toscalar(
@@ -32,7 +37,7 @@ let _ExpectedAADRoles = toscalar(
     | summarize RegEx = make_list(RegEx)
     | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
 );
-// User info before the signinlogs events
+// User info before the signin events
 let _Users =
     IdentityInfo
     | where TimeGenerated between (ago(query_period) .. ago(query_frequency))
@@ -47,29 +52,32 @@ let _ExpectedUsers =
 ;
 union SigninLogs, AADNonInteractiveUserSignInLogs
 | where TimeGenerated > ago(query_frequency)
-//| where ResourceTenantId == _HomeTenantId
 | where AppId in (_ShellApps)
-// Remove unsuccessful guest signins from app "Microsoft Azure CLI", when they use this app we assume a signin event happens in all tenants where they are a guest
-| where not(AppId == MicrosoftAzureCLI_appid and ResultType in (_ExpectedResultTypes) and (UserType != "Member" or not(HomeTenantId in (_HomeTenantId))))
+// Remove events where the accessed resource is not from our tenant
+//| where ResourceTenantId in (_HomeTenantId)
+// Remove expected result types
+| where not(ResultType in (_ExpectedResultTypes))
 // Remove expected users
 | where not(UserId in (_ExpectedUsers))
-| summarize arg_max(TimeGenerated, *) by CorrelationId
+// Remove unsuccessful guest signins from app "Microsoft Azure CLI", when they use this app we assume a signin event happens in all tenants where they are a guest
+| where not(AppId == MicrosoftAzureCLI_appid and ResultType in (_MicrosoftAzureCLIExpectedResultTypes) and (UserType != "Member" or not(HomeTenantId in (_HomeTenantId))))
+| summarize arg_max(TimeGenerated, *) by CorrelationId, ResultType
 | summarize
     TimeGenerated = min(TimeGenerated),
     CorrelationIds = make_list(CorrelationId),
     ResultTypes = make_set(ResultType),
     take_anyif(UserPrincipalName, not(UserPrincipalName matches regex UUID_regex))
-    by UserId, IPAddress, AppDisplayName
+    by UserId, IPAddress, AppDisplayName, AppId
 | join kind=leftouter _Users on $left.UserId == $right.AccountObjectId
 | extend UserPrincipalName = tolower(case(isnotempty(UserPrincipalName), UserPrincipalName, isnotempty(MailAddress), MailAddress, AccountUPN))
 | project-reorder
     TimeGenerated,
-    IPAddress,
     UserPrincipalName,
+    IPAddress,
+    ResultTypes,
+    AppDisplayName,
     UserType,
     AccountDisplayName,
-    AppDisplayName,
-    ResultTypes,
     GroupMembership,
     AssignedRoles,
     CorrelationIds
