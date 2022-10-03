@@ -1,0 +1,20 @@
+let query_frequency = 1h;
+let query_period = 3d;
+let _ExpectedFrequencies =
+    _GetWatchlist('DataType-IngestedTables')
+    | where Type == "AzureDiagnostics"
+    | mv-expand ResourceType = split(Auxiliar, " & ") to typeof(string)
+    | project Type, ResourceType, Critical, ExpectedIngestionFrequency = totimespan(Frequency)
+;
+AzureDiagnostics
+| where TimeGenerated > ago(query_period)
+| summarize IngestionTime = max(ingestion_time()) by Type, ResourceType
+| lookup kind=inner _ExpectedFrequencies on Type, ResourceType
+| where IngestionTime between (ago(ExpectedIngestionFrequency + query_frequency) .. ago(ExpectedIngestionFrequency))
+| extend
+    TimespanWithoutIngestion = now() - IngestionTime,
+    AlertSeverity = case(
+        Critical == "true", "High",
+        "Informational"
+        )
+| project Type, ResourceType, Critical, ExpectedIngestionFrequency, TimespanWithoutIngestion, AlertSeverity
