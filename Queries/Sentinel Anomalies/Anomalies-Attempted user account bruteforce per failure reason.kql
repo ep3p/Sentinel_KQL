@@ -1,0 +1,20 @@
+Anomalies
+| where RuleName endswith "Attempted user account bruteforce per failure reason" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    AttemptCount = toint(AnomalyDetails["Observables"][0]["Value"]),
+    ExpectedAttemptCount = toint(AnomalyDetails["Observables"][0]["TypicalObservations"]["Expected count"]),
+    FailureReason = tostring(AnomalyDetails["Observables"][1]["Value"])
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    AttemptCount,
+    ExpectedAttemptCount,
+    FailureReason,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
