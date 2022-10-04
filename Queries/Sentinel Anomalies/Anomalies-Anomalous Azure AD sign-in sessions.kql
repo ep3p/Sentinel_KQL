@@ -1,5 +1,5 @@
 Anomalies
-| where RuleName endswith "Anomalous Azure AD sign-in sessions" and RuleStatus <> "Flighting"
+| where RuleName endswith "Anomalous Azure AD sign-in sessions" and RuleStatus != "Flighting"
 | extend
     Query = ExtendedLinks[0]["DetailBladeInputs"]
 | project
