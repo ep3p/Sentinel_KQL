@@ -1,0 +1,19 @@
+Anomalies
+| where RuleName endswith "Suspicious volume of logins to computer" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    Computer = Entities[0]["HostName"],
+    LoginCount = toint(AnomalyDetails["Observables"][0]["Value"]),
+    ExpectedLoginCount = toint(AnomalyDetails["Observables"][0]["TypicalObservations"]["Expected count"])
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    Computer,
+    LoginCount,
+    ExpectedLoginCount,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
