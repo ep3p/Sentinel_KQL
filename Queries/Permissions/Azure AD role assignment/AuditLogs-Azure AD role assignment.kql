@@ -1,6 +1,6 @@
 let _PIM_ids = toscalar(
     _GetWatchlist('Activity-ExpectedSignificantActivity')
-    | where Activity == "PrivilegedIdentityManagement" and Notes has [App]
+    | where Activity == "PrivilegedIdentityManagement" and Notes has "[App]"
     | summarize make_list(ActorId)
 );
 let _PrivAzureADRoles = toscalar(
