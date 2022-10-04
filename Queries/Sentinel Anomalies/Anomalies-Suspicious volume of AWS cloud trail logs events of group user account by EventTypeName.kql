@@ -1,0 +1,20 @@
+Anomalies
+| where RuleName endswith "Suspicious volume of AWS cloud trail logs events of group user account by EventTypeName" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    EventType = tostring(AnomalyDetails["Observables"][1]["Value"]),
+    EventCount = toint(AnomalyDetails["Observables"][0]["Value"]),
+    ExpectedEventCount = toint(AnomalyDetails["Observables"][0]["TypicalObservations"]["Expected count"])
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    EventType,
+    EventCount,
+    ExpectedEventCount,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
