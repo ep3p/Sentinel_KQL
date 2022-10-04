@@ -1,0 +1,18 @@
+Anomalies
+| where RuleName endswith "Suspicious volume of AWS API calls from Non-AWS source IP address from a user account id per workspace on a daily basis" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    CallCount = toint(AnomalyDetails["Observables"][0]["Value"]),
+    ExpectedCallCount = toint(AnomalyDetails["Observables"][0]["TypicalObservations"]["Expected count"])
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    CallCount,
+    ExpectedCallCount,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
