@@ -1,0 +1,14 @@
+Anomalies
+| where RuleName endswith "Suspicious volume of AWS write API calls from a user account" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"]
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
