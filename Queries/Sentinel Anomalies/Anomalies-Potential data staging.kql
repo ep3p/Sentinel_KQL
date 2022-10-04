@@ -1,0 +1,20 @@
+Anomalies
+| where RuleName endswith "Potential data staging" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    DistinctFileCount = toint(AnomalyDetails["Observables"][0]["Value"]["Number of distinct file downloaded"]),
+    FileDownloadCount = toint(AnomalyDetails["Observables"][1]["Value"]["Total events"]),
+    DaysSeenPreviousWeek = toint(AnomalyDetails["Observables"][2]["Value"]["Number of days seen in previous week"])
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    DistinctFileCount,
+    FileDownloadCount,
+    DaysSeenPreviousWeek,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
