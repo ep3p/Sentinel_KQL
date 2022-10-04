@@ -50,3 +50,4 @@ Other links:
 - [sreedharande/IngestOffice365AuditLogs](https://github.com/sreedharande/IngestOffice365AuditLogs)
 - [www.infernux.no Create templates from your Analytics Rules to start a repository](https://www.infernux.no/MicrosoftSentinel-TemplateAnalyticRules/)
 - [https://detective.kusto.io/ Game Azure Data Explorer Kusto KQL](https://detective.kusto.io/)
+- [msandbu/azuread Azure AD ecosystem](https://github.com/msandbu/azuread/blob/main/AzureAD%20Big%20picture.jpg)
