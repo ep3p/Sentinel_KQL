@@ -1,0 +1,24 @@
+Anomalies
+| where RuleName endswith "Anomalous local account creation" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    Computer = AnomalyDetails.Observables[0].Value["Computer name"],
+    ActorDomain = AnomalyDetails.Observables[0].Value["Source Domain"],
+    ActorAccount = AnomalyDetails.Observables[0].Value["Source User name"],
+    TargetDomain = AnomalyDetails.Observables[0].Value["Target Domain"],
+    TargetAccount = AnomalyDetails.Observables[0].Value["Target User name"]
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    Computer,
+    ActorDomain,
+    ActorAccount,
+    TargetDomain,
+    TargetAccount,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
