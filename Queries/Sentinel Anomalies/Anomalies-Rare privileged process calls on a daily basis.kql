@@ -1,0 +1,17 @@
+Anomalies
+| where RuleName endswith "Rare privileged process calls on a daily basis" and RuleStatus != "Flighting"
+| extend
+    Query = tostring(ExtendedLinks[0]["DetailBladeInputs"])
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    Description = make_set(Description),
+    take_any(Entities, Tactics)
+    by RuleName, UserName, Query
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    Entities,
+    Tactics
