@@ -23,7 +23,6 @@ let _RoleManagementCoreDirectory = materialize(
         OperationName,
         EligibleOperation = OperationName contains "eligible",
         RemoveOperation = OperationName has "remove",
-        PermanentOperation = iff(not(Identity == "MS-PIM" and bag_has_key(InitiatedBy, "app")), true, bool(null)), //not(ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids))
         Result,
         // Information about the Privileged Role
         RoleDisplayName = iff(not(OperationName has_any ("role definition", "roledefinition")), column_ifexists('Role.DisplayName', ''), column_ifexists('RoleDefinition.DisplayName', '')),
@@ -51,6 +50,8 @@ let _RoleManagementCoreDirectory = materialize(
         TargetResources,
         AdditionalDetails,
         CorrelationId = todynamic(CorrelationId)
+    | extend
+        PermanentOperation = iff(not(Identity == "MS-PIM" and bag_has_key(InitiatedBy, "app")), true, bool(null)) //not(ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids))
 );
 let _RoleManagementPIM =
     AuditLogs
