@@ -1,0 +1,17 @@
+Anomalies
+| where RuleName endswith "Anomalous Process Path used by a user account" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"]
+| mv-expand AnomalyReasons
+| extend FilePath = AnomalyReasons["Value"]
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    FilePath,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
