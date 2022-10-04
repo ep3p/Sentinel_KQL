@@ -1,0 +1,20 @@
+Anomalies
+| where RuleName endswith "Suspicious volume of logins to user account by logon types" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    LogonType = tostring(AnomalyDetails["Observables"][1]["Value"]),
+    LoginCount = toint(AnomalyDetails["Observables"][0]["Value"]),
+    ExpectedLoginCount = toint(AnomalyDetails["Observables"][0]["TypicalObservations"]["Expected count"])
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    LogonType,
+    LoginCount,
+    ExpectedLoginCount,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
