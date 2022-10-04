@@ -1,0 +1,16 @@
+Anomalies
+| where RuleName endswith "Anomalous Azure operations" and RuleStatus <> "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    AnomalousOperations = AnomalyReasons[0]["Value"]
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    AnomalousOperations,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
