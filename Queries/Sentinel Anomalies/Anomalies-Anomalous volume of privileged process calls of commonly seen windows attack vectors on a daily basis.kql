@@ -1,0 +1,16 @@
+Anomalies
+| where RuleName endswith "Anomalous volume of privileged process calls of commonly seen windows attack vectors on a daily basis" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    ProcessCallCount = toint(AnomalyDetails["Observables"][0]["Value"])
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    ProcessCallCount,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics
