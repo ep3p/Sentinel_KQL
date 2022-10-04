@@ -1,6 +1,6 @@
 ## Queries
 
-Some of these queries are intended to be used in Analytics rules, if you see ```query_frequency``` that query probably could be used in an Scheduled rule. NRT rules should not use any ```query_frequency``` or ```query_period``` parameter.
+Some of these queries are intended to be used in Analytics rules. If you see ```query_frequency``` in the KQL code, probably that query could be used in an Scheduled rule. NRT rules should not use any ```query_frequency``` or ```query_period``` parameter.
 
 ### NRT Rules
 
