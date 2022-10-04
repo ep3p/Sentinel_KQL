@@ -3,7 +3,8 @@ Anomalies
 | extend
     Query = ExtendedLinks[0]["DetailBladeInputs"],
     Computer = Entities[0]["HostName"],
-    AttemptCount = toint(AnomalyDetails["Observables"][0]["Value"])
+    AttemptCount = toint(AnomalyDetails["Observables"][0]["Value"]),
+    ExpectedAttemptCount = toint(AnomalyDetails["Observables"][0]["TypicalObservations"]["Expected count"])
 | project
     TimeGenerated,
     RuleName,
@@ -11,6 +12,7 @@ Anomalies
     Query,
     Computer,
     AttemptCount,
+    ExpectedAttemptCount,
     Score,
     AnomalyDetails,
     Entities,
