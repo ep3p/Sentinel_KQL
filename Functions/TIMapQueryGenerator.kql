@@ -29,7 +29,10 @@
             "TIGroupByColumn":
                 'Url'
             ,
-            "TIAdditionalColumns":
+            "TIProjectColumns":
+                ''
+            ,
+            "TIExtendColumns":
                 ''
             ,
             "TICustomEntityExtend":
@@ -53,8 +56,11 @@
             "TIGroupByColumn":
                 'IPAddress'
             ,
-            "TIAdditionalColumns":
-                ', TI_IPAddress, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress'
+            "TIProjectColumns":
+                ', NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress'
+            ,
+            "TIExtendColumns":
+                ', TI_IPAddress'
             ,
             "TICustomEntityExtend":
                 ', IPCustomEntity = TI_IPAddress'
@@ -76,8 +82,11 @@
             "TIGroupByColumn":
                 'FileHashValue'
             ,
-            "TIAdditionalColumns":
+            "TIProjectColumns":
                 ', FileHashValue, FileHashType'
+            ,
+            "TIExtendColumns":
+                ''
             ,
             "TICustomEntityExtend":
                 ', FileHashCustomEntity = FileHashValue'
@@ -109,8 +118,11 @@
             "TIGroupByColumn":
                 'EmailAddress'
             ,
-            "TIAdditionalColumns":
+            "TIProjectColumns":
                 ', EmailSenderAddress'
+            ,
+            "TIExtendColumns":
+                ''
             ,
             "TICustomEntityExtend":
                 ', AccountCustomEntity = EmailSenderAddress'
@@ -145,7 +157,10 @@
             "TIGroupByColumn":
                 'Domain'
             ,
-            "TIAdditionalColumns":
+            "TIProjectColumns":
+                ''
+            ,
+            "TIExtendColumns":
                 ''
             ,
             "TICustomEntityExtend":
@@ -177,7 +192,7 @@
                 'HostName, HostIP, Facility, SeverityLevel, ProcessName, SyslogMessage'
             ,
             "TableCustomEntityExtend":
-                ', HostCustomEntity = HostName, IPCustomEntity = HostIP'
+                ', HostCustomEntity = HostName,// IPCustomEntity = HostIP'
         })
         ,
         'AADManagedIdentitySignInLogs',
@@ -1210,7 +1225,7 @@
                     // Take the earliest TimeGenerated and the latest information of indicators
                     | summarize hint.strategy=shuffle
                         minTimeGenerated = min(TimeGenerated),
-                        arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIAdditionalColumns>>>)
+                        arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIProjectColumns>>>)
                         by IndicatorId
                     // Remove inactive or expired indicators
                     | where Active and ExpirationDateTime > now()
@@ -1238,7 +1253,7 @@
                 ) on <<<TIGroupByColumn>>>
                 | project
                     <<<TableName>>>_TimeGenerated,
-                    Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIAdditionalColumns>>>,
+                    Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIExtendColumns>>><<<TIProjectColumns>>>,
                     <<<TableColumns>>>
             };
             union
