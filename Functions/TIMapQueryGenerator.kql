@@ -756,7 +756,7 @@
     let _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableConditions:dynamic) [
         'URL', 'Syslog',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(SyslogMessage)
                 | where SyslogMessage has_any (toscalar(_Indicators | summarize make_set(tostring(split(extract(_DomainRegex, 1, Url), ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -768,7 +768,7 @@
         ,
         'URL', 'SecurityAlert',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(Entities)
                 | where Entities has_any (toscalar(_Indicators | summarize make_set(tostring(split(extract(_DomainRegex, 1, Url), ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -780,7 +780,7 @@
         ,
         'URL', 'OfficeActivity',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(ModifiedProperties)
                 | where ModifiedProperties has_any (toscalar(_Indicators | summarize make_set(tostring(split(extract(_DomainRegex, 1, Url), ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -792,7 +792,7 @@
         ,
         'URL', 'DeviceNetworkEvents',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(RemoteUrl)
                 | where RemoteUrl has_any (toscalar(_Indicators | summarize make_set(tostring(split(extract(_DomainRegex, 1, Url), ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -804,11 +804,11 @@
         ,
         'URL', 'AuditLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where not(array_length(TargetResources) == 0)
                 | where TargetResources has_any (toscalar(_Indicators | summarize make_set(tostring(split(extract(_DomainRegex, 1, Url), ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
-                | extend Url = todynamic(dynamic_to_json(extract_all(URLRegex, dynamic([1]), tostring(TargetResources))))
+                | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), tostring(TargetResources))))
                 | mv-expand Url = Urls
                 | extend Url = tostring(Url[0])
                 | where isnotempty(Url)```
@@ -816,7 +816,7 @@
         ,
         'IP', 'Syslog',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(SyslogMessage) and not(SyslogMessage has @'[preauth]')
                 | extend IPAddressv4 = extract_all(@'\s((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))', SyslogMessage)
@@ -827,14 +827,14 @@
         ,
         'IP', 'AADServicePrincipalSignInLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'ADFSSignInLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000
                 | where not(ResultType in (_UncompromisedFailureResultTypes))
@@ -843,7 +843,7 @@
         ,
         'IP', 'AADNonInteractiveUserSignInLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000
                 | where not(ResultType in (_UncompromisedFailureResultTypes))```
@@ -851,7 +851,7 @@
         ,
         'IP', 'SigninLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000
                 | where not(ResultType in (_UncompromisedFailureResultTypes))```
@@ -859,7 +859,7 @@
         ,
         'IP', 'SecurityAlert',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(Entities)
                 | extend IPAddressv4 = extract_all(@'((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))', Entities)
@@ -870,7 +870,7 @@
         ,
         'IP', 'OfficeActivity',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(ClientIP)
                 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), ClientIP)[0]
@@ -879,7 +879,7 @@
         ,
         'IP', 'DnsEvents',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where SubType == "LookupQuery" and isnotempty(IPAddresses)
                 | mv-expand IPAddress = split(IPAddresses, ", ") to typeof(string)```
@@ -887,7 +887,7 @@
         ,
         'IP', 'DeviceNetworkEvents',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where not(isempty(RemoteIP))
                     and not(ActionType == "NetworkSignatureInspected")
@@ -898,14 +898,14 @@
         ,
         'IP', 'Azure_SQL',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(IPAddress) and (isnotnull(parse_ipv4(IPAddress)) or isnotnull(parse_ipv6(IPAddress)))```
         })
         ,
         'IP', 'Azure_Key_Vault',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(CallerIPAddress)
                 | extend IPAddress = CallerIPAddress```
@@ -913,7 +913,7 @@
         ,
         'IP', 'Azure_Firewall',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort:int " to " DestinationAddress1 ":" DestinationPort:int *
                 | parse msg_s with * ". Action: " Action1a "." *
@@ -934,7 +934,7 @@
         ,
         'IP', 'AzureActivity',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(CallerIpAddress)
                 | extend IPAddress = CallerIpAddress```
@@ -942,7 +942,7 @@
         ,
         'IP', 'AWSCloudTrail',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(SourceIpAddress) and (isnotnull(parse_ipv4(SourceIpAddress)) or isnotnull(parse_ipv6(SourceIpAddress)))
                 | extend IPAddress = SourceIpAddress```
@@ -950,14 +950,14 @@
         ,
         'IP', 'AuditLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(IPAddress)```
         })
         ,
         'File_Hash', 'SecurityEvent',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 // AppLocker generates hash PE256 for .exe files, WHICH IS NOT SHA256, unless you ingest PE256 hashes this rule should be disabled
                 | where EventID in (8002, 8003, 8005) and isnotempty(FileHash)
@@ -966,7 +966,7 @@
         ,
         'File_Hash', 'DeviceFileEvents',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | mv-expand FileHashValue = pack_array(MD5, SHA1, SHA256) to typeof(string)
                 | where isnotempty(FileHashValue)
@@ -976,7 +976,7 @@
         ,
         'Email', 'SecurityAlert',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(Entities)
                 // Extract already recognized addresses
@@ -1001,21 +1001,21 @@
         ,
         'Email', 'AADNonInteractiveUserSignInLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | extend EmailAddress = tolower(UserPrincipalName)```
         })
         ,
         'Email', 'SigninLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | extend EmailAddress = tolower(UserPrincipalName)```
         })
         ,
         'Email', 'OfficeActivity',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where not(isempty(UserId) and isempty(TargetUserOrGroupName))
                 | mv-expand EmailAddress = pack_array(UserId, TargetUserOrGroupName)
@@ -1031,7 +1031,7 @@
         ,
         'Email', 'AzureActivity',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(Caller)
                 | extend EmailAddress = tolower(Caller)
@@ -1045,7 +1045,7 @@
         ,
         'Email', 'AuditLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where not(array_length(TargetResources) == 0)
                 | extend TargetResourcesEmails = todynamic(dynamic_to_json(extract_all(_EmailAddressRegex, dynamic([1]), tostring(TargetResources))))
@@ -1063,7 +1063,7 @@
         ,
         'Domain', 'Syslog',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(SyslogMessage)
                 | where SyslogMessage has_any (toscalar(_Indicators | summarize make_set(tostring(split(Domain, ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -1081,7 +1081,7 @@
         ,
         'Domain', 'SecurityAlert',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(Entities)
                 | where Entities has_any (toscalar(_Indicators | summarize make_set(tostring(split(Domain, ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -1097,7 +1097,7 @@
         ,
         'Domain', 'OfficeActivity',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(ModifiedProperties)
                 | where ModifiedProperties has_any (toscalar(_Indicators | summarize make_set(tostring(split(Domain, ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -1113,7 +1113,7 @@
         ,
         'Domain', 'DnsEvents',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(Name)
                 | where Name has_any (toscalar(_Indicators | summarize make_set(tostring(split(Domain, ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -1125,7 +1125,7 @@
         ,
         'Domain', 'Cisco_Umbrella',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(Domain_s)
                 | where Domain_s has_any (toscalar(_Indicators | summarize make_set(tostring(split(Domain, ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -1137,7 +1137,7 @@
         ,
         'Domain', 'DeviceNetworkEvents',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where isnotempty(RemoteUrl)
                 | where RemoteUrl has_any (toscalar(_Indicators | summarize make_set(tostring(split(Domain, ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -1153,7 +1153,7 @@
         ,
         'Domain', 'AuditLogs',
         dynamic({
-            "TIWatchlistNoteType":
+            "TITableConditions":
                 ```
                 | where not(array_length(TargetResources) == 0)
                 | where TargetResources has_any (toscalar(_Indicators | summarize make_set(tostring(split(Domain, ".")[-1])))) // valid TLD ~1500 , has_any limit 10000
@@ -1189,6 +1189,7 @@
         Query:string=
             ```let query_frequency = 1h;
             let query_period = 14d;
+            let ti_ingestion_frequency = 1d;
             let _TIBenignProperty =
                 _GetWatchlist('ID-TIBenignProperty')
                 | where Notes has_any (<<<TIWatchlistNoteType>>>)
@@ -1200,28 +1201,39 @@
                 | summarize make_list(Auxiliar)
             );<<<TIAdditionalLets>>><<<TableAdditionalLets>>>
             let _TIMapMatch = (ti_datetime_start:datetime, ti_datetime_end:datetime, table_datetime_start:datetime, table_datetime_end:datetime) {
-                ThreatIntelligenceIndicator
-                | where TimeGenerated > ago(query_period)
-                // Take the earliest date and the lastest information of indicators
-                | summarize minTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by IndicatorId
-                // Remove inactive or expired indicators
-                | where Active and ExpirationDateTime > now()
-                // Remove indicators that existed previously to ti_datetime_start, these indicators will be checked instead when ti_datetime_start is the maximum (== ago(query_period))
-                | where not(minTimeGenerated < ti_datetime_start)
-                // Remove indicators from specific sources
-                | where not(todynamic(AdditionalInformation)["source"] has_any (_TIExcludedSources))
-                // Picking up only IOC's that contain the entities we want <<<TIOperators>>>
-                // Remove specific indicators with benign properties
-                | join kind = leftanti _TIBenignProperty on IndicatorId, $left.<<<TIGroupByColumn>>> == $right.BenignProperty
-                // Deduplicate indicators by key column, equivalent to using join kind=innerunique
-                | summarize take_any(*) by <<<TIGroupByColumn>>>
-                | as _Indicators
-                | join kind=inner (
+                let min_ti_datetime_start = ago(query_period);
+                let query_ti_datetime_start = max_of(min_ti_datetime_start, ti_datetime_start - 2*ti_ingestion_frequency);
+                let is_min_ti_datetime_start = query_ti_datetime_start == min_ti_datetime_start;
+                let _Indicators =
+                    ThreatIntelligenceIndicator
+                    | where TimeGenerated between (query_ti_datetime_start .. ti_datetime_end)
+                    // Take the earliest TimeGenerated and the latest information of indicators
+                    | summarize hint.strategy=shuffle
+                        minTimeGenerated = min(TimeGenerated),
+                        arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIAdditionalColumns>>>)
+                        by IndicatorId
+                    // Remove inactive or expired indicators
+                    | where Active and ExpirationDateTime > now()
+                    // Picking up only IOC's that contain the entities we want <<<TIOperators>>>
+                    // Remove indicators from specific sources
+                    | where not(AdditionalInformation has_any (_TIExcludedSources))
+                    // Remove specific indicators with benign properties
+                    | join kind=leftanti _TIBenignProperty on IndicatorId, $left.<<<TIGroupByColumn>>> == $right.BenignProperty
+                    // Deduplicate indicators by <<<TIGroupByColumn>>> column, equivalent to using afterwards join kind=innerunique
+                    | summarize hint.strategy=shuffle
+                        minTimeGenerated = min(minTimeGenerated),
+                        take_any(*)
+                        by <<<TIGroupByColumn>>>
+                    // Remove indicators that existed previously to ti_datetime_start, these indicators will be checked instead when ti_datetime_start is the maximum (ti_datetime_start == ago(query_period))
+                    | where not(not(is_min_ti_datetime_start) and minTimeGenerated < ti_datetime_start)
+                ;
+                _Indicators
+                | join kind=inner hint.strategy=shuffle (
                     <<<TableName>>>
                     | where <<<TableTimeColumn>>> between(table_datetime_start .. table_datetime_end)<<<PreTableOperators>>>
                     // Filter events that may contain indicators<<<TITableConditions>>><<<PostTableOperators>>>
                     // Take only one event by key columns
-                    | summarize take_any(*) by <<<TIGroupByColumn>>><<<TableGroupByColumn>>>
+                    | summarize hint.strategy=shuffle take_any(*) by <<<TIGroupByColumn>>><<<TableGroupByColumn>>>
                     | project-rename <<<TableName>>>_TimeGenerated = TimeGenerated
                 ) on <<<TIGroupByColumn>>>
                 | project
