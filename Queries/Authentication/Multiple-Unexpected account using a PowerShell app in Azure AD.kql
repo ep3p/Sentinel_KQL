@@ -16,7 +16,7 @@ let _ShellApps = toscalar(
 );
 let _ExpectedResultTypes = toscalar(
     _GetWatchlist('ResultType-SignInLogsErrorCodes')
-    | where not(Notes has_any ("[Success]", "[Expired]"))
+    | where isnotempty(ResultDescription) and not(Notes has_any ("[Success]", "[Expired]"))
     | summarize make_list(ResultType)
 );
 let MicrosoftAzureCLI_appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
