@@ -17,6 +17,7 @@ You could check other resources like:
 - https://github.com/eshlomo1/Microsoft-Sentinel-4-SecOps
 - https://github.com/Kaidja/Azure-Sentinel
 - https://github.com/samilamppu/Sentinel-queries
+- https://github.com/ashwin-patil/blue-teaming-with-kql
 - ...
 
 Other links:
