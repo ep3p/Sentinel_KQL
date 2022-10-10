@@ -1,0 +1,71 @@
+let query_period = 14d;
+let query_frequency = 1d;
+let monitored_operations = dynamic(["FileDownloaded", "FileSyncDownloadedFull"]);
+let operation_threshold = 10;
+let file_threshold = 1;
+let expected_locations = dynamic([]);
+let _DefaultSharePointAdministrators = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "SharePointAdministrator" and Notes has "[Default]"
+    | summarize make_list(ActorPrincipalName)
+    );
+let _ExpectedMachineDomainInfo = toscalar(
+    _GetWatchlist("UUID-AADTenantIds")
+    | where Notes has "[MachineDomainInfoHomeTenant]"
+    | summarize make_list(tostring(TenantId))
+    );
+let _ExpectedDomain = toscalar(
+    _GetWatchlist("UUID-AADTenantIds")
+    | where Notes has "[HomeTenant]"
+    | summarize make_list(strcat("@", Domain))
+    );
+let _ExpectedIPRanges = dynamic([]);
+OfficeActivity
+| where TimeGenerated > ago(query_frequency)
+| where Operation in (monitored_operations) and not(UserId in (_DefaultSharePointAdministrators))
+| join kind=leftanti hint.strategy=shuffle (
+    OfficeActivity
+    | where TimeGenerated between(ago(query_period) .. ago(query_frequency))
+    | where Operation in (monitored_operations) and not(UserId in (_DefaultSharePointAdministrators))
+    | distinct ClientIP
+    )
+    on ClientIP
+| as _FileOperations
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Operations = make_set(Operation),
+    FileCount = dcount(OfficeObjectId),
+    Files = make_set(OfficeObjectId, 250),
+    take_any(MachineDomainInfo)
+    by UserId, ClientIP, MachineId, OfficeWorkload, Site_Url
+| lookup kind=leftouter (
+    _FileOperations
+    | summarize OperationCount = count() by ClientIP
+    )
+    on ClientIP
+| where OperationCount > operation_threshold or FileCount > file_threshold
+// Add geolocation from IP address
+| lookup kind=leftouter (
+    union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_frequency)
+    | summarize hint.strategy=shuffle take_anyif(Location, isnotempty(Location)) by IPAddress
+    )
+    on $left.ClientIP == $right.IPAddress
+// Remove operations from expected devices
+//| where not(MachineDomainInfo in (_ExpectedMachineDomainInfo) or ipv4_is_in_any_range(ClientIP, _ExpectedIPRanges))
+// Remove home tenant users from expected locations
+//| where not(Location in (expected_locations) and UserId has_any (_ExpectedDomain))
+| project
+    StartTime,
+    EndTime,
+    OfficeWorkload,
+    UserId,
+    ClientIP,
+    Location,
+    MachineDomainInfo,
+    OperationCount,
+    Operations,
+    Site_Url,
+    FileCount,
+    Files
