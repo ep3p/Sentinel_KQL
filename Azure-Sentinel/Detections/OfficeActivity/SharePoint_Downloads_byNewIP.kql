@@ -1,3 +1,4 @@
+//This rule detects IP addresses that downloaded several files in SharePoint, and in the previous days they did not make these operations.
 let query_period = 14d;
 let query_frequency = 1d;
 let monitored_operations = dynamic(["FileDownloaded", "FileSyncDownloadedFull"]);
