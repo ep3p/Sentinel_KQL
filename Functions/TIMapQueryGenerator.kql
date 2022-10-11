@@ -28,7 +28,8 @@
             ,
             "TIOperators":
                 ```
-                | where isnotempty(Url)```
+                | where isnotempty(Url)
+                | extend Url = trim_end(@"\/", Url)```
             ,
             "TIGroupByColumn":
                 'Url'
@@ -54,6 +55,7 @@
             ,
             "TIPrefilter":
                 ```
+                let _IndicatorsLength = toscalar(_Indicators | summarize count());
                 let _IndicatorsPrefilter = toscalar(
                     _Indicators
                     | extend AuxiliarField = tostring(extract(@"([0-9A-Za-f]+)[\.\:]", 1, IPAddress))
@@ -236,7 +238,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ', Category, ServicePrincipalName'
+                ', ServicePrincipalName'
             ,
             "TableColumns":
                 'Category, ServicePrincipalName, IPAddress, Location, ResultType, ResultDescription, AuthenticationProcessingDetails, AppId, ResourceDisplayName, ServicePrincipalId, ServicePrincipalCredentialKeyId, ServicePrincipalCredentialThumbprint, CorrelationId'
@@ -264,7 +266,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ', Category, ServicePrincipalName'
+                ', ServicePrincipalName'
             ,
             "TableColumns":
                 'Category, ServicePrincipalName, IPAddress, Location, ResultType, ResultDescription, AuthenticationProcessingDetails, AppId, ResourceDisplayName, ServicePrincipalId, ServicePrincipalCredentialKeyId, ServicePrincipalCredentialThumbprint, CorrelationId'
@@ -298,7 +300,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ', Category'
+                ''
             ,
             "TableColumns":
                 'Category, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, ConditionalAccessPolicies, UserId, OriginalRequestId, CorrelationId'
@@ -332,7 +334,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ', Category'
+                ''
             ,
             "TableColumns":
                 'Category, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, ConditionalAccessPolicies, RiskState, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId'
@@ -363,13 +365,13 @@
                 ``````
             ,
             "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
                 ```
                 | extend
                     DeviceDetail = tostring(DeviceDetail),
                     ConditionalAccessPolicies = tostring(ConditionalAccessPolicies)```
-            ,
-            "TableGroupByColumn":
-                ', Category'
             ,
             "TableColumns":
                 'Category, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, ConditionalAccessPolicies, RiskState, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId'
@@ -823,81 +825,99 @@
     let _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableConditions:dynamic) [
         'URL', 'Syslog',
         dynamic({
+            "TITableLookback":
+                '3d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(SyslogMessage)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), SyslogMessage)))
                 | mv-expand Url = Urls
-                | extend Url = tostring(Url[0])
+                | extend Url = trim_end(@"\/", tostring(Url[0]))
                 | where isnotempty(Url)```
         })
         ,
         'URL', 'SecurityAlert',
         dynamic({
+            "TITableLookback":
+                '14d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(Entities)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), Entities)))
                 | mv-expand Url = Urls
-                | extend Url = tostring(Url[0])
+                | extend Url = trim_end(@"\/", tostring(Url[0]))
                 | where isnotempty(Url)```
         })
         ,
         'URL', 'OfficeActivity',
         dynamic({
+            "TITableLookback":
+                '7d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(ModifiedProperties)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(ModifiedProperties has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(ModifiedProperties has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), ModifiedProperties)))
                 | mv-expand Url = Urls
-                | extend Url = tostring(Url[0])
+                | extend Url = trim_end(@"\/", tostring(Url[0]))
                 | where isnotempty(Url)```
         })
         ,
         'URL', 'DeviceNetworkEvents',
         dynamic({
+            "TITableLookback":
+                '7d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(RemoteUrl)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(RemoteUrl has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteUrl has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), RemoteUrl)))
                 | mv-expand Url = Urls
-                | extend Url = tostring(Url[0])
+                | extend Url = trim_end(@"\/", tostring(Url[0]))
                 | where isnotempty(Url)```
         })
         ,
         'URL', 'AuditLogs',
         dynamic({
+            "TITableLookback":
+                '14d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where not(array_length(TargetResources) == 0)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(TargetResources has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(TargetResources has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), tostring(TargetResources))))
                 | mv-expand Url = Urls
-                | extend Url = tostring(Url[0])
+                | extend Url = trim_end(@"\/", tostring(Url[0]))
                 | where isnotempty(Url)```
         })
         ,
         'IP', 'Syslog',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ```
                 let _IPv4Regex = toscalar(
@@ -914,7 +934,7 @@
             "TITableConditions":
                 ```
                 | where isnotempty(SyslogMessage) and not(SyslogMessage has @'[preauth]')
-                | where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddressv4 = extract_all(strcat(@"\s", _IPv4Regex), SyslogMessage)
                 | extend IPAddressv6 = extract_all(strcat(@"\s", _IPv6Regex), SyslogMessage)
                 | mv-expand IPAddress = array_concat(IPAddressv4, IPAddressv6) to typeof(string)
@@ -923,54 +943,69 @@
         ,
         'IP', 'AADServicePrincipalSignInLogs',
         dynamic({
+            "TITableLookback":
+                '14d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
-                | where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'ADFSSignInLogs',
         dynamic({
+            "TITableLookback":
+                '14d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
-                | where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000
                 | where not(ResultType in (_UncompromisedFailureResultTypes))
-                | where not(todynamic(AuthenticationDetails)[0].authenticationMethod == "Integrated Windows Authentication")```
+                | where not(todynamic(AuthenticationDetails)[0].authenticationMethod == "Integrated Windows Authentication")
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'AADNonInteractiveUserSignInLogs',
         dynamic({
+            "TITableLookback":
+                '14d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
-                | where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000
-                | where not(ResultType in (_UncompromisedFailureResultTypes))```
+                | where not(ResultType in (_UncompromisedFailureResultTypes))
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'SigninLogs',
         dynamic({
+            "TITableLookback":
+                '14d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
-                | where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000
-                | where not(ResultType in (_UncompromisedFailureResultTypes))```
+                | where not(ResultType in (_UncompromisedFailureResultTypes))
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'SecurityAlert',
         dynamic({
+            "TITableLookback":
+                '14d'
+            ,
             "TITableAdditionalLets":
                 ```
                 let _IPv4Regex = toscalar(
@@ -987,42 +1022,56 @@
             "TITableConditions":
                 ```
                 | where isnotempty(Entities)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddressv4 = extract_all(_IPv4Regex, Entities)
                 | extend IPAddressv6 = extract_all(_IPv6Regex, Entities)
                 | mv-expand IPAddress = array_concat(IPAddressv4, IPAddressv6) to typeof(string)
-                | where isnotempty(IPAddress) and not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))```
+                | where isnotempty(IPAddress) and not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'OfficeActivity',
         dynamic({
+            "TITableLookback":
+                '14d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(ClientIP)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(ClientIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(ClientIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), ClientIP)[0]
                 | extend IPAddress = tostring(ClientIPValues[0])
                 | where isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))
-                //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000```
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'DnsEvents',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(IPAddresses) and SubType has "LookupQuery"
-                | where not(_IndicatorsPrefilterLength < 10000 and not(IPAddresses has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | mv-expand IPAddress = split(IPAddresses, ", ") to typeof(string)```
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddresses has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | mv-expand IPAddress = split(IPAddresses, ", ") to typeof(string)
+                | where not(ipv4_is_private(IPAddress))
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
+        //| where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has Name or Name has DomainName))
+        //| where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith Name))
         ,
         'IP', 'DeviceNetworkEvents',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1031,43 +1080,54 @@
                 | where not(isempty(RemoteIP))
                     and not(ActionType has "NetworkSignatureInspected")
                     and not(RemoteIPType has_any ("Private", "Loopback", "Teredo", "Broadcast"))//Reserved
-                | where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = iff(RemoteIPType has "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
-                | where not(ipv4_is_private(IPAddress))
-                //| where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000```
+                //| where not(ipv4_is_private(IPAddress))
+                | where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Azure_SQL',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(IPAddress) and (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress)))
-                | where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000```
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Azure_Key_Vault',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(CallerIPAddress)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(CallerIPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
                 | extend IPAddress = CallerIPAddress```
         })
         ,
         'IP', 'Azure_Firewall',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
-                | where not(_IndicatorsPrefilterLength < 10000 and not(msg_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(msg_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort:int " to " DestinationAddress1 ":" DestinationPort:int *
                 | parse msg_s with * ". Action: " Action1a "." *
                 | parse msg_s with * " was " Action1b " to " NatDestination ":" NatDestinationPort:int "." *
@@ -1082,46 +1142,62 @@
                 | where isnotempty(IPAddress)
                 | where not(ipv4_is_private(IPAddress))
                 // Remove denied traffic where the source was remote
-                | where not(IPAddress == SourceAddress and Firewall_Action == "Deny")```
+                | where not(IPAddress == SourceAddress and Firewall_Action == "Deny")
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'AzureActivity',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(CallerIpAddress)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(CallerIpAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
                 | extend IPAddress = CallerIpAddress```
         })
         ,
         'IP', 'AWSCloudTrail',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(SourceIpAddress) and (isnotempty(parse_ipv4(SourceIpAddress)) or isnotempty(parse_ipv6(SourceIpAddress)))
-                | where not(_IndicatorsPrefilterLength < 10000 and not(SourceIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(SourceIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(SourceIpAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
                 | extend IPAddress = SourceIpAddress```
         })
         ,
         'IP', 'AuditLogs',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
             "TITableConditions":
                 ```
                 | where isnotempty(IPAddress)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000```
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'File_Hash', 'SecurityEvent',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1134,6 +1210,9 @@
         ,
         'File_Hash', 'DeviceFileEvents',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1147,6 +1226,9 @@
         ,
         'Email', 'SecurityAlert',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ```
                 let _EmailAddressRegex = toscalar(
@@ -1186,6 +1268,9 @@
         ,
         'Email', 'AADNonInteractiveUserSignInLogs',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1197,6 +1282,9 @@
         ,
         'Email', 'SigninLogs',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1208,6 +1296,9 @@
         ,
         'Email', 'OfficeActivity',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ```
                 let _EmailAddressRegex = toscalar(
@@ -1238,6 +1329,9 @@
         ,
         'Email', 'AzureActivity',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ```
                 let _EmailAddressRegex = toscalar(
@@ -1266,6 +1360,9 @@
         ,
         'Email', 'AuditLogs',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ```
                 let _EmailAddressRegex = toscalar(
@@ -1298,6 +1395,9 @@
         ,
         'Domain', 'Syslog',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1319,6 +1419,9 @@
         ,
         'Domain', 'SecurityAlert',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1338,6 +1441,9 @@
         ,
         'Domain', 'OfficeActivity',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1357,6 +1463,9 @@
         ,
         'Domain', 'DnsEvents',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1372,6 +1481,9 @@
         ,
         'Domain', 'Cisco_Umbrella',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1387,6 +1499,9 @@
         ,
         'Domain', 'DeviceNetworkEvents',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ``````
             ,
@@ -1406,6 +1521,9 @@
         ,
         'Domain', 'AuditLogs',
         dynamic({
+            "TITableLookback":
+                '1d'
+            ,
             "TITableAdditionalLets":
                 ```
                 let _DomainRegex = toscalar(
@@ -1456,7 +1574,7 @@
             let query_period = 14d;
             let ti_feed_sync_frequency = 1d;
             let ti_feed_sync_length = 6h;
-            let table_query_lookback = 3d;
+            let table_query_lookback = <<<TITableLookback>>>;
             let _TIBenignProperty =
                 _GetWatchlist('ID-TIBenignProperty')
                 | where Notes has_any (<<<TIWatchlistNoteType>>>)
@@ -1522,7 +1640,7 @@
                 // Match        all indicators available                                      with current table events
                 _TITableMatch(  ago(ti_feed_sync_frequency + ti_feed_sync_length), false,     ago(query_frequency), now()),
                 // Match        new indicators since last query execution                     with past table events
-                _TITableMatch(  ago(query_frequency), true,                                   ago(table_query_lookback), ago(query_frequency))
+                _TITableMatch(  ago(1d), true,                                   ago(table_query_lookback), ago(query_frequency))
             | extend
                 timestamp = <<<TableName>>>_TimeGenerated<<<TableCustomEntityExtend>>><<<TICustomEntityExtend>>>```
         ) with (
@@ -1536,4 +1654,5 @@
             ;
         )
     | project IndicatorType, TableType, Query
+    | sort by IndicatorType asc, TableType asc
 // };
