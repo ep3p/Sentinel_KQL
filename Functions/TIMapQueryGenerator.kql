@@ -19,6 +19,7 @@
             ,
             "TIPrefilter":
                 ```
+                let _IndicatorsLength = toscalar(_Indicators | summarize count());
                 let _IndicatorsPrefilter = toscalar(
                     _Indicators
                     | extend AuxiliarField = tostring(split(extract(_URLRegex, 3, Url), ".")[-1])
@@ -92,7 +93,8 @@
                 ``````
             ,
             "TIPrefilter":
-                ``````
+                ```
+                let _IndicatorsLength = toscalar(_Indicators | summarize count());```
             ,
             "TIOperators":
                 ```
@@ -123,6 +125,7 @@
             ,
             "TIPrefilter":
                 ```
+                let _IndicatorsLength = toscalar(_Indicators | summarize count());
                 let _IndicatorsPrefilter = toscalar(
                     _Indicators
                     | extend AuxiliarField = tostring(split(EmailAddress, ".")[-1])
@@ -155,15 +158,11 @@
                 '"[DestinationDomain]"'
             ,
             "TIAdditionalLets":
-                ```
-                let _DomainRegex = toscalar(
-                    _GetWatchlist('RegEx-SingleRegularExpressions')
-                    | where UseCase == "Threat Intelligence Indicator Domain"
-                    | project RegEx
-                );```
+                ``````
             ,
             "TIPrefilter":
                 ```
+                let _IndicatorsLength = toscalar(_Indicators | summarize count());
                 let _IndicatorsPrefilter = toscalar(
                     _Indicators
                     | extend AuxiliarField = tostring(split(Domain, ".")[-1])
@@ -209,7 +208,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ''
+                '//, HostName'
             ,
             "TableColumns":
                 'HostName, HostIP, Facility, SeverityLevel, ProcessName, SyslogMessage'
@@ -300,7 +299,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ''
+                '//, UserPrincipalName'
             ,
             "TableColumns":
                 'Category, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, ConditionalAccessPolicies, UserId, OriginalRequestId, CorrelationId'
@@ -334,14 +333,14 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ''
+                '//, UserPrincipalName'
             ,
             "TableColumns":
                 'Category, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, ConditionalAccessPolicies, RiskState, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId'
             ,
             "TableCustomEntityExtend":
                 ```,
-                AccountCustomEntity = UserPrincipalName,
+                //AccountCustomEntity = UserPrincipalName,
                 //IPCustomEntity = IPAddress```
         })
         ,
@@ -368,7 +367,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ```
+                ```//, UserPrincipalName
                 | extend
                     DeviceDetail = tostring(DeviceDetail),
                     ConditionalAccessPolicies = tostring(ConditionalAccessPolicies)```
@@ -378,7 +377,7 @@
             ,
             "TableCustomEntityExtend":
                 ```,
-                AccountCustomEntity = UserPrincipalName,
+                //AccountCustomEntity = UserPrincipalName,
                 //IPCustomEntity = IPAddress```
         })
         ,
@@ -400,7 +399,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ', Computer'
+                '//, Computer'
             ,
             "TableColumns":
                 'Computer, Account, EventID, Activity, Process, FilePath, Fqbn, FileHash, EventData'
@@ -446,7 +445,7 @@
             ,
             "TableCustomEntityExtend":
                 ```,
-                AccountCustomEntity = Alert_Account,
+                //AccountCustomEntity = Alert_Account,
                 //IPCustomEntity = Alert_IPAddress,
                 HostCustomEntity = Alert_HostName```
         })
@@ -469,14 +468,14 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ''
+                '//, UserId'
             ,
             "TableColumns":
                 'OfficeWorkload, RecordType, Operation, UserType, UserId, ClientIP, ResultStatus, OfficeObjectId, Parameters'
             ,
             "TableCustomEntityExtend":
                 ```,
-                AccountCustomEntity = UserId,
+                //AccountCustomEntity = UserId,
                 //IPCustomEntity = ClientIP```
         })
         ,
@@ -498,7 +497,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ''
+                '//, ClientIP'
             ,
             "TableColumns":
                 'Computer, SubType, ClientIP, QueryType, Name, IPAddresses, MaliciousIP, IndicatorThreatType'
@@ -526,7 +525,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ''
+                '//, DeviceName'
             ,
             "TableColumns":
                 'DeviceName, LocalIP, ActionType, RemoteUrl, RemoteIP, RemotePort, Protocol, LocalPort, InitiatingProcessCommandLine, InitiatingProcessFolderPath, InitiatingProcessAccountName, InitiatingProcessAccountUpn'
@@ -558,7 +557,7 @@
                     DeviceFileEvents_FileSize = FileSize```
             ,
             "TableGroupByColumn":
-                ''
+                '//, DeviceName'
             ,
             "TableColumns":
                 'DeviceName, InitiatingProcessAccountName, InitiatingProcessAccountUpn, ActionType, DeviceFileEvents_FileName, DeviceFileEvents_FileSize, FolderPath, FileOriginReferrerUrl, FileOriginUrl, InitiatingProcessCommandLine, InitiatingProcessFolderPath, MD5 = toupper(MD5), SHA1 = toupper(SHA1), SHA256 = toupper(SHA256)'
@@ -585,15 +584,15 @@
             ,
             "PostTableOperators":
                 ```
-                | mv-apply todynamic(Identities) to typeof(string), todynamic(IdentityTypes) to typeof(string) on ( 
-                    summarize IdentitiesDict = make_bag(pack(IdentityTypes, Identities))
+                | mv-apply todynamic(Identities_s) to typeof(string), todynamic(Identity_Types_s) to typeof(string) on ( 
+                    summarize IdentitiesDict = make_bag(pack(Identity_Types_s, Identities_s))
                     )
                 | extend
                     HostName = IdentitiesDict["AD Computers"],
                     UserPrincipalName = IdentitiesDict["AD Users"]```
             ,
             "TableGroupByColumn":
-                'HostName'
+                '//, HostName'
             ,
             "TableColumns":
                 ```EventStartTime = todatetime(column_ifexists('Timestamp_t', column_ifexists('Timestamp_s',''))),
@@ -637,14 +636,14 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ''
+                '//, Caller'
             ,
             "TableColumns":
                 'Category, Level, ResourceProvider, ResourceId, Caller, CallerIpAddress, OperationNameValue, OperationName, ActivityStatus, HTTPRequest, Properties, CorrelationId'
             ,
             "TableCustomEntityExtend":
                 ```, 
-                AccountCustomEntity = Caller,
+                //AccountCustomEntity = Caller,
                 //IPCustomEntity = CallerIpAddress```
         })
         ,
@@ -676,18 +675,18 @@
                     LogicalServerName = column_ifexists("LogicalServerName_s", ""),
                     DatabasePrincipalName = column_ifexists("database_principal_name_s", ""),
                     DatabaseName = column_ifexists("database_name_s", ""),
-                    AdditionalInformation = column_ifexists("additional_information_s", "")```
+                    AzureDiagnostics_AdditionalInformation = column_ifexists("additional_information_s", "")```
             ,
             "TableGroupByColumn":
-                ', ResourceId'
+                '//, ResourceId'
             ,
             "TableColumns":
-                'Category, ResourceId, ResourceType, OperationName, ActionName, HostName, IPAddress, ApplicationName, ClassTypeDescription, ServerPrincipalName, ServerInstanceName, LogicalServerName, DatabasePrincipalName, DatabaseName, AdditionalInformation'
+                'Category, ResourceId, ResourceType, OperationName, ActionName, HostName, IPAddress, ApplicationName, ClassTypeDescription, ServerPrincipalName, ServerInstanceName, LogicalServerName, DatabasePrincipalName, DatabaseName, AzureDiagnostics_AdditionalInformation'
             ,
             "TableCustomEntityExtend":
                 ```,
                 HostCustomEntity = HostName,
-                IPCustomEntity = IPAddress```
+                //IPCustomEntity = IPAddress```
         })
         ,
         'Azure_Key_Vault',
@@ -723,20 +722,21 @@
                     CallerObjectUPN = iff(isempty(identity_claim_upn_s), identity_claim_http_schemas_xmlsoap_org_ws_2005_05_identity_claims_upn_s, identity_claim_upn_s)```
             ,
             "TableGroupByColumn":
-                ', CallerObjectId, ResourceId'
+                '//, CallerObjectId, ResourceId'
             ,
             "TableColumns":
                 'Category, ResourceId, ResourceType, OperationName, CallerObjectUPN, CallerObjectId, CallerIPAddress, ClientInfo, RequestUri, HttpStatusCode, Id, CorrelationId'
             ,
             "TableCustomEntityExtend":
-                ', AccountCustomEntity = CallerObjectUPN, IPCustomEntity = CallerIPAddress'
+                ```,
+                AccountCustomEntity = CallerObjectUPN,
+                //IPCustomEntity = CallerIPAddress```
         })
         ,
         'Azure_Firewall',
         dynamic({
             "TableAdditionalLets":
-                ```
-                let _BenignEventMessages = dynamic(["SYN ACK reply for TCP Connection", "FIN packet received for closing TCP Connection", "RST packet received for TCP Connection"]);```
+                ``````
             ,
             "TableName":
                 'AzureDiagnostics'
@@ -748,7 +748,7 @@
                 ```
                 | where ResourceProvider has "MICROSOFT.NETWORK" and ResourceType has "AZUREFIREWALLS"// and Category in ("AzureFirewallNetworkRule", "AzureFirewallApplicationRule")
                 // Some kinds of operations could be excluded
-                //| where OperationName !in ("AzureFirewallNetworkRuleLog", "AzureFirewallApplicationRuleLog", "AzureFirewallNatRuleLog", "AzureFirewallIDSLog", "AzureFirewallThreatIntelLog")```
+                | where not(OperationName in ("AzureFirewallNatRuleLog"))// "AzureFirewallNetworkRuleLog", "AzureFirewallApplicationRuleLog", "AzureFirewallIDSLog", "AzureFirewallThreatIntelLog"```
             ,
             "PostTableOperators":
                 ``````
@@ -757,7 +757,8 @@
                 ''
             ,
             "TableColumns":
-                'Resource, Category, OperationName, FirewallAction, Protocol, SourceAddress, DestinationAddress, NatDestinationAddress, msg_s, ResourceId, ResourceType'
+                ```Resource, Category, OperationName, FirewallAction, Protocol, SourceAddress, DestinationAddress,// NatDestinationAddress,
+                msg_s, ResourceId, ResourceType```
             ,
             "TableCustomEntityExtend":
                 ``````
@@ -781,7 +782,7 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ', UserIdentityAccountId'
+                '//, UserIdentityAccountId'
             ,
             "TableColumns":
                 'EventTypeName, EventSource, EventName, ManagementEvent, ReadOnly, UserIdentityType, UserIdentityAccountId, UserIdentityArn, UserIdentityUserName, SourceIpAddress, UserAgent, SessionMfaAuthenticated, ErrorCode, ErrorMessage, Resources, RequestParameters, ResponseElements, AdditionalEventData, AwsEventId'
@@ -811,14 +812,14 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ''
+                '//, UserId'
             ,
             "TableColumns":
                 'Category, OperationName, Result, ResultDescription, Identity, UserPrincipalName, IPAddress, InitiatedBy, LoggedByService, AdditionalDetails, TargetResources, CorrelationId'
             ,
             "TableCustomEntityExtend":
                 ```,
-                AccountCustomEntity = UserPrincipalName,
+                //AccountCustomEntity = UserPrincipalName,
                 //IPCustomEntity = IPAddress```
         })
     ];
@@ -838,7 +839,8 @@
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), SyslogMessage)))
                 | mv-expand Url = Urls
                 | extend Url = trim_end(@"\/", tostring(Url[0]))
-                | where isnotempty(Url)```
+                | where isnotempty(Url)
+                //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
         'URL', 'SecurityAlert',
@@ -856,7 +858,8 @@
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), Entities)))
                 | mv-expand Url = Urls
                 | extend Url = trim_end(@"\/", tostring(Url[0]))
-                | where isnotempty(Url)```
+                | where isnotempty(Url)
+                //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
         'URL', 'OfficeActivity',
@@ -874,7 +877,8 @@
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), ModifiedProperties)))
                 | mv-expand Url = Urls
                 | extend Url = trim_end(@"\/", tostring(Url[0]))
-                | where isnotempty(Url)```
+                | where isnotempty(Url)
+                //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
         'URL', 'DeviceNetworkEvents',
@@ -897,7 +901,8 @@
                     ))))
                 | mv-expand Url = Urls
                 | extend Url = trim_end(@"\/", tostring(Url[0]))
-                | where isnotempty(Url)```
+                | where isnotempty(Url)
+                //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
         'URL', 'AuditLogs',
@@ -915,7 +920,8 @@
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), tostring(TargetResources))))
                 | mv-expand Url = Urls
                 | extend Url = trim_end(@"\/", tostring(Url[0]))
-                | where isnotempty(Url)```
+                | where isnotempty(Url)
+                //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Syslog',
@@ -1065,7 +1071,7 @@
                 ```
                 | where isnotempty(IPAddresses) and SubType has "LookupQuery"
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddresses has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | mv-expand IPAddress = split(IPAddresses, ", ") to typeof(string)
+                | mv-expand IPAddress = array_concatsplit(IPAddresses, ", ") to typeof(string)
                 | where not(ipv4_is_private(IPAddress))
                 | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
@@ -1088,7 +1094,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = iff(RemoteIPType has "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
                 | where not(ipv4_is_private(IPAddress))
-                | where IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))) // "in" limit 1.000.000```
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         // | where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has RemoteUrl or RemoteUrl has DomainName))
         // | where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith trim_end(@"\/", RemoteUrl)))
@@ -1097,7 +1103,7 @@
         'IP', 'Azure_SQL',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1112,7 +1118,7 @@
         'IP', 'Azure_Key_Vault',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1128,36 +1134,52 @@
         'IP', 'Azure_Firewall',
         dynamic({
             "TITableLookback":
-                '1d'
+                '2h'
             ,
             "TITableAdditionalLets":
-                ``````
+                ```
+                let _WAFAddresses = toscalar(
+                    _GetWatchlist('Service-PrivateCorporateServices')
+                    | where Service == "WAF"
+                    | summarize make_list(IPAddress)
+                );
+                let _BenignWAFReplies = toscalar(
+                    _GetWatchlist('Activity-ExpectedSignificantActivity')
+                    | where Activity == "MaliciousAddressReplyWAF"
+                    | summarize make_list(Auxiliar)
+                );```
             ,
             "TITableConditions":
                 ```
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(msg_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort:int " to " DestinationAddress1 ":" DestinationPort:int *
                 | parse msg_s with * ". Action: " Action1a "." *
-                | parse msg_s with * " was " Action1b " to " NatDestination ":" NatDestinationPort:int "." *
+                //| parse msg_s with * " was " Action1b " to " NatDestinationAddress ":" NatDestinationPort:int "." *
                 | parse msg_s with Protocol2 " request from " SourceAddress2 " to " DestinationAddress2 ". Action: " Action2 "." *
                 | extend
-                    FirewallAction = case(isnotempty(Action1a), Action1a, isnotempty(Action1b), Action1b, Action2),
+                    //FirewallAction = case(isnotempty(Action1a), Action1a, isnotempty(Action1b), Action1b, Action2),
+                    FirewallAction = case(isnotempty(Action1a), Action1a, Action2),
                     Protocol = iff(isnotempty(Protocol), Protocol, Protocol2),
                     SourceAddress = iff(isnotempty(SourceAddress1), SourceAddress1, SourceAddress2),
-                    DestinationAddress = iff(isnotempty(DestinationAddress1), DestinationAddress1, DestinationAddress2),
-                    NatDestinationAddress = iff(isnotempty(NatDestination), NatDestination, "")
-                | mv-expand IPAddress = pack_array(SourceAddress, DestinationAddress, NatDestinationAddress) to typeof(string)
+                    DestinationAddress = iff(isnotempty(DestinationAddress1), DestinationAddress1, DestinationAddress2)//,
+                    //NatDestinationAddress = iff(isnotempty(NatDestination), NatDestination, "")
+                // Remove special cases where WAF is involved
+                | where not(DestinationAddress in (_WAFAddresses))
+                | where not(SourceAddress in (_WAFAddresses) and FirewallAction == "Log" and msg_s has_any (_BenignWAFReplies))
+                | mv-expand IPAddress = pack_array(SourceAddress, DestinationAddress) to typeof(string) //, NatDestinationAddress)
                 | where isnotempty(IPAddress)
-                | where not(ipv4_is_private(IPAddress))
                 // Remove denied traffic where the source was remote
-                | where not(IPAddress == SourceAddress and Firewall_Action == "Deny")
-                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                | where not(IPAddress == SourceAddress and FirewallAction == "Deny")
+                | where not(ipv4_is_private(IPAddress))
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
+        //// Remove indicators of certain type
+        //| where not(todynamic(AdditionalInformation)["value_type"] in ("domain", "url"))
         ,
         'IP', 'AzureActivity',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1189,7 +1211,7 @@
         'IP', 'AuditLogs',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1197,14 +1219,14 @@
             "TITableConditions":
                 ```
                 | where isnotempty(IPAddress)
-                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(InitiatedBy has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'File_Hash', 'SecurityEvent',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1213,13 +1235,14 @@
                 ```
                 // AppLocker generates hash PE256 for .exe files, WHICH IS NOT SHA256, unless you ingest PE256 hash indicators this rule should be disabled
                 | where EventID in (8002, 8003, 8005) and isnotempty(FileHash)
-                | extend FileHashValue = toupper(FileHash)```
+                | extend FileHashValue = toupper(FileHash)
+                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
         })
         ,
         'File_Hash', 'DeviceFileEvents',
         dynamic({
             "TITableLookback":
-                '1d'
+                '3d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1229,13 +1252,44 @@
                 | mv-expand FileHashValue = pack_array(MD5, SHA1, SHA256) to typeof(string)
                 | where isnotempty(FileHashValue)
                 //| where not(FileHashValue in ("00000000000000000000000000000000", "0000000000000000000000000000000000000000000000000000000000000000"))
-                | extend FileHashValue = toupper(FileHashValue)```
+                | extend FileHashValue = toupper(FileHashValue)
+                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Email', 'AADNonInteractiveUserSignInLogs',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(UserPrincipalName has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend EmailAddress = tolower(UserPrincipalName)
+                //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Email', 'SigninLogs',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(UserPrincipalName has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend EmailAddress = tolower(UserPrincipalName)
+                //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
         })
         ,
         'Email', 'SecurityAlert',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ```
@@ -1253,7 +1307,7 @@
             "TITableConditions":
                 ```
                 | where isnotempty(Entities)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 // Extract already recognized addresses
                 | mv-apply EntitiesDynamic = todynamic(Entities) on (
                     extend EntityUPNSuffix = tostring(EntitiesDynamic.UPNSuffix)
@@ -1271,41 +1325,14 @@
                     EmailAddress has "#EXT#", replace_regex(EmailAddress, _ExternalEmailAddressRegex, @"\2@\3"),
                     EmailAddress startswith "live.com#" or EmailAddress startswith "guest#", replace_regex(EmailAddress, strcat(@"(?:live\.com#|guest#)", _EmailAddressRegex), @"\2@\3"),
                     EmailAddress
-                    )```
-        })
-        ,
-        'Email', 'AADNonInteractiveUserSignInLogs',
-        dynamic({
-            "TITableLookback":
-                '1d'
-            ,
-            "TITableAdditionalLets":
-                ``````
-            ,
-            "TITableConditions":
-                ```
-                | where not(_IndicatorsPrefilterLength < 10000 and not(UserPrincipalName has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | extend EmailAddress = tolower(UserPrincipalName)```
-        })
-        ,
-        'Email', 'SigninLogs',
-        dynamic({
-            "TITableLookback":
-                '1d'
-            ,
-            "TITableAdditionalLets":
-                ``````
-            ,
-            "TITableConditions":
-                ```
-                | where not(_IndicatorsPrefilterLength < 10000 and not(UserPrincipalName has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | extend EmailAddress = tolower(UserPrincipalName)```
+                    )
+                //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
         })
         ,
         'Email', 'OfficeActivity',
         dynamic({
             "TITableLookback":
-                '1d'
+                '7d'
             ,
             "TITableAdditionalLets":
                 ```
@@ -1323,7 +1350,7 @@
             "TITableConditions":
                 ```
                 | where not(isempty(UserId) and isempty(TargetUserOrGroupName))
-                | where not(_IndicatorsPrefilterLength < 10000 and not(UserId has_any (_IndicatorsPrefilter) or TargetUserOrGroupName has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(UserId has_any (_IndicatorsPrefilter) or TargetUserOrGroupName has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | mv-expand EmailAddress = pack_array(UserId, TargetUserOrGroupName)
                 | where isnotempty(EmailAddress)
                 | extend EmailAddress = tolower(EmailAddress)
@@ -1332,13 +1359,14 @@
                     EmailAddress has "#EXT#", replace_regex(EmailAddress, _ExternalEmailAddressRegex, @"\2@\3"),
                     EmailAddress startswith "live.com#" or EmailAddress startswith "urn:spo:guest#", replace_regex(EmailAddress, strcat(@"(?:live\.com#|urn:spo:guest#)", _EmailAddressRegex), @"\2@\3"),
                     EmailAddress
-                    )```
+                    )
+                //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
         })
         ,
         'Email', 'AzureActivity',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ```
@@ -1356,20 +1384,21 @@
             "TITableConditions":
                 ```
                 | where isnotempty(Caller)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(Caller has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Caller has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend EmailAddress = tolower(Caller)
                 | where EmailAddress matches regex _EmailAddressRegex
                 | extend EmailAddress = case(
                     EmailAddress has "#EXT#", replace_regex(EmailAddress, _ExternalEmailAddressRegex, @"\2@\3"),
                     EmailAddress startswith "live.com#" or EmailAddress startswith "urn:spo:guest#", replace_regex(EmailAddress, strcat(@"(?:live\.com#|urn:spo:guest#)", _EmailAddressRegex), @"\2@\3"),
                     EmailAddress
-                    )```
+                    )
+                //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
         })
         ,
         'Email', 'AuditLogs',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ```
@@ -1387,7 +1416,7 @@
             "TITableConditions":
                 ```
                 | where not(array_length(TargetResources) == 0)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(TargetResources has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(TargetResources has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend TargetResourcesEmails = todynamic(dynamic_to_json(extract_all(_EmailAddressRegex, dynamic([1]), tostring(TargetResources))))
                 | mv-expand EmailAddress = TargetResourcesEmails
                 | extend EmailAddress = tolower(tostring(EmailAddress[0]))
@@ -1398,136 +1427,11 @@
                     EmailAddress has "#EXT#", replace_regex(EmailAddress, _ExternalEmailAddressRegex, @"\2@\3"),
                     EmailAddress startswith "live.com#" or EmailAddress startswith "guest#", replace_regex(EmailAddress, strcat(@"(?:live\.com#|guest#)", _EmailAddressRegex), @"\2@\3"),
                     EmailAddress
-                    )```
+                    )
+                //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'Syslog',
-        dynamic({
-            "TITableLookback":
-                '1d'
-            ,
-            "TITableAdditionalLets":
-                ``````
-            ,
-            "TITableConditions":
-                ```
-                | where isnotempty(SyslogMessage)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), SyslogMessage)))
-                | mv-expand Domain = Domains
-                | extend Domain = tolower(tostring(Domain[0]))
-                | where isnotempty(Domain)
-                // Remove if TLD is unwanted
-                // | where tostring(split(Domain, ".")[-1]) in (toscalar(_Indicators | summarize make_set(tostring(split(Domain, ".")[-1]))))
-                | summarize take_any(*) by OriginalDomain = Domain
-                | extend SplitLevelDomains = split(OriginalDomain, ".")
-                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
-                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")```
-        })
-        ,
-        'Domain', 'SecurityAlert',
-        dynamic({
-            "TITableLookback":
-                '1d'
-            ,
-            "TITableAdditionalLets":
-                ``````
-            ,
-            "TITableConditions":
-                ```
-                | where isnotempty(Entities)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), Entities)))
-                | mv-expand Domain = Domains
-                | extend Domain = tolower(tostring(Domain[0]))
-                | where isnotempty(Domain)
-                | summarize take_any(*) by OriginalDomain = Domain
-                | extend SplitLevelDomains = split(OriginalDomain, ".")
-                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
-                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")```
-        })
-        ,
-        'Domain', 'OfficeActivity',
-        dynamic({
-            "TITableLookback":
-                '1d'
-            ,
-            "TITableAdditionalLets":
-                ``````
-            ,
-            "TITableConditions":
-                ```
-                | where isnotempty(ModifiedProperties)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(ModifiedProperties has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), ModifiedProperties)))
-                | mv-expand Domain = Domains
-                | extend Domain = tolower(tostring(Domain[0]))
-                | where isnotempty(Domain)
-                | summarize take_any(*) by OriginalDomain = Domain
-                | extend SplitLevelDomains = split(OriginalDomain, ".")
-                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
-                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")```
-        })
-        ,
-        'Domain', 'DnsEvents',
-        dynamic({
-            "TITableLookback":
-                '1d'
-            ,
-            "TITableAdditionalLets":
-                ``````
-            ,
-            "TITableConditions":
-                ```
-                | where isnotempty(Name)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(Name has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | summarize take_any(*) by OriginalDomain = tolower(Name)
-                | extend SplitLevelDomains = split(OriginalDomain, ".")
-                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
-                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")```
-        })
-        ,
-        'Domain', 'Cisco_Umbrella',
-        dynamic({
-            "TITableLookback":
-                '1d'
-            ,
-            "TITableAdditionalLets":
-                ``````
-            ,
-            "TITableConditions":
-                ```
-                | where isnotempty(Domain_s)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(Domain_s has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | summarize take_any(*) by OriginalDomain = tolower(Domain_s)
-                | extend SplitLevelDomains = split(OriginalDomain, ".")
-                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
-                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -2), ".")```
-        })
-        ,
-        'Domain', 'DeviceNetworkEvents',
-        dynamic({
-            "TITableLookback":
-                '1d'
-            ,
-            "TITableAdditionalLets":
-                ``````
-            ,
-            "TITableConditions":
-                ```
-                | where isnotempty(RemoteUrl)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(RemoteUrl has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), RemoteUrl)))
-                | mv-expand Domain = Domains
-                | extend Domain = tolower(tostring(Domain[0]))
-                | where isnotempty(Domain)
-                | summarize take_any(*) by OriginalDomain = Domain
-                | extend SplitLevelDomains = split(OriginalDomain, ".")
-                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
-                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")```
-        })
-        ,
-        'Domain', 'AuditLogs',
         dynamic({
             "TITableLookback":
                 '1d'
@@ -1542,16 +1446,174 @@
             ,
             "TITableConditions":
                 ```
-                | where not(array_length(TargetResources) == 0)
-                | where not(_IndicatorsPrefilterLength < 10000 and not(TargetResources has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), TargetResources)))
+                | where isnotempty(SyslogMessage)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), SyslogMessage)))
                 | mv-expand Domain = Domains
                 | extend Domain = tolower(tostring(Domain[0]))
                 | where isnotempty(Domain)
-                | summarize take_any(*) by OriginalDomain = Domain
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
-                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")```
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'SecurityAlert',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ```
+                let _DomainRegex = toscalar(
+                    _GetWatchlist('RegEx-SingleRegularExpressions')
+                    | where UseCase == "Threat Intelligence Indicator Domain"
+                    | project RegEx
+                );```
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(Entities)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), Entities)))
+                | mv-expand Domain = Domains
+                | extend Domain = tolower(tostring(Domain[0]))
+                | where isnotempty(Domain)
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'OfficeActivity',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ```
+                let _DomainRegex = toscalar(
+                    _GetWatchlist('RegEx-SingleRegularExpressions')
+                    | where UseCase == "Threat Intelligence Indicator Domain"
+                    | project RegEx
+                );```
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(ModifiedProperties)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(ModifiedProperties has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), ModifiedProperties)))
+                | mv-expand Domain = Domains
+                | extend Domain = tolower(tostring(Domain[0]))
+                | where isnotempty(Domain)
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'DnsEvents',
+        dynamic({
+            "TITableLookback":
+                '2d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(Name)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Name has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = tolower(Name)
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'DeviceNetworkEvents',
+        dynamic({
+            "TITableLookback":
+                '5d'
+            ,
+            "TITableAdditionalLets":
+                ```
+                let _DomainRegex = toscalar(
+                    _GetWatchlist('RegEx-SingleRegularExpressions')
+                    | where UseCase == "Threat Intelligence Indicator Domain"
+                    | project RegEx
+                );```
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(RemoteUrl)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteUrl has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), RemoteUrl)))
+                | mv-expand Domain = Domains
+                | extend Domain = tolower(tostring(Domain[0]))
+                | where isnotempty(Domain)
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'Cisco_Umbrella',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(Domain_s)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Domain_s has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = trim_end(@"\.", tolower(Domain_s))
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'AuditLogs',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ```
+                let _DomainRegex = toscalar(
+                    _GetWatchlist('RegEx-SingleRegularExpressions')
+                    | where UseCase == "Threat Intelligence Indicator Domain"
+                    | project RegEx
+                );```
+            ,
+            "TITableConditions":
+                ```
+                | where not(array_length(TargetResources) == 0)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(TargetResources has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), tostring(TargetResources))))
+                | mv-expand Domain = Domains
+                | extend Domain = tolower(tostring(Domain[0]))
+                | where isnotempty(Domain)
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
     ];
     _IndicatorXTableDatatable
