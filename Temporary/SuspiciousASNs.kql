@@ -1,0 +1,15 @@
+union SigninLogs, AADNonInteractiveUserSignInLogs
+| where AutonomousSystemNumber in (33438, 25369, 62240, 9009, 60068, 40676, 8100)
+| summarize
+    min(TimeGenerated),
+    max(TimeGenerated),
+    ResultTypes = make_set(ResultType),
+    IPAddresses = make_set(IPAddress),
+    ASNs = make_set(AutonomousSystemNumber),
+    AppDisplayNames = make_set(AppDisplayName),
+    ClientAppUsed = make_set_if(ClientAppUsed, isnotempty(ClientAppUsed)),
+    ResourceDisplayNames = make_set(ResourceDisplayName),
+    take_anyif(UserPrincipalName, not(UserPrincipalName matches regex @"[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+")),
+    take_anyif(UserDisplayName, isnotempty(UserDisplayName))
+    by UserId
+| project UserPrincipalName, UserDisplayName, min_TimeGenerated, max_TimeGenerated, ResultTypes, IPAddresses, ASNs, AppDisplayNames, ClientAppUsed, ResourceDisplayNames, UserId
