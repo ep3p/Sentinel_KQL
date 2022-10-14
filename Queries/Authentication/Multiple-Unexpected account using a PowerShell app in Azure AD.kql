@@ -11,7 +11,8 @@ let _HomeTenantId = toscalar(
     | summarize make_list(TenantId)
 );
 let _ShellApps = toscalar(
-    _GetWatchlist('UUID-PowerShellAADApps')
+    _GetWatchlist('UUID-AADApps')
+    | where Notes has "[PowerShell]"
     | summarize make_list(AppId)
 );
 let _ExpectedResultTypes = toscalar(
