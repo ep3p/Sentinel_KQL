@@ -1,0 +1,37 @@
+// This query can help you to filter certain security alerts depending on the auditor of the events.
+// This function will need the list of auditors you want to filter, and the rule ids that generate the security alerts.
+//
+// Click "Save as function", in Parameters write in the fields:
+// "dynamic"  "rule_auditors"      "dynamic([])"
+// "dynamic"  "monitored_rule_ids" "dynamic([])"
+//
+// If you name the function "AuditorAlerts", you can check the function with queries like the following:
+//
+// AuditorAlerts(dynamic(["SOC","Security Architecture"]), dynamic(["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"]))
+//
+//let Function = (rule_auditors:dynamic = dynamic([]), monitored_rule_ids:dynamic = dynamic([])){
+    SecurityAlert
+    | where AlertType has_any (monitored_rule_ids)
+    | project
+        AlertName,
+        AlertSeverity,
+        AlertDescription = Description,
+        Tactics,
+        Entities,
+        ExtractedEvents = extract_all(@"\'([^\']+)\'", dynamic([1]), tostring(todynamic(ExtendedProperties).Query))
+    | mv-expand ExtractedEvents to typeof(string)
+    | extend BagToUnpack = todynamic(zlib_decompress_from_base64_string(ExtractedEvents))
+    | evaluate bag_unpack(BagToUnpack, columnsConflict="replace_source")
+    | where column_ifexists("Auditor", "") in (rule_auditors)
+    | project-away ExtractedEvents
+    | extend
+        TimeGenerated = column_ifexists("TimeGenerated", datetime(null)),
+        Activity = column_ifexists("Activity", ""),
+        ActorAccount = column_ifexists("ActorAccount", ""),
+        Auditor = column_ifexists("Auditor", ""),
+        Auditors = column_ifexists("Auditors", "")
+    | project-away Auditor, Auditors
+    | project-reorder
+        TimeGenerated
+//};
+//Function(rule_auditors, monitored_rule_ids)
