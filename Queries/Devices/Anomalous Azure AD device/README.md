@@ -17,4 +17,4 @@ Azure AD devices may be joined with different trust types:
 
 In an enterprise you may not expect some trust types to happen depending on your processes, maybe there aren't AD on-premises devices being synchronized to Azure AD, or employees might use managed or personal devices exclusively, or the personal devices have to be enrolled on Intune... So the expected trust types, Intune Group Tags or other information could be defined in a Watchlist to compare against.
 
-Sometimes threat actors may have to join their own devices to Azure AD to use compromised accounts or other activity, or an employee unknowningly tries to join an external device when signing into their account in Windows, these devices could be considered anomalous, and it might be worth looking into them.
+Sometimes threat actors may have to join their own devices to Azure AD to use compromised accounts or other activity, or an employee unknowningly tries to join an external device when signing into their enterprise account in Windows, these devices could be considered anomalous, and it might be worth looking into them.
