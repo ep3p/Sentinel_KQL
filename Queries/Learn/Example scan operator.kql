@@ -1,0 +1,37 @@
+// Notice that x = 15 does not have a state whose "parent step" is step 3 . But 11, 12, 13, 14, 16 do.
+// This is because 14 had evaluated step 2 successfully, so in the next event (15) the state from step 2 will take precedence over the state from step 3, and this one will disappear.
+let threshold = 5;
+let _Range =
+    range x from 1 to 16 step 1
+    | extend ToBeCounted = not(x between (4 .. 6))
+;
+let _ScanResults =
+    _Range
+    | scan declare (ScanStep:long=0, ParentStep:long=0, Count:long=0, SurpassedThreshold:bool=false) with
+    (
+        step Step1: // output=none:
+            ToBeCounted
+            =>  ScanStep = 1,
+                Count = Step1.Count + 1,
+                ParentStep = iff(Step1.Count == 0, int(null), 1)
+        ;
+        step Step2:
+            ToBeCounted and Step1.Count >= threshold
+            =>  ScanStep = 2,
+                Count = Step1.Count,
+                SurpassedThreshold = true,
+                ParentStep = iff(Step2.ParentStep == 0, 1, 2)
+        ;
+        step Step3:
+            ToBeCounted and Step1.Count >= threshold
+            =>  ScanStep = 3,
+                Count = Step2.Count,
+                SurpassedThreshold = true,
+                ParentStep = iff(Step3.ParentStep == 0, 2, 3)
+        ;
+    )
+;
+_Range
+| lookup _ScanResults on x, ToBeCounted
+| sort by x asc, ScanStep asc
+| project-reorder x, ToBeCounted, ScanStep, ParentStep
