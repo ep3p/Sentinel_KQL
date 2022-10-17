@@ -1,0 +1,5 @@
+SecurityIncident
+| where CreatedTime between (make_datetime(2022,getmonth(now())-1,01)..make_datetime(2022,getmonth(now()),01))
+| summarize arg_max(TimeGenerated, *) by IncidentName
+| where Classification == "TruePositive"
+| project CreatedTime, ProviderIncidentId, Title, Severity, Classification, Labels, IncidentUrl
