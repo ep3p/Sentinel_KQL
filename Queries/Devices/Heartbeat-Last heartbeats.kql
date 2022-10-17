@@ -1,0 +1,6 @@
+let query_period = 24h;
+Heartbeat
+| where TimeGenerated > ago(query_period)
+| summarize arg_max(TimeGenerated, *) by Category, VMUUID, SourceComputerId
+| sort by Computer asc, VMUUID asc, Category asc, SourceComputerId asc
+| project-reorder Category, TimeGenerated, Computer, ComputerIP, ComputerPrivateIPs
