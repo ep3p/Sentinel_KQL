@@ -1,0 +1,15 @@
+let excluded_incidents = dynamic([
+    "Automation Rules stopped working"
+]);
+SecurityIncident
+| where CreatedTime > ago(90d)
+| summarize arg_max(TimeGenerated, *) by IncidentName
+| where not(Title in (excluded_incidents))
+| where Classification == "BenignPositive" and ModifiedBy has_any ("Automation rule", "Alert updated")
+| project CreatedTime, ProviderIncidentId, Title, Severity, Classification, Labels, IncidentUrl, ModifiedBy
+| extend Month = getmonth(CreatedTime)
+| summarize ClosedIncidents = count() by Month, Title
+| sort by Month asc
+| render areachart kind=stacked
+//| sort by Title asc
+//| serialize AccumulatedClosedIncidents = row_cumsum(ClosedIncidents)
