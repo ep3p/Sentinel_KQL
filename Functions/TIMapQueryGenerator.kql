@@ -190,6 +190,34 @@
         })
     ];
     let _TablesDatatable = datatable(EntityType:string, TableDictionary:dynamic) [
+        'VMConnection',
+        dynamic({
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'VMConnection'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                '//, Computer'
+            ,
+            "TableColumns":
+                '_ResourceId, Computer, SourceIp, DestinationIp, Protocol, DestinationPort, Direction, RemoteIp, ProcessName, RemoteDnsQuestions, RemoteDnsCanonicalNames, ConnectionId'
+            ,
+            "TableCustomEntityExtend":
+                ```,
+                HostCustomEntity = Computer```
+        })
+        ,
         'Syslog',
         dynamic({
             "TableAdditionalLets":
@@ -217,6 +245,60 @@
                 ```,
                 HostCustomEntity = HostName,
                 //IPCustomEntity = HostIP```
+        })
+        ,
+        'StorageFileLogs',
+        dynamic({
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'StorageFileLogs'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                '//, AccountName'
+            ,
+            "TableColumns":
+                '_ResourceId, Category, AccountName, CallerIpAddress, IPAddress, OperationName, LastModifiedTime, AuthenticationType, AuthenticationHash, Protocol, StatusCode, StatusText, ReferrerHeader, Uri, ConditionsUsed, UserAgentHeader, CorrelationId'
+            ,
+            "TableCustomEntityExtend":
+                ``````
+        })
+        ,
+        'StorageBlobLogs',
+        dynamic({
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'StorageBlobLogs'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                '//, AccountName'
+            ,
+            "TableColumns":
+                '_ResourceId, Category, AccountName, CallerIpAddress, IPAddress, OperationName, LastModifiedTime, AuthenticationType, AuthenticationHash, Protocol, StatusCode, StatusText, ReferrerHeader, Uri, ConditionsUsed, UserAgentHeader, CorrelationId'
+            ,
+            "TableCustomEntityExtend":
+                ``````
         })
         ,
         'AADManagedIdentitySignInLogs',
@@ -459,7 +541,7 @@
                 'OfficeActivity'
             ,
             "TableTimeColumn":
-                'TimeGenerated'
+                'ingestion_time()'
             ,
             "PreTableOperators":
                 ``````
@@ -477,6 +559,87 @@
                 ```,
                 //AccountCustomEntity = UserId,
                 //IPCustomEntity = ClientIP```
+        })
+        ,
+        'EmailUrlInfo',
+        dynamic({
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'EmailUrlInfo'
+            ,
+            "TableTimeColumn":
+                'ingestion_time()'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ''
+            ,
+            "TableColumns":
+                'UrlLocation, Url, UrlDomain, NetworkMessageId, ReportId'
+            ,
+            "TableCustomEntityExtend":
+                ``````
+        })
+        ,
+        'EmailEvents',
+        dynamic({
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'EmailEvents'
+            ,
+            "TableTimeColumn":
+                'ingestion_time()'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ''
+            ,
+            "TableColumns":
+                'SenderFromAddress, SenderFromDomain, SenderMailFromAddress, SenderMailFromDomain, SenderDisplayName, SenderIPv4, SenderIPv6, AuthenticationDetails, RecipientEmailAddress, EmailDirection, Subject, EmailLanguage, UrlCount, AttachmentCount, AdditionalFields, OrgLevelPolicy, OrgLevelAction, UserLevelPolicy, UserLevelAction, EmailActionPolicy, EmailAction, DeliveryAction, DeliveryLocation, ThreatTypes, ConfidenceLevel, DetectionMethods, Connectors, NetworkMessageId, ReportId'
+            ,
+            "TableCustomEntityExtend":
+                ``````
+        })
+        ,
+        'EmailAttachmentInfo',
+        dynamic({
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'EmailAttachmentInfo'
+            ,
+            "TableTimeColumn":
+                'ingestion_time()'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ''
+            ,
+            "TableColumns":
+                'SenderFromAddress, SenderDisplayName, RecipientEmailAddress, FileName, FileType, FileSize, SHA256, ThreatTypes, DetectionMethods, NetworkMessageId, ReportId'
+            ,
+            "TableCustomEntityExtend":
+                ``````
         })
         ,
         'DnsEvents',
@@ -660,7 +823,7 @@
             ,
             "PreTableOperators":
                 ```
-                | where ResourceProvider has "MICROSOFT.SQL"
+                | where ResourceProvider == "MICROSOFT.SQL"
                 | extend IPAddress = column_ifexists("client_ip_s", "")```
             ,
             "PostTableOperators":
@@ -689,6 +852,34 @@
                 //IPCustomEntity = IPAddress```
         })
         ,
+        'Azure_Kubernetes',
+        dynamic({
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'AzureDiagnostics'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ```
+                | where ResourceProvider == "MICROSOFT.CONTAINERSERVICE" and ResourceType == "MANAGEDCLUSTERS"```
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                '//, ResourceId'
+            ,
+            "TableColumns":
+                'Category, ResourceId, ResourceType, OperationName, Environment_s, pod_s, UnderlayName_s, stream_s, log_s'
+            ,
+            "TableCustomEntityExtend":
+                ``````
+        })
+        ,
         'Azure_Key_Vault',
         dynamic({
             "TableAdditionalLets":
@@ -702,7 +893,7 @@
             ,
             "PreTableOperators":
                 ```
-                | where ResourceProvider has "MICROSOFT.KEYVAULT"```
+                | where ResourceProvider == "MICROSOFT.KEYVAULT"```
             ,
             "PostTableOperators":
                 ```
@@ -746,7 +937,7 @@
             ,
             "PreTableOperators":
                 ```
-                | where ResourceProvider has "MICROSOFT.NETWORK" and ResourceType has "AZUREFIREWALLS"// and Category in ("AzureFirewallNetworkRule", "AzureFirewallApplicationRule")
+                | where ResourceProvider == "MICROSOFT.NETWORK" and ResourceType == "AZUREFIREWALLS"// and Category in ("AzureFirewallNetworkRule", "AzureFirewallApplicationRule")
                 // Some kinds of operations could be excluded
                 | where not(OperationName in ("AzureFirewallNatRuleLog"))// "AzureFirewallNetworkRuleLog", "AzureFirewallApplicationRuleLog", "AzureFirewallIDSLog", "AzureFirewallThreatIntelLog"```
             ,
@@ -759,6 +950,34 @@
             "TableColumns":
                 ```Resource, Category, OperationName, FirewallAction, Protocol, SourceAddress, DestinationAddress,// NatDestinationAddress,
                 msg_s, ResourceId, ResourceType```
+            ,
+            "TableCustomEntityExtend":
+                ``````
+        })
+        ,
+        'Azure_Data_Lake',
+        dynamic({
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'AzureDiagnostics'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ```
+                | where ResourceProvider == "MICROSOFT.DATALAKESTORE" and ResourceType == "ACCOUNTS" and Category in ("Requests")```
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                '//, ResourceId'
+            ,
+            "TableColumns":
+                ```Category, ResourceId, ResourceType, identity_s, CallerIPAddress, OperationName, ResultType, HttpMethod_s, Path_s, QueryParameters_s, CorrelationId```
             ,
             "TableCustomEntityExtend":
                 ``````
@@ -838,8 +1057,9 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), SyslogMessage)))
                 | mv-expand Url = Urls
-                | extend Url = trim_end(@"\/", tostring(Url[0]))
+                | extend Url = tostring(Url[0])
                 | where isnotempty(Url)
+                | extend Url = trim_end(@"\/", Url)
                 //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
@@ -857,8 +1077,9 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), Entities)))
                 | mv-expand Url = Urls
-                | extend Url = trim_end(@"\/", tostring(Url[0]))
+                | extend Url = tostring(Url[0])
                 | where isnotempty(Url)
+                | extend Url = trim_end(@"\/", Url)
                 //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
@@ -876,8 +1097,25 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(ModifiedProperties has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), ModifiedProperties)))
                 | mv-expand Url = Urls
-                | extend Url = trim_end(@"\/", tostring(Url[0]))
+                | extend Url = tostring(Url[0])
                 | where isnotempty(Url)
+                | extend Url = trim_end(@"\/", Url)
+                //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
+        })
+        ,
+        'URL', 'EmailUrlInfo',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(Url)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Url has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend Url = trim_end(@"\/", Url)
                 //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
@@ -900,8 +1138,9 @@
                         RemoteUrl
                     ))))
                 | mv-expand Url = Urls
-                | extend Url = trim_end(@"\/", tostring(Url[0]))
+                | extend Url = tostring(Url[0])
                 | where isnotempty(Url)
+                | extend Url = trim_end(@"\/", Url)
                 //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
         })
         ,
@@ -919,9 +1158,27 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(TargetResources has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), tostring(TargetResources))))
                 | mv-expand Url = Urls
-                | extend Url = trim_end(@"\/", tostring(Url[0]))
+                | extend Url = tostring(Url[0])
                 | where isnotempty(Url)
+                | extend Url = trim_end(@"\/", Url)
                 //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'VMConnection',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where not(isempty(RemoteIp))
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | extend IPAddress = trim_start("::ffff:", RemoteIp)
+                | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Syslog',
@@ -946,10 +1203,46 @@
                 ```
                 | where isnotempty(SyslogMessage) and not(SyslogMessage has @'[preauth]')
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | extend IPAddressv4 = extract_all(strcat(@"\s", _IPv4Regex), SyslogMessage)
-                | extend IPAddressv6 = extract_all(strcat(@"\s", _IPv6Regex), SyslogMessage)
+                | extend IPAddressv4 = extract_all(strcat(@'\"', _IPv4Regex), SyslogMessage)
+                | extend IPAddressv6 = extract_all(strcat(@'\"', _IPv6Regex), SyslogMessage)
                 | mv-expand IPAddress = array_concat(IPAddressv4, IPAddressv6) to typeof(string)
                 | where isnotempty(IPAddress) and not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))```
+        })
+        ,
+        'IP', 'StorageFileLogs',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(CallerIpAddress)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), CallerIpAddress)[0]
+                | extend IPAddress = tostring(ClientIPValues[0])
+                | where (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))) and not(ipv4_is_private(IPAddress))
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'StorageBlobLogs',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(CallerIpAddress)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), CallerIpAddress)[0]
+                | extend IPAddress = tostring(ClientIPValues[0])
+                | where (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))) and not(ipv4_is_private(IPAddress))
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'AADServicePrincipalSignInLogs',
@@ -1069,7 +1362,7 @@
             ,
             "TITableConditions":
                 ```
-                | where isnotempty(IPAddresses) and SubType has "LookupQuery"
+                | where isnotempty(IPAddresses) and SubType == "LookupQuery"
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddresses has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = array_concatsplit(IPAddresses, ", ") to typeof(string)
                 | where not(ipv4_is_private(IPAddress))
@@ -1089,10 +1382,10 @@
             "TITableConditions":
                 ```
                 | where not(isempty(RemoteIP))
-                    and not(ActionType has "NetworkSignatureInspected")
-                    and not(RemoteIPType has_any ("Private", "Loopback", "Teredo", "Broadcast"))//Reserved
+                    and not(ActionType == "NetworkSignatureInspected")
+                    and not(RemoteIPType in ("Private", "Loopback", "Teredo", "Broadcast"))//Reserved
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | extend IPAddress = iff(RemoteIPType has "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
+                | extend IPAddress = iff(RemoteIPType == "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
                 | where not(ipv4_is_private(IPAddress))
                 | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
@@ -1112,6 +1405,36 @@
                 ```
                 | where isnotempty(IPAddress) and (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress)))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'Azure_Kubernetes',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ```
+                let _IPv4Regex = toscalar(
+                    _GetWatchlist('RegEx-SingleRegularExpressions')
+                    | where UseCase == "Threat Intelligence Indicator IPv4"
+                    | project RegEx
+                );
+                let _IPv6Regex = toscalar(
+                    _GetWatchlist('RegEx-SingleRegularExpressions')
+                    | where UseCase == "Threat Intelligence Indicator IPv6"
+                    | project RegEx
+                );```
+            ,
+            "TITableConditions":
+                ```
+                | where not(log_s has @'"status":"Failure"')
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | extend IPAddressv4 = extract_all(strcat(@'\"', _IPv4Regex), log_s)
+                | extend IPAddressv6 = extract_all(strcat(@'\"', _IPv6Regex), log_s)
+                | mv-expand IPAddress = array_concat(IPAddressv4, IPAddressv6) to typeof(string)
+                | where isnotempty(IPAddress) and not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
                 | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1127,8 +1450,9 @@
                 ```
                 | where isnotempty(CallerIPAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(CallerIPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
-                | extend IPAddress = CallerIPAddress```
+                | extend IPAddress = trim_start("::ffff:", CallerIPAddress)
+                | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Azure_Firewall',
@@ -1176,6 +1500,23 @@
         //// Remove indicators of certain type
         //| where not(todynamic(AdditionalInformation)["value_type"] in ("domain", "url"))
         ,
+        'IP', 'Azure_Data_Lake',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(CallerIPAddress)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | extend IPAddress = trim_start("::ffff:", CallerIPAddress)
+                | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
         'IP', 'AzureActivity',
         dynamic({
             "TITableLookback":
@@ -1188,8 +1529,8 @@
                 ```
                 | where isnotempty(CallerIpAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(CallerIpAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
-                | extend IPAddress = CallerIpAddress```
+                | extend IPAddress = CallerIpAddress //trim_start("::ffff:", CallerIpAddress)
+                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'AWSCloudTrail',
@@ -1236,6 +1577,21 @@
                 // AppLocker generates hash PE256 for .exe files, WHICH IS NOT SHA256, unless you ingest PE256 hash indicators this rule should be disabled
                 | where EventID in (8002, 8003, 8005) and isnotempty(FileHash)
                 | extend FileHashValue = toupper(FileHash)
+                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
+        })
+        ,
+        'File_Hash', 'EmailAttachmentInfo',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(SHA256)
+                | extend FileHashValue = toupper(SHA256)
                 | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
         })
         ,
@@ -1360,6 +1716,24 @@
                     EmailAddress startswith "live.com#" or EmailAddress startswith "urn:spo:guest#", replace_regex(EmailAddress, strcat(@"(?:live\.com#|urn:spo:guest#)", _EmailAddressRegex), @"\2@\3"),
                     EmailAddress
                     )
+                //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Email', 'EmailEvents',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where not(EmailDirection in ("Intra-org"))
+                | mv-expand EmailAddress = pack_array(SenderFromAddress, iff(SenderFromAddress != SenderMailFromAddress, SenderFromAddress, ""), RecipientEmailAddress) to typeof(string)
+                | where isnotempty(EmailAddress)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(EmailAddress has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | extend EmailAddress = tolower(EmailAddress)
                 //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1511,6 +1885,48 @@
                 | extend Domain = tolower(tostring(Domain[0]))
                 | where isnotempty(Domain)
                 | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'EmailUrlInfo',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(UrlDomain)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(UrlDomain has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = tolower(UrlDomain)
+                | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'EmailEvents',
+        dynamic({
+            "TITableLookback":
+                '1d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where not(EmailDirection in ("Intra-org"))
+                | mv-expand Domain = pack_array(SenderFromDomain, iff(SenderFromDomain != SenderMailFromDomain, SenderFromDomain, ""), split(RecipientEmailAddress, "@")[-1]) to typeof(string)
+                | where isnotempty(Domain)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Domain has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = tolower(Domain)
                 | where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
