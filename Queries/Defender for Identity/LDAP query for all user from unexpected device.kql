@@ -1,0 +1,42 @@
+let _ExpectedIPAddresses = toscalar(
+    union
+        (_GetWatchlist('Service-PrivateCorporateServices')
+        | where Notes has "[LDAP-AllUsers]"
+        ),
+        (_GetWatchlist('IP-PrivateAddressing')
+        | where Notes has "[LDAP-AllUsers]"
+        )
+    | summarize make_list(IPAddress)
+);
+let _ExpectedDomains = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "DomainJoinedLDAP"
+    | summarize make_list(strcat(".", Auxiliar))
+    );
+IdentityQueryEvents
+| where not(DeviceName has_any (_ExpectedDomains))
+| parse Query with "LDAP Search Scope: " SearchScope ", Base Object:" BaseObject ", Search Filter: " SearchFilter
+| where Protocol == "Ldap" and QueryType == "AllUsers" and SearchScope == "WholeSubtree"
+| where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
+| extend AdditionalFieldsCount = toint(AdditionalFields["Count"])
+| summarize Count = sum(AdditionalFieldsCount), arg_min(TimeGenerated, *) by IPAddress
+| project
+    TimeGenerated,
+    DeviceName,
+    IPAddress,
+    ActionType,
+    Count,
+    Protocol,
+    QueryType,
+    QueryTarget,
+    TargetAccountUpn,
+    TargetAccountDisplayName,
+    SearchScope,
+    BaseObject,
+    SearchFilter,
+    Query,
+    Port,
+    DestinationDeviceName,
+    DestinationIPAddress,
+    DestinationPort,
+    AdditionalFields
