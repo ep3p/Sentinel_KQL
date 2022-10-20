@@ -1,0 +1,11 @@
+let _ExpectedIPAddresses = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "AxfrDNSQuery"
+    | summarize make_list(SourceAddress)
+);
+IdentityQueryEvents
+| where ActionType == "DNS query" and QueryType == "Axfr"
+| where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
+| extend AdditionalFieldsCount = toint(AdditionalFields["Count"])
+| summarize Count = sum(AdditionalFieldsCount), QueryTarget = make_set_if(QueryTarget, isnotempty(QueryTarget)), arg_min(TimeGenerated, *) by IPAddress
+| project TimeGenerated, DeviceName, IPAddress, ActionType, QueryType, Protocol, QueryTarget, DestinationDeviceName, DestinationIPAddress, DestinationPort, AdditionalFields
