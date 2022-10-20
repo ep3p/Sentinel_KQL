@@ -210,7 +210,7 @@
             "TableGroupByColumn":
                 '//, Computer'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 '_ResourceId, Computer, SourceIp, DestinationIp, Protocol, DestinationPort, Direction, RemoteIp, ProcessName, RemoteDnsQuestions, RemoteDnsCanonicalNames, ConnectionId'
             ,
             "TableCustomEntityExtend":
@@ -238,7 +238,7 @@
             "TableGroupByColumn":
                 '//, HostName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'HostName, HostIP, Facility, SeverityLevel, ProcessName, SyslogMessage'
             ,
             "TableCustomEntityExtend":
@@ -267,7 +267,7 @@
             "TableGroupByColumn":
                 '//, AccountName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 '_ResourceId, Category, AccountName, CallerIpAddress, IPAddress, OperationName, LastModifiedTime, AuthenticationType, AuthenticationHash, Protocol, StatusCode, StatusText, ReferrerHeader, Uri, ConditionsUsed, UserAgentHeader, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -294,7 +294,7 @@
             "TableGroupByColumn":
                 '//, AccountName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 '_ResourceId, Category, AccountName, CallerIpAddress, IPAddress, OperationName, LastModifiedTime, AuthenticationType, AuthenticationHash, Protocol, StatusCode, StatusText, ReferrerHeader, Uri, ConditionsUsed, UserAgentHeader, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -321,7 +321,7 @@
             "TableGroupByColumn":
                 ', ServicePrincipalName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, ServicePrincipalName, IPAddress, Location, ResultType, ResultDescription, AuthenticationProcessingDetails, AppId, ResourceDisplayName, ServicePrincipalId, ServicePrincipalCredentialKeyId, ServicePrincipalCredentialThumbprint, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -349,7 +349,7 @@
             "TableGroupByColumn":
                 ', ServicePrincipalName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, ServicePrincipalName, IPAddress, Location, ResultType, ResultDescription, AuthenticationProcessingDetails, AppId, ResourceDisplayName, ServicePrincipalId, ServicePrincipalCredentialKeyId, ServicePrincipalCredentialThumbprint, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -383,7 +383,7 @@
             "TableGroupByColumn":
                 '//, UserPrincipalName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, ConditionalAccessPolicies, UserId, OriginalRequestId, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -417,7 +417,7 @@
             "TableGroupByColumn":
                 '//, UserPrincipalName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, ConditionalAccessPolicies, RiskState, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -454,7 +454,7 @@
                     DeviceDetail = tostring(DeviceDetail),
                     ConditionalAccessPolicies = tostring(ConditionalAccessPolicies)```
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, ConditionalAccessPolicies, RiskState, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -483,7 +483,7 @@
             "TableGroupByColumn":
                 '//, Computer'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Computer, Account, EventID, Activity, Process, FilePath, Fqbn, FileHash, EventData'
             ,
             "TableCustomEntityExtend":
@@ -522,7 +522,7 @@
             "TableGroupByColumn":
                 ', AlertName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'AlertName, AlertSeverity, Entities, ProviderName, VendorName, Alert_Description, Alert_Account, Alert_IPAddress, Alert_HostName, CompromisedEntity'
             ,
             "TableCustomEntityExtend":
@@ -552,7 +552,7 @@
             "TableGroupByColumn":
                 '//, UserId'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'OfficeWorkload, RecordType, Operation, UserType, UserId, ClientIP, ResultStatus, OfficeObjectId, Parameters'
             ,
             "TableCustomEntityExtend":
@@ -576,13 +576,19 @@
                 ``````
             ,
             "PostTableOperators":
-                ``````
+                ```
+                | extend EmailUrlInfo_Url = Url```
             ,
             "TableGroupByColumn":
                 ''
             ,
-            "TableColumns":
-                'UrlLocation, Url, UrlDomain, NetworkMessageId, ReportId'
+            "TableColumns&LookUp":
+                ```UrlLocation, EmailUrlInfo_Url, UrlDomain, NetworkMessageId, ReportId
+                | join kind=leftouter hint.strategy=shuffle (
+                    EmailEvents
+                    | where ingestion_time() between(table_start .. table_end)
+                    | project SenderFromAddress, SenderFromDomain, SenderMailFromAddress, SenderMailFromDomain, SenderDisplayName, SenderIPv4, SenderIPv6, AuthenticationDetails, RecipientEmailAddress, EmailDirection, Subject, EmailLanguage, UrlCount, AttachmentCount, AdditionalFields, OrgLevelPolicy, OrgLevelAction, UserLevelPolicy, UserLevelAction, EmailActionPolicy, EmailAction, DeliveryAction, DeliveryLocation, ThreatTypes, ConfidenceLevel, DetectionMethods, Connectors, NetworkMessageId, ReportId
+                ) on NetworkMessageId```
             ,
             "TableCustomEntityExtend":
                 ``````
@@ -608,7 +614,7 @@
             "TableGroupByColumn":
                 ''
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'SenderFromAddress, SenderFromDomain, SenderMailFromAddress, SenderMailFromDomain, SenderDisplayName, SenderIPv4, SenderIPv6, AuthenticationDetails, RecipientEmailAddress, EmailDirection, Subject, EmailLanguage, UrlCount, AttachmentCount, AdditionalFields, OrgLevelPolicy, OrgLevelAction, UserLevelPolicy, UserLevelAction, EmailActionPolicy, EmailAction, DeliveryAction, DeliveryLocation, ThreatTypes, ConfidenceLevel, DetectionMethods, Connectors, NetworkMessageId, ReportId'
             ,
             "TableCustomEntityExtend":
@@ -635,8 +641,13 @@
             "TableGroupByColumn":
                 ''
             ,
-            "TableColumns":
-                'SenderFromAddress, SenderDisplayName, RecipientEmailAddress, FileName, FileType, FileSize, SHA256, ThreatTypes, DetectionMethods, NetworkMessageId, ReportId'
+            "TableColumns&LookUp":
+                ```SenderFromAddress, SenderDisplayName, RecipientEmailAddress, FileName, FileType, FileSize, SHA256, ThreatTypes, DetectionMethods, NetworkMessageId, ReportId
+                | join kind=leftouter hint.strategy=shuffle (
+                    EmailEvents
+                    | where ingestion_time() between(table_start .. table_end)
+                    | project SenderFromDomain, SenderMailFromAddress, SenderMailFromDomain, SenderIPv4, SenderIPv6, AuthenticationDetails, EmailDirection, Subject, EmailLanguage, UrlCount, AttachmentCount, AdditionalFields, OrgLevelPolicy, OrgLevelAction, UserLevelPolicy, UserLevelAction, EmailActionPolicy, EmailAction, DeliveryAction, DeliveryLocation, ConfidenceLevel, Connectors, NetworkMessageId, ReportId
+                ) on NetworkMessageId```
             ,
             "TableCustomEntityExtend":
                 ``````
@@ -662,7 +673,7 @@
             "TableGroupByColumn":
                 '//, ClientIP'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Computer, SubType, ClientIP, QueryType, Name, IPAddresses, MaliciousIP, IndicatorThreatType'
             ,
             "TableCustomEntityExtend":
@@ -690,7 +701,7 @@
             "TableGroupByColumn":
                 '//, DeviceName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'DeviceName, LocalIP, ActionType, RemoteUrl, RemoteIP, RemotePort, Protocol, LocalPort, InitiatingProcessCommandLine, InitiatingProcessFolderPath, InitiatingProcessAccountName, InitiatingProcessAccountUpn'
             ,
             "TableCustomEntityExtend":
@@ -722,7 +733,7 @@
             "TableGroupByColumn":
                 '//, DeviceName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'DeviceName, InitiatingProcessAccountName, InitiatingProcessAccountUpn, ActionType, DeviceFileEvents_FileName, DeviceFileEvents_FileSize, FolderPath, FileOriginReferrerUrl, FileOriginUrl, InitiatingProcessCommandLine, InitiatingProcessFolderPath, MD5 = toupper(MD5), SHA1 = toupper(SHA1), SHA256 = toupper(SHA256)'
             ,
             "TableCustomEntityExtend":
@@ -757,7 +768,7 @@
             "TableGroupByColumn":
                 '//, HostName'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 ```EventStartTime = todatetime(column_ifexists('Timestamp_t', column_ifexists('Timestamp_s',''))),
                 Dvc = "CiscoUmbrella",
                 DvcAction = column_ifexists('Action_s', ''),
@@ -801,7 +812,7 @@
             "TableGroupByColumn":
                 '//, Caller'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, Level, ResourceProvider, ResourceId, Caller, CallerIpAddress, OperationNameValue, OperationName, ActivityStatus, HTTPRequest, Properties, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -843,7 +854,7 @@
             "TableGroupByColumn":
                 '//, ResourceId'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, ResourceId, ResourceType, OperationName, ActionName, HostName, IPAddress, ApplicationName, ClassTypeDescription, ServerPrincipalName, ServerInstanceName, LogicalServerName, DatabasePrincipalName, DatabaseName, AzureDiagnostics_AdditionalInformation'
             ,
             "TableCustomEntityExtend":
@@ -873,7 +884,7 @@
             "TableGroupByColumn":
                 '//, ResourceId'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, ResourceId, ResourceType, OperationName, Environment_s, pod_s, UnderlayName_s, stream_s, log_s'
             ,
             "TableCustomEntityExtend":
@@ -915,7 +926,7 @@
             "TableGroupByColumn":
                 '//, CallerObjectId, ResourceId'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, ResourceId, ResourceType, OperationName, CallerObjectUPN, CallerObjectId, CallerIPAddress, ClientInfo, RequestUri, HttpStatusCode, Id, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -947,7 +958,7 @@
             "TableGroupByColumn":
                 ''
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 ```Resource, Category, OperationName, FirewallAction, Protocol, SourceAddress, DestinationAddress,// NatDestinationAddress,
                 msg_s, ResourceId, ResourceType```
             ,
@@ -976,7 +987,7 @@
             "TableGroupByColumn":
                 '//, ResourceId'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 ```Category, ResourceId, ResourceType, identity_s, CallerIPAddress, OperationName, ResultType, HttpMethod_s, Path_s, QueryParameters_s, CorrelationId```
             ,
             "TableCustomEntityExtend":
@@ -1003,7 +1014,7 @@
             "TableGroupByColumn":
                 '//, UserIdentityAccountId'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'EventTypeName, EventSource, EventName, ManagementEvent, ReadOnly, UserIdentityType, UserIdentityAccountId, UserIdentityArn, UserIdentityUserName, SourceIpAddress, UserAgent, SessionMfaAuthenticated, ErrorCode, ErrorMessage, Resources, RequestParameters, ResponseElements, AdditionalEventData, AwsEventId'
             ,
             "TableCustomEntityExtend":
@@ -1033,7 +1044,7 @@
             "TableGroupByColumn":
                 '//, UserId'
             ,
-            "TableColumns":
+            "TableColumns&LookUp":
                 'Category, OperationName, Result, ResultDescription, Identity, UserPrincipalName, IPAddress, InitiatedBy, LoggedByService, AdditionalDetails, TargetResources, CorrelationId'
             ,
             "TableCustomEntityExtend":
@@ -1106,7 +1117,7 @@
         'URL', 'EmailUrlInfo',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1167,7 +1178,7 @@
         'IP', 'VMConnection',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1178,7 +1189,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = trim_start("::ffff:", RemoteIp)
                 | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Syslog',
@@ -1212,7 +1223,7 @@
         'IP', 'StorageFileLogs',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1224,13 +1235,13 @@
                 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), CallerIpAddress)[0]
                 | extend IPAddress = tostring(ClientIPValues[0])
                 | where (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))) and not(ipv4_is_private(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'StorageBlobLogs',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1242,7 +1253,7 @@
                 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), CallerIpAddress)[0]
                 | extend IPAddress = tostring(ClientIPValues[0])
                 | where (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))) and not(ipv4_is_private(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'AADServicePrincipalSignInLogs',
@@ -1256,7 +1267,7 @@
             "TITableConditions":
                 ```
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'ADFSSignInLogs',
@@ -1272,7 +1283,7 @@
                 | where not(ResultType in (_UncompromisedFailureResultTypes))
                 | where not(todynamic(AuthenticationDetails)[0].authenticationMethod == "Integrated Windows Authentication")
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'AADNonInteractiveUserSignInLogs',
@@ -1287,7 +1298,7 @@
                 ```
                 | where not(ResultType in (_UncompromisedFailureResultTypes))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'SigninLogs',
@@ -1302,7 +1313,7 @@
                 ```
                 | where not(ResultType in (_UncompromisedFailureResultTypes))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'SecurityAlert',
@@ -1349,7 +1360,24 @@
                 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), ClientIP)[0]
                 | extend IPAddress = tostring(ClientIPValues[0])
                 | where isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'EmailEvents',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where not(EmailDirection in ("Intra-org"))
+                | mv-expand IPAddress = pack_array(SenderIPv4, SenderIPv6) to typeof(string)
+                | where isnotempty(IPAddress)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'DnsEvents',
@@ -1366,7 +1394,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddresses has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = array_concatsplit(IPAddresses, ", ") to typeof(string)
                 | where not(ipv4_is_private(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         //| where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has Name or Name has DomainName))
         //| where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith Name))
@@ -1387,7 +1415,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = iff(RemoteIPType == "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
                 | where not(ipv4_is_private(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         // | where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has RemoteUrl or RemoteUrl has DomainName))
         // | where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith trim_end(@"\/", RemoteUrl)))
@@ -1406,13 +1434,13 @@
                 | where isnotempty(IPAddress) and (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress)))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Azure_Kubernetes',
         dynamic({
             "TITableLookback":
-                '1d'
+                '4h'
             ,
             "TITableAdditionalLets":
                 ```
@@ -1435,7 +1463,7 @@
                 | extend IPAddressv6 = extract_all(strcat(@'\"', _IPv6Regex), log_s)
                 | mv-expand IPAddress = array_concat(IPAddressv4, IPAddressv6) to typeof(string)
                 | where isnotempty(IPAddress) and not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Azure_Key_Vault',
@@ -1452,7 +1480,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = trim_start("::ffff:", CallerIPAddress)
                 | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'Azure_Firewall',
@@ -1495,7 +1523,7 @@
                 // Remove denied traffic where the source was remote
                 | where not(IPAddress == SourceAddress and FirewallAction == "Deny")
                 | where not(ipv4_is_private(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         //// Remove indicators of certain type
         //| where not(todynamic(AdditionalInformation)["value_type"] in ("domain", "url"))
@@ -1503,7 +1531,7 @@
         'IP', 'Azure_Data_Lake',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1514,7 +1542,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = trim_start("::ffff:", CallerIPAddress)
                 | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'AzureActivity',
@@ -1530,7 +1558,7 @@
                 | where isnotempty(CallerIpAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = CallerIpAddress //trim_start("::ffff:", CallerIpAddress)
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'AWSCloudTrail',
@@ -1545,7 +1573,7 @@
                 ```
                 | where isnotempty(SourceIpAddress) and (isnotempty(parse_ipv4(SourceIpAddress)) or isnotempty(parse_ipv6(SourceIpAddress)))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(SourceIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(SourceIpAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
+                //| where not(_IndicatorsLength < 1000000 and not(SourceIpAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
                 | extend IPAddress = SourceIpAddress```
         })
         ,
@@ -1561,7 +1589,7 @@
                 ```
                 | where isnotempty(IPAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(InitiatedBy has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'File_Hash', 'SecurityEvent',
@@ -1577,13 +1605,13 @@
                 // AppLocker generates hash PE256 for .exe files, WHICH IS NOT SHA256, unless you ingest PE256 hash indicators this rule should be disabled
                 | where EventID in (8002, 8003, 8005) and isnotempty(FileHash)
                 | extend FileHashValue = toupper(FileHash)
-                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
         })
         ,
         'File_Hash', 'EmailAttachmentInfo',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1592,8 +1620,9 @@
                 ```
                 | where isnotempty(SHA256)
                 | extend FileHashValue = toupper(SHA256)
-                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
         })
+        //| where FileHashType == "SHA256"
         ,
         'File_Hash', 'DeviceFileEvents',
         dynamic({
@@ -1609,7 +1638,7 @@
                 | where isnotempty(FileHashValue)
                 //| where not(FileHashValue in ("00000000000000000000000000000000", "0000000000000000000000000000000000000000000000000000000000000000"))
                 | extend FileHashValue = toupper(FileHashValue)
-                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
         })
         ,
         'Email', 'AADNonInteractiveUserSignInLogs',
@@ -1688,7 +1717,7 @@
         'Email', 'OfficeActivity',
         dynamic({
             "TITableLookback":
-                '7d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ```
@@ -1722,7 +1751,7 @@
         'Email', 'EmailEvents',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1831,7 +1860,7 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'SecurityAlert',
@@ -1860,7 +1889,7 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'OfficeActivity',
@@ -1889,7 +1918,7 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'EmailUrlInfo',
@@ -1909,13 +1938,13 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'EmailEvents',
         dynamic({
             "TITableLookback":
-                '1d'
+                '14d'
             ,
             "TITableAdditionalLets":
                 ``````
@@ -1931,7 +1960,7 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'DnsEvents',
@@ -1951,7 +1980,7 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'DeviceNetworkEvents',
@@ -1980,7 +2009,7 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'Cisco_Umbrella',
@@ -2000,7 +2029,7 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
         ,
         'Domain', 'AuditLogs',
@@ -2029,7 +2058,7 @@
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
                 | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
-                | where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
         })
     ];
     _IndicatorXTableDatatable
@@ -2120,7 +2149,7 @@
                 | project
                     <<<TableName>>>_TimeGenerated,
                     Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIExtendColumns>>><<<TIProjectColumns>>>,
-                    <<<TableColumns>>>
+                    <<<TableColumns&LookUp>>>
             };
             union isfuzzy=true
                 // Match        all indicators available                                      with current table events
