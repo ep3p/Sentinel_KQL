@@ -1,3 +1,7 @@
+// In the returned Query substitute
+// reverse(split(reverse(tostring(UserIdentityArn)),"/",0))
+// by
+// split(UserIdentityArn,"/",0)[-1]
 Anomalies
 | where RuleName endswith "Suspicious volume of AWS write API calls from a user account" and RuleStatus != "Flighting"
 | extend
