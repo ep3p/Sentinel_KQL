@@ -27,7 +27,7 @@ IdentityQueryEvents
     or Query has_any (toscalar(_PrivilegedObjects | summarize make_list(SID)))
 | where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
 | extend AdditionalFieldsCount = toint(AdditionalFields["Count"])
-| summarize Count = sum(AdditionalFieldsCount), QueryType = make_set_if(split(QueryType, ", "), isnotempty(QueryType) and SearchScope == "WholeSubtree"), QueryTarget = make_set_if(QueryTarget, isnotempty(QueryTarget)), arg_max(TimeGenerated, *) by IPAddress
+| summarize Count = sum(AdditionalFieldsCount), QueryType = make_set_if(split(QueryType, ", "), isnotempty(QueryType) and SearchScope == "WholeSubtree"), QueryTarget = make_set_if(QueryTarget, isnotempty(QueryTarget)), arg_min(TimeGenerated, *) by IPAddress
 | where not(array_length(QueryType) == 0 and QueryTarget[0] == "Admins. del dominio")
 | project
     TimeGenerated,
