@@ -1,10 +1,10 @@
 let _ExpectedIPAddresses = toscalar(
     union
         (_GetWatchlist('Service-PrivateCorporateServices')
-        | where Notes has "[LDAP-All]"
+        | where Notes has "[LDAPQuery]"
         ),
         (_GetWatchlist('IP-PrivateAddressing')
-        | where Notes has "[LDAP-All]"
+        | where Notes has "[LDAPQuery]"
         )
     | summarize make_list(IPAddress)
 );
@@ -12,14 +12,23 @@ let _ExpectedDomains = toscalar(
     _GetWatchlist('Activity-ExpectedSignificantActivity')
     | where Activity == "DomainJoinedLDAP"
     | summarize make_list(strcat(".", Auxiliar))
-    );
+);
+let _PrivilegedObjects =
+    _GetWatchlist('SID-AuditADObjects')
+    | where Notes has "[LDAPQuery]"
+    | project SID, SAMAccountName
+;
 IdentityQueryEvents
 | where not(DeviceName has_any (_ExpectedDomains))
 | parse Query with "LDAP Search Scope: " SearchScope ", Base Object:" BaseObject ", Search Filter: " SearchFilter
-| where Protocol == "Ldap" and QueryType has_any ("AllUsers", "AllGroups", "AllComputers", "AllTrustDomains", "AllDomains", "AllSecurityPrincipals", "AllObjects") and SearchScope == "WholeSubtree"
+| where Protocol == "Ldap"
+| where (QueryType has_any ("AllUsers", "AllGroups", "AllComputers", "AllTrustDomains", "AllDomains", "AllSecurityPrincipals", "AllObjects") and SearchScope == "WholeSubtree")
+    or trim(@"\s", QueryTarget) in (toscalar(_PrivilegedObjects | summarize make_list(SAMAccountName)))
+    or Query has_any (toscalar(_PrivilegedObjects | summarize make_list(SID)))
 | where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
 | extend AdditionalFieldsCount = toint(AdditionalFields["Count"])
-| summarize Count = sum(AdditionalFieldsCount), QueryType = make_set(split(QueryType, ", ")), arg_min(TimeGenerated, *) by IPAddress
+| summarize Count = sum(AdditionalFieldsCount), QueryType = make_set_if(split(QueryType, ", "), isnotempty(QueryType) and SearchScope == "WholeSubtree"), QueryTarget = make_set_if(QueryTarget, isnotempty(QueryTarget)), arg_max(TimeGenerated, *) by IPAddress
+| where not(array_length(QueryType) == 0 and QueryTarget[0] == "Admins. del dominio")
 | project
     TimeGenerated,
     DeviceName,
