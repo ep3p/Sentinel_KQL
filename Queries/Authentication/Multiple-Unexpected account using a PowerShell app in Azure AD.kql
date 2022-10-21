@@ -65,7 +65,7 @@ union SigninLogs, AADNonInteractiveUserSignInLogs
 | summarize arg_max(TimeGenerated, *) by CorrelationId, ResultType
 | summarize
     TimeGenerated = min(TimeGenerated),
-    CorrelationIds = make_list(CorrelationId),
+    CorrelationIds = make_set(CorrelationId),
     ResultTypes = make_set(ResultType),
     take_anyif(UserPrincipalName, not(UserPrincipalName matches regex UUID_regex))
     by UserId, IPAddress, AppDisplayName, AppId
