@@ -6,12 +6,12 @@ In the folder *[Azure-Sentinel/Detections](https://github.com/ep3p/Sentinel_KQL/
 
 ### NRT Rules
 
-Currently NRT rules don't allow multiple data types (tables) to be used in the same query. The *Analytics rule wizard* does not allow in the query two or more distinct strings that could be one of the table names. If ```Operation``` and ```OfficeActivity``` are the names of tables, you won't be able to use this query in a NRT rule:
+Currently NRT rules don't allow multiple data types (tables) to be used in the same query. The *Analytics rule wizard* does not allow in the query two or more distinct strings that could be one of the table names. If, for example, ```Operation``` and ```OfficeActivity``` are the names of tables, you won't be able to use this query in a NRT rule:
 ```
 OfficeActivity
 | where Operation == "ExampleText"
 ```
-And the query has only called the table ```OfficeActivity```, but ```Operation``` is the name of a table *and also* a column in another table. But there are certain ways to rewrite queries without using certain strings and bypass the *Analytics rule wizard*. So the previous query could be rewrited and used in a NRT rule like:
+The query has only called the table ```OfficeActivity```, but ```Operation``` is the name of a table *and also* a column in the table ```OfficeActivity```. But there are certain ways to rewrite queries without using certain strings and bypass the *Analytics rule wizard*. So the previous query could be rewrited and used in a NRT rule like:
 ```
 OfficeActivity
 | where ['O''peration'] == "ExampleText"
