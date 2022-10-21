@@ -3,8 +3,6 @@ In this repository you may find KQL (Kusto Query Language) queries and Watchlist
 
 I will be commenting the queries in [this Twitter thread](https://twitter.com/ep3p/status/1556248792269066241).
 
-In the folder *Azure-Sentinel* you may find ***upgraded*** [Microsoft content from their repository](https://github.com/Azure/Azure-Sentinel), that might not be worth to commit in that repository, where I have contributed [several pull requests](https://github.com/Azure/Azure-Sentinel/pulls?q=is%3Apr+author%3Aep3p) and I have appeared in their [Threat Hunters leaderboard](https://github.com/Azure/Azure-Sentinel/blob/master/Tools/stats/stats.md) (the scores might not be updated for several months).
-
 You could check other resources like:
 - https://github.com/reprise99/awesome-kql-sentinel (start here)
 - https://github.com/reprise99/Sentinel-Queries
