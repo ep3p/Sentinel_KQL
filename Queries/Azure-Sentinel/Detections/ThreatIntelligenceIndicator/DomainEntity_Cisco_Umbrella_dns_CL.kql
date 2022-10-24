@@ -106,8 +106,8 @@ let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: date
         summarize IdentitiesDict = make_bag(pack(Identity_Types_s_aux, Identities_s_aux))
         )
     | extend
-        HostName = IdentitiesDict["AD Computers"],
-        UserPrincipalName = IdentitiesDict["AD Users"]
+        HostName = tostring(IdentitiesDict["AD Computers"]),
+        UserPrincipalName = tostring(IdentitiesDict["AD Users"])
 };
 union// isfuzzy=true
     // Match      all indicators available                                    with current table events
