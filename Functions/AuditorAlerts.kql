@@ -28,6 +28,12 @@
         TimeGenerated = column_ifexists("TimeGenerated", datetime(null)),
         Activity = column_ifexists("Activity", ""),
         ActorAccount = column_ifexists("ActorAccount", ""),
+        ActorAccountSid = column_ifexists("ActorAccountSid", ""),
+        GroupName = column_ifexists("GroupName", ""),
+        GroupSid = column_ifexists("GroupSid", ""),
+        MemberAccount = column_ifexists("MemberAccount", ""),
+        MemberSid = column_ifexists("MemberSid", ""),
+        Computer = column_ifexists("Computer", ""),
         Auditor = column_ifexists("Auditor", ""),
         Auditors = column_ifexists("Auditors", "")
     | project-away Auditor, Auditors
