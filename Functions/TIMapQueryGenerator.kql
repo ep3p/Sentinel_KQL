@@ -19,13 +19,13 @@
             ,
             "TIPrefilter":
                 ```
-                let _IndicatorsLength = toscalar(_Indicators | summarize count());
-                let _IndicatorsPrefilter = toscalar(
-                    _Indicators
-                    | extend AuxiliarField = tostring(split(extract(_URLRegex, 3, Url), ".")[-1])
-                    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField), 10000)
-                );
-                let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);```
+                //let _IndicatorsLength = toscalar(_Indicators | summarize count());
+                //let _IndicatorsPrefilter = toscalar(
+                //    _Indicators
+                //    | extend AuxiliarField = tostring(split(extract(_URLRegex, 3, Url), ".")[-1])
+                //    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField), 10000)
+                //);
+                //let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);```
             ,
             "TIOperators":
                 ```
@@ -56,13 +56,13 @@
             ,
             "TIPrefilter":
                 ```
-                let _IndicatorsLength = toscalar(_Indicators | summarize count());
-                let _IndicatorsPrefilter = toscalar(
-                    _Indicators
-                    | extend AuxiliarField = tostring(extract(@"([0-9A-Za-f]+)[\.\:]", 1, IPAddress))
-                    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField), 10000)
-                );
-                let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);```
+                //let _IndicatorsLength = toscalar(_Indicators | summarize count());
+                //let _IndicatorsPrefilter = toscalar(
+                //    _Indicators
+                //    | extend AuxiliarField = tostring(extract(@"([0-9A-Za-f]+)[\.\:]", 1, IPAddress))
+                //    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField), 10000)
+                //);
+                //let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);```
             ,
             "TIOperators":
                 ```
@@ -94,7 +94,7 @@
             ,
             "TIPrefilter":
                 ```
-                let _IndicatorsLength = toscalar(_Indicators | summarize count());```
+                //let _IndicatorsLength = toscalar(_Indicators | summarize count());```
             ,
             "TIOperators":
                 ```
@@ -125,13 +125,13 @@
             ,
             "TIPrefilter":
                 ```
-                let _IndicatorsLength = toscalar(_Indicators | summarize count());
-                let _IndicatorsPrefilter = toscalar(
-                    _Indicators
-                    | extend AuxiliarField = tostring(split(EmailAddress, ".")[-1])
-                    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField))
-                );
-                let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);```
+                //let _IndicatorsLength = toscalar(_Indicators | summarize count());
+                //let _IndicatorsPrefilter = toscalar(
+                //    _Indicators
+                //    | extend AuxiliarField = tostring(split(EmailAddress, ".")[-1])
+                //    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField))
+                //);
+                //let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);```
             ,
             "TIOperators":
                 ```
@@ -162,13 +162,13 @@
             ,
             "TIPrefilter":
                 ```
-                let _IndicatorsLength = toscalar(_Indicators | summarize count());
-                let _IndicatorsPrefilter = toscalar(
-                    _Indicators
-                    | extend AuxiliarField = tostring(split(Domain, ".")[-1])
-                    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField))
-                );
-                let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);```
+                //let _IndicatorsLength = toscalar(_Indicators | summarize count());
+                //let _IndicatorsPrefilter = toscalar(
+                //    _Indicators
+                //    | extend AuxiliarField = tostring(split(Domain, ".")[-1])
+                //    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField))
+                //);
+                //let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);```
             ,
             "TIOperators":
                 ```
@@ -199,7 +199,7 @@
                 'VMConnection'
             ,
             "TableTimeColumn":
-                'TimeGenerated'
+                'ingestion_time()'
             ,
             "PreTableOperators":
                 ``````
@@ -256,7 +256,7 @@
                 'StorageFileLogs'
             ,
             "TableTimeColumn":
-                'TimeGenerated'
+                'ingestion_time()'
             ,
             "PreTableOperators":
                 ``````
@@ -283,7 +283,7 @@
                 'StorageBlobLogs'
             ,
             "TableTimeColumn":
-                'TimeGenerated'
+                'ingestion_time()'
             ,
             "PreTableOperators":
                 ``````
@@ -759,23 +759,17 @@
                 ``````
             ,
             "PostTableOperators":
-                ```
-                | mv-apply todynamic(Identities_s) to typeof(string), todynamic(Identity_Types_s) to typeof(string) on ( 
-                    summarize IdentitiesDict = make_bag(pack(Identity_Types_s, Identities_s))
-                    )
-                | extend
-                    HostName = IdentitiesDict["AD Computers"],
-                    UserPrincipalName = IdentitiesDict["AD Users"]```
+                ``````
             ,
             "TableGroupByColumn":
-                '//, HostName'
+                '//, Identities_s'
             ,
             "TableColumns&LookUp":
                 ```EventStartTime = todatetime(column_ifexists('Timestamp_t', column_ifexists('Timestamp_s',''))),
                 Dvc = "CiscoUmbrella",
                 DvcAction = column_ifexists('Action_s', ''),
-                HostName,
-                UserPrincipalName,
+                Identities_s,
+                Identity_Types_s,
                 SrcIpAddr = column_ifexists('InternalIp_s', ''),
                 SrcNatIpAddr = column_ifexists('ExternalIp_s', ''),
                 DnsQuery = trim_end(@'\.',column_ifexists('Domain_s', '')),
@@ -786,7 +780,13 @@
                 IdentityTypes = column_ifexists('Identity_Types_s', ''),
                 Identities = column_ifexists('Identities_s', ''),
                 PolicyIdentityType = column_ifexists('Policy_Identity_Type_s', ''),
-                PolicyIdentity = column_ifexists('Policy_Identity_s', '')```
+                PolicyIdentity = column_ifexists('Policy_Identity_s', '')                
+                | mv-apply todynamic(Identities_s) to typeof(string), todynamic(Identity_Types_s) to typeof(string) on ( 
+                    summarize IdentitiesDict = make_bag(pack(Identity_Types_s, Identities_s))
+                    )
+                | extend
+                    HostName = IdentitiesDict["AD Computers"],
+                    UserPrincipalName = IdentitiesDict["AD Users"]```
             ,
             "TableCustomEntityExtend":
                 ```,
@@ -803,7 +803,7 @@
                 'AzureActivity'
             ,
             "TableTimeColumn":
-                'TimeGenerated'
+                'ingestion_time()'
             ,
             "PreTableOperators":
                 ``````
@@ -1197,7 +1197,7 @@
         'IP', 'Syslog',
         dynamic({
             "TITableLookback":
-                '1d'
+                '2d'
             ,
             "TITableAdditionalLets":
                 ```
@@ -1300,7 +1300,7 @@
                 ```
                 | where not(ResultType in (_UncompromisedFailureResultTypes))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'SigninLogs',
@@ -1315,7 +1315,7 @@
                 ```
                 | where not(ResultType in (_UncompromisedFailureResultTypes))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'SecurityAlert',
@@ -1361,7 +1361,7 @@
                 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), ClientIP)[0]
                 | extend IPAddress = tostring(ClientIPValues[0])
                 | where isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
         'IP', 'EmailEvents',
@@ -1395,7 +1395,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddresses has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = split(IPAddresses, ", ") to typeof(string)
                 | where not(ipv4_is_private(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         //| where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has Name or Name has DomainName))
         //| where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith Name))
@@ -1416,7 +1416,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = iff(RemoteIPType == "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
                 | where not(ipv4_is_private(IPAddress))
-                | where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         // | where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has RemoteUrl or RemoteUrl has DomainName))
         // | where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith trim_end(@"\/", RemoteUrl)))
@@ -1486,7 +1486,7 @@
         'IP', 'Azure_Firewall',
         dynamic({
             "TITableLookback":
-                '2h'
+                '3h'
             ,
             "TITableAdditionalLets":
                 ```
@@ -1605,7 +1605,7 @@
                 // AppLocker generates hash PE256 for .exe files, WHICH IS NOT SHA256, unless you ingest PE256 hash indicators this rule should be disabled
                 | where EventID in (8002, 8003, 8005) and isnotempty(FileHash)
                 | extend FileHashValue = toupper(FileHash)
-                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
         })
         ,
         'File_Hash', 'EmailAttachmentInfo',
@@ -1620,7 +1620,7 @@
                 ```
                 | where isnotempty(SHA256)
                 | extend FileHashValue = toupper(SHA256)
-                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
         })
         //| where FileHashType == "SHA256"
         ,
@@ -1638,7 +1638,7 @@
                 | where isnotempty(FileHashValue)
                 //| where not(FileHashValue in ("00000000000000000000000000000000", "0000000000000000000000000000000000000000000000000000000000000000"))
                 | extend FileHashValue = toupper(FileHashValue)
-                | where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
+                //| where not(_IndicatorsLength < 1000000 and not(FileHashValue in (toscalar(_Indicators | summarize make_list(FileHashValue))))) // "in" limit 1.000.000```
         })
         ,
         'Email', 'AADNonInteractiveUserSignInLogs',
@@ -2140,12 +2140,12 @@
                     <<<TableName>>>
                     | where <<<TableTimeColumn>>> between (table_start .. table_end)<<<PreTableOperators>>>
                     // Filter events that may contain indicators<<<TITableConditions>>><<<PostTableOperators>>>
-                    // Take only a single event by key columns
-                    | summarize hint.strategy=shuffle take_any(*) by <<<TIGroupByColumn>>><<<TableGroupByColumn>>>
                     | project-rename <<<TableName>>>_TimeGenerated = TimeGenerated
                 ;
                 _Indicators
                 | join kind=inner hint.strategy=shuffle _TableEvents on <<<TIGroupByColumn>>>
+                // Take only a single event by key columns
+                //| summarize hint.strategy=shuffle take_any(*) by <<<TIGroupByColumn>>><<<TableGroupByColumn>>>
                 | project
                     <<<TableName>>>_TimeGenerated,
                     Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIExtendColumns>>><<<TIProjectColumns>>>,
