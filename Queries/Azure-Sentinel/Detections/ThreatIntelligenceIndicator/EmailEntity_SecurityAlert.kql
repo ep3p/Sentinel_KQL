@@ -1,0 +1,134 @@
+// This query assumes a feed of threat indicators is ingested/synchronized periodically, and each synchronization ingests all the indicators that are to be monitored.
+// Additionally, threat indicators that were added manually in Sentinel are renovated as ThreatIntelligenceIndicators events every ~12 days.
+// Matching indicators with table events will require taking into account these different processes.
+// The function defined below has some datetime parameters, these will affect only the feed threat indicators, not the manually added indicators.
+let query_frequency = 1h;
+let query_period = 14d;
+let ti_feed_sync_frequency = 1d;
+let ti_feed_sync_duration = 6h;
+let table_query_lookback = 14d;
+let _TIBenignProperty =
+    _GetWatchlist('ID-TIBenignProperty')
+    | where Notes has_any ("[SourceEmailAddress]", "[DestinationEmailAddress]")
+    | project IndicatorId, BenignProperty
+;
+let _TIExcludedSources = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "ThreatIndicatorSource"
+    | summarize make_list(Auxiliar)
+    );
+let _EmailAddressRegex = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "EmailAddress"
+    | project RegEx
+    );
+let _ExternalEmailAddressRegex = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "ExternalEmailAddress"
+    | project RegEx
+    );
+let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: datetime, table_end: datetime) {
+    // Scheduled Analytics rules have a query period limit of 14d
+    let ti_feed_start = max_of(ago(query_period), ti_start - iff(only_new_ti, ti_feed_sync_frequency + ti_feed_sync_duration, 0s));
+    let ti_feed_end = now();
+    let _Indicators =// materialize(
+        union
+            // Manually added indicators
+            (ThreatIntelligenceIndicator
+            | where TimeGenerated > ago(query_period) and ExternalIndicatorId has "indicator--"
+            ),
+            // Feed ingested indicators
+            (ThreatIntelligenceIndicator
+            | where TimeGenerated between (ti_feed_start .. ti_feed_end) and not(ExternalIndicatorId has "indicator--")
+            )
+        // Take the earliest TimeGenerated and the latest column info
+        | summarize hint.strategy=shuffle
+            minTimeGenerated = min(TimeGenerated),
+            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId, EmailSenderAddress)
+            by IndicatorId
+        // Remove inactive or expired indicators
+        | where not(not(Active) or ExpirationDateTime < ti_feed_end)
+        // Remove feed indicators not received in the specified period
+        | where not(TimeGenerated < ti_start and not(ExternalIndicatorId has "indicator--"))
+        // Pick indicators that contain the desired entity type
+        | where isnotempty(EmailSenderAddress)
+        | extend EmailAddress = tolower(EmailSenderAddress)
+        // Remove indicators from specific sources
+        | where not(AdditionalInformation has_any (_TIExcludedSources))
+        // Remove excluded indicators with benign properties
+        | join kind=leftanti _TIBenignProperty on IndicatorId, $left.EmailAddress == $right.BenignProperty
+        // Deduplicate indicators by EmailAddress column, equivalent to using join kind=innerunique afterwards
+        | summarize hint.strategy=shuffle
+            minTimeGenerated = min(minTimeGenerated),
+            take_any(*)
+            by EmailAddress
+        // If we want only new indicators, remove indicators received previously
+        | where not(only_new_ti and minTimeGenerated < ti_start)
+    //)
+    ;
+    //let _IndicatorsLength = toscalar(_Indicators | summarize count());
+    //let _IndicatorsPrefilter = toscalar(
+    //    _Indicators
+    //    | extend AuxiliarField = tostring(split(EmailAddress, ".")[-1])
+    //    | summarize make_set_if(AuxiliarField, isnotempty(AuxiliarField))
+    //);
+    //let _IndicatorsPrefilterLength = array_length(_IndicatorsPrefilter);
+    let _TableEvents =
+        SecurityAlert
+        | where TimeGenerated between (table_start .. table_end)
+        // Remove TI map alerts
+        | extend MSTI = (VendorName == "Microsoft" and ProductName == 'Azure Sentinel' and (ProviderName == "Threat Intelligence Alerts" or AlertName has "TI map"))
+        | where MSTI == false //or MSTI == true
+        // Filter events that may contain indicators
+        | where isnotempty(Entities)
+        //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+        // Extract already recognized addresses
+        | mv-apply EntitiesDynamic = todynamic(Entities) on (
+            extend EntityUPNSuffix = tostring(EntitiesDynamic.UPNSuffix)
+            | extend EntityUPN = iff(isnotempty(EntityUPNSuffix), strcat(tostring(EntitiesDynamic.Name), "@", EntityUPNSuffix), "")
+            | summarize EntityEmails = make_set_if(EntityUPN, isnotempty(EntityUPN))
+            )
+        // Extract recognized and unrecognized addresses
+        | extend EntityEmails = todynamic(dynamic_to_json(extract_all(_EmailAddressRegex, dynamic([1]), strcat(tostring(EntityEmails), Entities))))
+        | mv-expand EmailAddress = EntityEmails
+        | extend EmailAddress = tolower(tostring(EmailAddress[0]))
+        | where isnotempty(EmailAddress)
+        | summarize take_any(*) by EmailAddress
+        // Parse original address
+        | extend EmailAddress = case(
+            EmailAddress has "#EXT#", replace_regex(EmailAddress, _ExternalEmailAddressRegex, @"\2@\3"),
+            EmailAddress startswith "live.com#" or EmailAddress startswith "guest#", replace_regex(EmailAddress, strcat(@"(?:live\.com#|guest#)", _EmailAddressRegex), @"\2@\3"),
+            EmailAddress
+            )
+        //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000
+        // Extract one entity of each type of multiple possible
+        | mv-apply EntitiesDynamic = todynamic(Entities) on (
+            summarize
+                Alert_Account = take_anyif(strcat(tostring(EntitiesDynamic.Name), iff(isnotempty(tostring(EntitiesDynamic.UPNSuffix)), "@", ""), tostring(EntitiesDynamic.UPNSuffix)), EntitiesDynamic.Type == "account" and not(EntitiesDynamic.IsValid == "false")),
+                Alert_HostName = take_anyif(tostring(EntitiesDynamic.HostName), EntitiesDynamic.Type == "host"),
+                Alert_IPAddress = take_anyif(tostring(EntitiesDynamic.Address), EntitiesDynamic.Type == "ip")
+            )
+        | project-rename Alert_Description = Description
+        | project-rename SecurityAlert_TimeGenerated = TimeGenerated
+    ;
+    _Indicators
+    | join kind=inner hint.strategy=shuffle _TableEvents on EmailAddress
+    // Take only a single event by key columns
+    //| summarize hint.strategy=shuffle take_any(*) by EmailAddress, AlertName
+    | project
+        SecurityAlert_TimeGenerated,
+        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, EmailSenderAddress,
+        AlertName, AlertSeverity, Entities, ProviderName, VendorName, Alert_Description, Alert_Account, Alert_IPAddress, Alert_HostName, CompromisedEntity
+};
+union// isfuzzy=true
+    // Match      all indicators available                                    with current table events
+    _TITableMatch(ago(ti_feed_sync_frequency + ti_feed_sync_duration), false, ago(query_frequency), now()),
+    // Match      new indicators since last query execution                   with past table events
+    _TITableMatch(ago(query_frequency), true, ago(table_query_lookback), ago(query_frequency))
+| summarize arg_max(SecurityAlert_TimeGenerated, *) by IndicatorId, AlertName
+| extend
+    timestamp = SecurityAlert_TimeGenerated,
+    //AccountCustomEntity = Alert_Account,
+    IPCustomEntity = Alert_IPAddress,
+    HostCustomEntity = Alert_HostName,
+    AccountCustomEntity = EmailSenderAddress
