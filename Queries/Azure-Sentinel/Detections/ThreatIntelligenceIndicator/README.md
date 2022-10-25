@@ -13,7 +13,7 @@ Developing +40 queries with common elements between them without making mistakes
 Usually developing this query generator would require a programming language, but you can also define functions in KQL. You could define:
 1. A datatable of indicator types.
 2. A datatable of data types (or event tables).
-3. A datatable of pair indicatortype-datatype.
+3. A datatable of pairs indicatortype-datatype.
 4. A query scheme with some variables (or placeholders), which will be substituted by query code depending on the indicator and data types.
 
 The generator only needs to check the third datatable and substitute parts of the query scheme, and a query will be generated for each indicator and data type.
