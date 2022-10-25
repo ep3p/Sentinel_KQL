@@ -128,7 +128,6 @@ union// isfuzzy=true
 | summarize arg_max(SecurityAlert_TimeGenerated, *) by IndicatorId, AlertName
 | extend
     timestamp = SecurityAlert_TimeGenerated,
-    //AccountCustomEntity = Alert_Account,
     IPCustomEntity = Alert_IPAddress,
     HostCustomEntity = Alert_HostName,
     AccountCustomEntity = EmailSenderAddress
