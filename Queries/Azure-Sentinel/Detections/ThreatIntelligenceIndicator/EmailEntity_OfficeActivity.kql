@@ -108,6 +108,5 @@ union// isfuzzy=true
 | summarize arg_max(OfficeActivity_TimeGenerated, *) by IndicatorId, UserId
 | extend
     timestamp = OfficeActivity_TimeGenerated,
-    //AccountCustomEntity = UserId,
     IPCustomEntity = ClientIP,
     AccountCustomEntity = EmailSenderAddress
