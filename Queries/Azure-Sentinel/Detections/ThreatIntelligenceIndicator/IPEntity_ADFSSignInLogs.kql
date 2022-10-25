@@ -97,5 +97,4 @@ union// isfuzzy=true
 | extend
     timestamp = ADFSSignInLogs_TimeGenerated,
     AccountCustomEntity = UserPrincipalName,
-    //IPCustomEntity = IPAddress,
     IPCustomEntity = TI_IPAddress
