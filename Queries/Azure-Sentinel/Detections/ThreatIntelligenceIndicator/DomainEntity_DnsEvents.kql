@@ -9,7 +9,7 @@ let ti_feed_sync_duration = 6h;
 let table_query_lookback = 6h;
 let _TIBenignProperty =
     _GetWatchlist('ID-TIBenignProperty')
-    | where Notes has_any ("[SourceDomain]", "[DestinationDomain]")
+    | where Notes has_any ("[DestinationDomain]")
     | project IndicatorId, BenignProperty
 ;
 let _TIExcludedSources = toscalar(
