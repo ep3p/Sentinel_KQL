@@ -4,7 +4,7 @@ This folder contains queries created with the help of the function [TIMapQueryGe
 
 The rules created by Microsoft for threat intelligence indicators can't be expected to adjust to each Sentinel workspace and their indicators, and some of the rules might contain unexpected mistakes. For example, Microsoft has developed a rule that matches Windows Security AppLocker Events with file hashes, but AppLocker does not generate SHA256 hashes, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work.
 
-Also, the default rules check activity that happens *after* you ingest an indicator. When possible, if you ingest a threat indicator you should also check the events that happened before the ingestion. Because of this, each Sentinel workspace should adapt, develop and review their own Threat Intelligence Indicators rules.
+Also, the default rules check activity that happens *after* you ingest an indicator. When possible, if you ingest a threat indicator you should also check the events that happened *before* the ingestion. Because of this, each Sentinel workspace should adapt, develop and review their own Threat Intelligence Indicators rules.
 
 Many data types or tables have several columns that could be matched to a certain indicator type, like email address, domain, url, file hash, IP address... And so each indicator type could also be matched with several data types. The query (or algorithm) that matches a certain indicator type with a certain data type should have common elements regardless of the indicator and data types.
 
