@@ -105,7 +105,7 @@ Query:string=
     | extend
         timestamp = <<<TableName>>>_TimeGenerated<<<TableCustomEntityExtend>>><<<TICustomEntityExtend>>>```
 ```
-You can observe this "query" has some placeholders between the characters <<< xxxxx >>>, it won't work as a KQL query in this state. The three defined datatables contain the query parts that will substitute these placeholders. The datatables are called:
+You can observe this "query" has some placeholders between the characters ```<<< xxxxx >>>```, it won't work as a KQL query in this state. The three defined datatables contain the query parts that will substitute these placeholders. The datatables are called:
 ```
 _IndicatorTypesDatatable = datatable(EntityType:string, IndicatorDictionary:dynamic)
 _TablesDatatable = datatable(EntityType:string, TableDictionary:dynamic)
