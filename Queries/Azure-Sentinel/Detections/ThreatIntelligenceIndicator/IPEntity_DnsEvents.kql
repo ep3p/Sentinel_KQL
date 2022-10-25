@@ -77,8 +77,8 @@ let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: date
     ;
     _Indicators
     | join kind=inner hint.strategy=shuffle _TableEvents on IPAddress
-    | where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has Name or Name has DomainName))
-    | where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith Name))
+    //| where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has Name or Name has DomainName))
+    //| where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith Name))
     // Take only a single event by key columns
     //| summarize hint.strategy=shuffle take_any(*) by IPAddress, ClientIP
     | project
