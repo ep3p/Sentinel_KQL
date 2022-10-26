@@ -145,4 +145,4 @@ Then, you just need to copy and paste the generated query in a new tab, press "F
 
 Check the generated [URL Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Detections/ThreatIntelligenceIndicator/URLEntity_Syslog.kql).
 
-This generator contains ~2200 lines in one file and is a little empty, while it generates 46 queries that contain ~4600 lines in total.
+This generator matches 5 indicator types with 27 tables, contains ~2200 lines in one file that is a little empty, and it generates 46 queries that contain ~4600 lines in total.
