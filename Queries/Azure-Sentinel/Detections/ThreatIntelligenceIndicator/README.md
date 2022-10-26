@@ -111,7 +111,7 @@ _IndicatorTypesDatatable = datatable(EntityType:string, IndicatorDictionary:dyna
 _TablesDatatable = datatable(EntityType:string, TableDictionary:dynamic)
 _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableConditions:dynamic)
 ```
-Each datable *element* has a dictionary that contains the placeholders, an example element for the third datatable, for the match between URL indicators and the Syslog table, would be:
+In this example each datable *element* has a dictionary that contains the placeholders. An element for the third datatable, for the match between URL indicators and the Syslog table, would be:
 ```
 'URL', 'Syslog',
 dynamic({
@@ -143,6 +143,6 @@ Then, you just need to copy and paste the generated query in a new tab, press "F
 
 ![image](https://user-images.githubusercontent.com/2527990/197820972-5d9aa918-17ca-44f1-9369-8c229613477f.png) ![image](https://user-images.githubusercontent.com/2527990/197821197-f25ce94e-3a3d-480e-a464-59e1ab3f5616.png)
 
-Check the generated [URL Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Detections/ThreatIntelligenceIndicator/URLEntity_Syslog.kql) example.
+Check the generated [URL Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Detections/ThreatIntelligenceIndicator/URLEntity_Syslog.kql).
 
 This generator contains ~2200 lines in one file and is a little empty, while it generates 46 queries that contain ~4600 lines in total.
