@@ -144,3 +144,5 @@ You can call the generator only once, and generate a query for each indicatortyp
 Then, you just need to copy and paste the generated query in a new tab, press "Format query" for readability, and you will have one query ready to use in an Analytics Rule.
 
 ![image](https://user-images.githubusercontent.com/2527990/197820972-5d9aa918-17ca-44f1-9369-8c229613477f.png) ![image](https://user-images.githubusercontent.com/2527990/197821197-f25ce94e-3a3d-480e-a464-59e1ab3f5616.png)
+
+Check the generated [URL Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Detections/ThreatIntelligenceIndicator/URLEntity_Syslog.kql) example.
