@@ -146,3 +146,5 @@ Then, you just need to copy and paste the generated query in a new tab, press "F
 ![image](https://user-images.githubusercontent.com/2527990/197820972-5d9aa918-17ca-44f1-9369-8c229613477f.png) ![image](https://user-images.githubusercontent.com/2527990/197821197-f25ce94e-3a3d-480e-a464-59e1ab3f5616.png)
 
 Check the generated [URL Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Detections/ThreatIntelligenceIndicator/URLEntity_Syslog.kql) example.
+
+This generator contains ~2200 lines in one file and is a little empty, while it generates 46 queries that contain ~4600 lines in total.
