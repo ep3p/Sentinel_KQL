@@ -2,27 +2,27 @@
 
 This folder contains queries created with the help of the function [TIMapQueryGenerator.kql](https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/TIMapQueryGenerator.kql).
 
-The rules created by Microsoft for threat intelligence indicators can't be expected to adjust to each Sentinel workspace and their indicators, and some of the rules might contain unexpected mistakes. For example, Microsoft has developed a rule that matches Windows Security AppLocker Events with file hashes, but AppLocker does not generate SHA256 hashes, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work.
+The default rules created by Microsoft for threat intelligence indicators can't be expected to adapt to each Sentinel workspace and their indicators, and some of the rules might contain unexpected mistakes. For example, Microsoft has developed a rule that matches Windows Security AppLocker Events with file hashes, but AppLocker does not generate SHA256 hashes, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work.
 
-Also, the default rules check activity that happens *after* you ingest an indicator. When possible, if you ingest a threat indicator you should also check the events that happened *before* the ingestion. Because of this, each Sentinel workspace should adapt, develop and review their own Threat Intelligence Indicator detections.
+Also, the default rules check activity that happens *after* ingesting an indicator. When possible, you should also check the events that happened *before* the ingestion. Because of this, each Sentinel workspace should adapt, develop and review their own Threat Intelligence Indicator detections.
 
-Many data types or tables have several columns that could be matched to a certain indicator type, like email address, domain, url, file hash, IP address... And so each indicator type could also be matched with several data types. The query (or algorithm) that matches a certain indicator type with a certain data type should have common elements regardless of the indicator and data types.
+Many data types or tables have columns that could be matched to several indicator types, like: email address, domain, url, file hash, IP address... And so each indicator type could also be matched with several data types. The query (or algorithm) that tries to match a certain indicator type with a certain data type will have common elements regardless of the indicator and data types checked.
 
-Developing +40 queries with common elements between them without making mistakes is a difficult task, so it would be beneficial to develop a function or a generator for these queries, where you pick an indicator type and a data type and the function generates the appropiate query, reusing and defining only once the common query parts. The part of the query that is unique to each pair indicatortype-datatype should be small.
+Developing and maintaining +40 queries with common elements between them, without making mistakes or keeping track of changes, is a difficult task, so it would be beneficial to develop a function or a generator for these queries. You pick an indicator type and a data type and the function generates the appropiate query, reusing and defining only once the common query parts. The part of the query that will be unique to each pair indicatortype-datatype should be small.
 
-Usually developing this query generator would require a programming language, but you can also define functions in KQL. You could define:
+Usually developing this query generator would require a programming language, but KQL is also capable of solving this problem. You could define in KQL:
 1. A datatable of indicator types.
-2. A datatable of data types (or event tables).
-3. A datatable of pairs indicatortype-datatype.
-4. A query scheme with some variables (or placeholders), which will be substituted by query code depending on the indicator and data types.
+2. A datatable of data types (or ingested tables).
+3. A datatable of indicatortype-datatype pairs.
+4. A query scheme (the common algorithm) with some variables (or placeholders), which will be substituted by query code, depending on the indicator and data types.
 
-The generator only needs to check the third datatable and substitute parts of the query scheme, and a query will be generated for each indicator and data type.
+This generator could check the third datatable to know which indicators and tables do you want to match, substitute the appropiate parts in the query scheme, and a query will be generated for each pair.
 
 One example of this generator function is [TIMapQueryGenerator.kql](https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/TIMapQueryGenerator.kql).
 
 An advantage of this generator is that all the information related to threat indicator queries is contained in a single file, and is easier to search and replace similar query parts.
 
-One example query scheme could be:
+The query scheme of this generator example is:
 ```
 Query:string=
     ```// This query assumes a feed of threat indicators is ingested/synchronized periodically, and each synchronization ingests all the indicators that are to be monitored.
@@ -105,13 +105,13 @@ Query:string=
     | extend
         timestamp = <<<TableName>>>_TimeGenerated<<<TableCustomEntityExtend>>><<<TICustomEntityExtend>>>```
 ```
-You can observe this "query" has some placeholders between the characters ```<<< xxxxx >>>```, it won't work as a KQL query in this state. The three defined datatables contain the query parts that will substitute these placeholders. The datatables are called:
+You will notice this "query" has some placeholders indicated by the strings ```<<< xxxxx >>>```, in this state the query won't work. The three defined datatables contain the query parts that substitute these placeholders. In this example the datatables are called:
 ```
 _IndicatorTypesDatatable = datatable(EntityType:string, IndicatorDictionary:dynamic)
 _TablesDatatable = datatable(EntityType:string, TableDictionary:dynamic)
 _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableConditions:dynamic)
 ```
-Each datable *element* has a dictionary that contains the placeholders, an example element for the third datatable would be:
+Each datable *element* has a dictionary that contains the placeholders, an example element for the third datatable, for the match between URL indicators and the Syslog table, would be:
 ```
 'URL', 'Syslog',
 dynamic({
@@ -134,13 +134,13 @@ dynamic({
 })
 ,
 ```
-In this case ```TITableLookback```, ```TITableAdditionalLets``` and ```TITableConditions``` are placeholders in the query scheme. *Each element of the datatables should have a dictionary with the same placeholders*, even if some of them are empty.
+```TITableLookback```, ```TITableAdditionalLets``` and ```TITableConditions``` are placeholders in the query scheme. In this example, *each element of the datatables should have a dictionary with the same placeholders*, even if some of them are empty.
 
-This generator at the end tries to substitute, in the query scheme, any placeholder found in the datatable dictionaries, with the help of the ```scan``` KQL operator.
+This generator tries to substitute, in the query scheme, any placeholder found in the datatable dictionaries. If you want to change the generated queries, you just need to change the datatable elements or the query scheme, and making sure the placeholders are named the same in both places. You can add or remove as many placeholders you want, the ```scan``` KQL operator will try to replace all the placeholders found in the element dictionaries.
 
-You could call the generator only once, and generate a query for each indicatortype-datatype defined in the third datatable.
+You can call the generator only once, and generate a query for each indicatortype-datatype pair defined in the third datatable.
 ![image](https://user-images.githubusercontent.com/2527990/197820399-c4b7e18a-5211-480e-a65d-8b29ac2df468.png)
 
-Then, you can copy and paste the generated query in a new tab and press "Format query", and you will have one query ready to use for an Analytics Rule.
+Then, you just need to copy and paste the generated query in a new tab, press "Format query" for readability, and you will have one query ready to use in an Analytics Rule.
 
 ![image](https://user-images.githubusercontent.com/2527990/197820972-5d9aa918-17ca-44f1-9369-8c229613477f.png) ![image](https://user-images.githubusercontent.com/2527990/197821197-f25ce94e-3a3d-480e-a464-59e1ab3f5616.png)
