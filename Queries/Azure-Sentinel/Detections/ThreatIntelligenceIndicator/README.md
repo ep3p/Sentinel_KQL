@@ -136,7 +136,7 @@ dynamic({
 ```
 ```TITableLookback```, ```TITableAdditionalLets``` and ```TITableConditions``` are placeholders in the query scheme. In this example, *each element of the datatables should have a dictionary with the same placeholders*, even if some of them are empty.
 
-This generator tries to substitute, in the query scheme, any placeholder found in the datatable dictionaries. If you want to change the generated queries, you just need to change the datatable elements or the query scheme, and making sure the placeholders are named the same in both places. You can add or remove as many placeholders you want, the ```scan``` KQL operator will try to replace all the placeholders found in the element dictionaries.
+This generator tries to substitute, in the query scheme, any placeholder found in the datatable dictionaries. **If you want to change the generated queries**, you just need to change the datatable elements or the query scheme, and making sure the placeholders are named the same in both places. You can add or remove as many placeholders you want, the ```scan``` KQL operator will try to replace all the placeholders found in the element dictionaries.
 
 You can call the generator only once, and generate a query for each indicatortype-datatype pair defined in the third datatable.
 ![image](https://user-images.githubusercontent.com/2527990/197820399-c4b7e18a-5211-480e-a65d-8b29ac2df468.png)
