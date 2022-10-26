@@ -124,13 +124,11 @@ dynamic({
     "TITableConditions":
         ```
         | where isnotempty(SyslogMessage)
-        //| where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
         | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), SyslogMessage)))
         | mv-expand Url = Urls
         | extend Url = tostring(Url[0])
         | where isnotempty(Url)
-        | extend Url = trim_end(@"\/", Url)
-        //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
+        | extend Url = trim_end(@"\/", Url)```
 })
 ,
 ```
