@@ -1,0 +1,75 @@
+let _ADGroups =
+    _GetWatchlist('SID-AuditADObjects')
+    | where Notes has ("[GroupActivity]")
+    | project GroupSID = SID, SAMAccountName, Auditors = Auditor, MonitoredEventID, Severity
+    | mv-apply split(MonitoredEventID, " ") to typeof(string) on (
+        summarize
+            take_any(*),
+            ValidEventIDs = make_list_if(MonitoredEventID, isnotempty(MonitoredEventID) and not(MonitoredEventID startswith "-")),
+            ExcludedEventIDs = make_list_if(replace_string(MonitoredEventID, "-", ""), isnotempty(MonitoredEventID) and MonitoredEventID startswith "-")
+        )
+;
+let _ExpectedActivityADGroups =
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "ADGroupEventID"
+    | project
+        Activity = Auxiliar,
+        ActorAccount = ActorPrincipalName,
+        GroupSid = DestinationResource
+;
+let _ExpectedADGroupDomains = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "MonitorADGroupFromDomain"
+    | summarize make_list(Auxiliar)
+);
+let _AccountOperators = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "AccountOperator"
+    | summarize make_list(ActorPrincipalName)
+    );
+let add_member_eventids = dynamic([4728, 4732, 4756]);
+let remove_member_eventids = dynamic([4729, 4733, 4757]);
+SecurityEvent
+| where isnotempty(TargetSid)
+// Remove events "A security-enabled xxx group was changed"
+| where not(EventID in (4735, 4737, 4755))
+// Remove local group events where the domain of the actor account is not the expected tenant domain
+| where not(EventID in (4732, 4733) and SubjectDomainName !in (_ExpectedADGroupDomains))
+// Remove group enumeration events where the domain of the actor account is not the expected tenant domain
+| where not(EventID in (4799) and SubjectDomainName !in (_ExpectedADGroupDomains))
+// Remove local group event where account "NT AUTHORITY\NETWORK SERVICE" is added to "IIS_IUSRS" group
+| where not(EventID in (4732, 4733) and MemberSid == "S-1-5-20" and TargetSid == "S-1-5-32-568")
+| lookup kind=inner _ADGroups on $left.TargetSid == $right.GroupSID
+| where not(array_length(ValidEventIDs) > 0 and not(ValidEventIDs has tostring(EventID)))
+| where not(array_length(ExcludedEventIDs) > 0 and ExcludedEventIDs has tostring(EventID))
+| extend
+    Activity = trim_end(@"\.", Activity),
+    ActorAccount = SubjectAccount,
+    GroupSid = TargetSid
+// Remove expected activity
+| join kind=leftanti _ExpectedActivityADGroups on Activity, ActorAccount, GroupSid
+| extend
+    MemberAccount = iff(MemberSid == SubjectUserSid, SubjectUserName, extract(@'[Cc][Nn]=([^,]*).*$', 1, MemberName)),
+    GroupName = SAMAccountName,
+    ActorSid = SubjectUserSid,
+    ActorAccountType = AccountType,
+    ActorDomainName = SubjectDomainName,
+    AlertSeverity = case(
+        IsWorkingTime(TimeGenerated) and ActorAccount in (_AccountOperators), "Informational",
+        Severity
+    )
+| project
+    TimeGenerated,
+    Computer,
+    ActorAccount,
+    Activity,
+    GroupName,
+    MemberAccount,
+    ActorSid,
+    GroupSid,
+    MemberSid,
+    ActorAccountType,
+    ActorDomainName,
+    AlertSeverity,
+    Auditors,
+    EventData
