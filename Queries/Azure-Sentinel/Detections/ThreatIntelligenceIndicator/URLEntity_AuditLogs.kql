@@ -91,14 +91,14 @@ let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: date
     | project
         AuditLogs_TimeGenerated,
         Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation,
-        Category, OperationName, Result, ResultDescription, Identity, UserPrincipalName, IPAddress, InitiatedBy, LoggedByService, AdditionalDetails, TargetResources, CorrelationId
+        Category, OperationName, Result, ResultDescription, Identity, UserPrincipalName, IPAddress, InitiatedBy = tostring(InitiatedBy), LoggedByService, AdditionalDetails, TargetResources, CorrelationId
 };
 union// isfuzzy=true
     // Match      all indicators available                                    with current table events
     _TITableMatch(ago(ti_feed_sync_frequency + ti_feed_sync_duration), false, ago(query_frequency), now()),
     // Match      new indicators since last query execution                   with past table events
     _TITableMatch(ago(query_frequency), true, ago(table_query_lookback), ago(query_frequency))
-| summarize arg_max(AuditLogs_TimeGenerated, *) by IndicatorId, InitiatedBy = tostring(InitiatedBy)
+| summarize arg_max(AuditLogs_TimeGenerated, *) by IndicatorId, InitiatedBy
 | extend
     timestamp = AuditLogs_TimeGenerated,
     AccountCustomEntity = UserPrincipalName,
