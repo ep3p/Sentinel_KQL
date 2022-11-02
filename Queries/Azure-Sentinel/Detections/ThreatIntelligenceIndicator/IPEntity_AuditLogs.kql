@@ -78,7 +78,7 @@ let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: date
     _Indicators
     | join kind=inner hint.strategy=shuffle _TableEvents on IPAddress
     // Take only a single event by key columns
-    //| summarize hint.strategy=shuffle take_any(*) by IPAddress, InitiatedBy
+    //| summarize hint.strategy=shuffle take_any(*) by IPAddress, InitiatedBy = tostring(InitiatedBy)
     | project
         AuditLogs_TimeGenerated,
         Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, TI_IPAddress, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress,
