@@ -67,7 +67,8 @@ union SigninLogs, AADNonInteractiveUserSignInLogs
     TimeGenerated = min(TimeGenerated),
     CorrelationIds = make_set(CorrelationId),
     ResultTypes = make_set(ResultType),
-    take_anyif(UserPrincipalName, not(UserPrincipalName matches regex UUID_regex))
+    take_anyif(UserPrincipalName, not(UserPrincipalName matches regex UUID_regex)),
+    take_any(Location, ClientAppUsed, ResourceDisplayName, UserAgent, AuthenticationDetails, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated)
     by UserId, IPAddress, AppDisplayName, AppId
 | join kind=leftouter _Users on $left.UserId == $right.AccountObjectId
 | extend UserPrincipalName = tolower(case(isnotempty(UserPrincipalName), UserPrincipalName, isnotempty(MailAddress), MailAddress, AccountUPN))
