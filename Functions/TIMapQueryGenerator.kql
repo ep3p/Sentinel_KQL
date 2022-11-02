@@ -1051,10 +1051,10 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ', InitiatedBy = tostring(InitiatedBy)'
+                ', InitiatedBy'
             ,
             "TableColumns&LookUp":
-                'Category, OperationName, Result, ResultDescription, Identity, UserPrincipalName, IPAddress, InitiatedBy, LoggedByService, AdditionalDetails, TargetResources, CorrelationId'
+                'Category, OperationName, Result, ResultDescription, Identity, UserPrincipalName, IPAddress, InitiatedBy = tostring(InitiatedBy), LoggedByService, AdditionalDetails, TargetResources, CorrelationId'
             ,
             "TableCustomEntityExtend":
                 ```,
