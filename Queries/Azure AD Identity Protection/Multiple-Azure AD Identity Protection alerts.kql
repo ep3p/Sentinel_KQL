@@ -1,41 +1,66 @@
 let query_frequency = 5m;
 let query_period = 2d;
 let untolerated_risks = dynamic(["high"]);
-let product_name = "Azure Active Directory Identity Protection";
 let _SubstitutedAlert = toscalar(
     _GetWatchlist('AlertName-SubstitutedDetections')
-    | where ProductName == product_name
+    | where ProductName == "Azure Active Directory Identity Protection"
     | summarize make_list(AlertName)
 );
 SecurityAlert
 | where TimeGenerated > ago(query_period)
-| where ProductName has product_name
+| where ProductName has "Azure Active Directory Identity Protection" and not(AlertName in (_SubstitutedAlert))
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend OriginalRequestId = tostring(ExtendedProperties["Request Id"])
-| summarize arg_min(TimeGenerated, *) by OriginalRequestId, AlertName, AlertSeverity
-| where TimeGenerated > ago(query_frequency)
-| where not(AlertName in (_SubstitutedAlert))
-| project TimeGenerated, ProductName, AlertName, Description, AlertSeverity, Entities, ExtendedProperties, OriginalRequestId
-| project-rename Alert_TimeGenerated = TimeGenerated
+| summarize minTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by OriginalRequestId, AlertName, AlertSeverity
+| where minTimeGenerated > ago(query_frequency)
+| project
+    Alert_TimeGenerated = TimeGenerated,
+    ProductName,
+    AlertName,
+    Description,
+    AlertSeverity,
+    Entities,
+    ExtendedProperties,
+    OriginalRequestId
 | evaluate bag_unpack(ExtendedProperties, OutputColumnPrefix="Alert_", ignoredProperties=dynamic(["Alert generation status", "ProcessedBySentinel", "Request Id", "Tenant Login Source", "User Account", "User Name"]))
 | as _Alerts
 | lookup kind=leftouter (
     union
-    (SigninLogs
-    | where TimeGenerated > ago(query_period)
-    | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
-    | extend
-        DeviceDetail = tostring(DeviceDetail),
-        TimeReceived = _TimeReceived
-    ),
-    (AADNonInteractiveUserSignInLogs
-    | where TimeGenerated > ago(query_period)
-    | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
-    | extend TimeReceived = _TimeReceived
-    )
+        (SigninLogs
+        | where TimeGenerated > ago(query_period)
+        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+        | extend
+            DeviceDetail = tostring(DeviceDetail),
+            TimeReceived = _TimeReceived
+        ),
+        (AADNonInteractiveUserSignInLogs
+        | where TimeGenerated > ago(query_period)
+        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+        | extend TimeReceived = _TimeReceived
+        )
     | summarize arg_max(TimeReceived, *) by OriginalRequestId
-    | project TimeGenerated, Type, UserPrincipalName, UserDisplayName, IPAddress, Location, ResultType, ResultDescription, ClientAppUsed, AppDisplayName, ResourceDisplayName, DeviceDetail, UserAgent, AuthenticationDetails, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, UserId, OriginalRequestId, CorrelationId
-) on OriginalRequestId
+    | project
+        TimeGenerated,
+        Type,
+        UserPrincipalName,
+        UserDisplayName,
+        IPAddress,
+        Location,
+        ResultType,
+        ResultDescription,
+        ClientAppUsed,
+        AppDisplayName,
+        ResourceDisplayName,
+        DeviceDetail,
+        UserAgent,
+        AuthenticationDetails,
+        RiskEventTypes,
+        RiskLevelDuringSignIn,
+        RiskLevelAggregated,
+        UserId,
+        OriginalRequestId,
+        CorrelationId
+    ) on OriginalRequestId
 | extend
     AlertSeverity = case(
         RiskLevelAggregated in (untolerated_risks) or RiskLevelDuringSignIn in (untolerated_risks), "High",
@@ -47,7 +72,7 @@ SecurityAlert
     )
 | project-reorder
     TimeGenerated,
-    ProductName, 
+    ProductName,
     AlertName,
     Description,
     Alert_*,
