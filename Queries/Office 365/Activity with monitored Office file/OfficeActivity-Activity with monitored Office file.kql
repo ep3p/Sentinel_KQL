@@ -6,7 +6,16 @@ let _BenignUsers = toscalar(
 );
 let _MonitoredOfficeFiles =
     _GetWatchlist("UUID-AuditOfficeFiles")
-    | project Site_ = tostring(Site_), Site_Url, SourceRelativeUrl, SourceFileName, Auditor, MonitoredOperation, AlertSeverity = Severity, OfficeObjectId, Notes
+    | project
+        Site_ = tostring(Site_),
+        Site_Url,
+        SourceRelativeUrl,
+        SourceFileName,
+        Auditors = Auditor,
+        MonitoredOperation,
+        AlertSeverity = Severity,
+        OfficeObjectId,
+        Notes
     | mv-apply split(MonitoredOperation, " ") to typeof(string) on (
         summarize
             ValidOperations = make_list_if(MonitoredOperation, isnotempty(MonitoredOperation) and not(MonitoredOperation startswith "-")),
@@ -22,9 +31,6 @@ OfficeActivity
 | where not(array_length(ExcludedOperations) > 0 and ExcludedOperations has Operation)
 | where not(isnotempty(SourceRelativeUrl1) and SourceRelativeUrl != SourceRelativeUrl1)
 | where not(isnotempty(SourceFileName1) and SourceFileName != SourceFileName1)
-//| as _Activities
-//| extend Auditors = toscalar(_Activities | summarize strcat_array(array_sort_asc(make_set(split(Auditor, " & "))), " & "))
-| mv-expand Auditor = split(Auditor, " & ") to typeof(string)
 | summarize
     TimeGenerated = min(TimeGenerated),
     ClientIPs = make_set(ClientIP, 250),
@@ -33,18 +39,14 @@ OfficeActivity
     FileNames = make_set(strcat(SourceRelativeUrl, SourceFileName), 250),
     UserAgents = make_set(UserAgent, 250),
     MachineIds = make_set(MachineId, 250),
-    take_any(Site_Url)//, Auditors)
-    by OfficeWorkload, UserId, Site_, AlertSeverity, Auditor
+    take_any(Site_Url)
+    by OfficeWorkload, UserId, Site_, AlertSeverity, Auditors
 | extend File = iff(array_length(FileNames) == 1, tostring(FileNames[0]), "")
 | extend AlertDescription = strcat(
-    ```This rule detects operations with specified SharePoint files. This description presents only the information from one of the detected events. The information of the rest of the events may appear at the Entities table.
-This activity was performed by the account: "```, UserId,
-    ```".
-This activity affected the SharePoint files from: "```, Site_Url, '".',
+    'This rule detects operations with specified SharePoint files. This description presents only the information from one of the events. The information of the rest of the events may appear at the Entities table.\n\nThis activity was performed by the account: "', UserId, '"\n\n',
+    'This activity affected the SharePoint files from: "', Site_Url, '"',
     iff(isnotempty(File),
-        strcat(```
-The file "```, File, '" was "', tostring(Operations[0]), '".'
-        ),
+        strcat('\n\nThe file "', File, '" was "', tostring(Operations[0]), '".'),
         ""
         )
     )
@@ -62,5 +64,4 @@ The file "```, File, '" was "', tostring(Operations[0]), '".'
     MachineIds,
     AlertSeverity,
     AlertDescription,
-    Auditor//,
-    //Auditors
+    Auditors
