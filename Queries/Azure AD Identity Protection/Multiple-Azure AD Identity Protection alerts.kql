@@ -19,6 +19,9 @@ SecurityAlert
     AlertName,
     Description,
     AlertSeverity,
+    Status,
+    Tactics,
+    Techniques,
     Entities,
     ExtendedProperties,
     OriginalRequestId
@@ -62,6 +65,13 @@ SecurityAlert
         CorrelationId
     ) on OriginalRequestId
 | extend
+    Alert_State = column_ifexists("Alert_State", "")
+| extend
+    BenignAlert = case(
+        // Remove cases where Identity Protection considers the alert solved (currently by default it would create an incident in Sentinel!!!)
+        Status == "Resolved" or Alert_State == "Closed", true,
+        false
+    ),
     AlertSeverity = case(
         RiskLevelAggregated in (disallowed_risks) or RiskLevelDuringSignIn in (disallowed_risks), "High",
         AlertSeverity
