@@ -1,0 +1,141 @@
+let query_frequency = 7d;
+let query_period = 14d;
+let disallowed_risks = dynamic(["high"]);
+let legacy_auth_protocols = dynamic(["Authenticated SMTP", "AutoDiscover", "Exchange ActiveSync", "Exchange Online PowerShell", "Exchange Web Services", "IMAP4", "MAPI Over HTTP", "Outlook Anywhere (RPC over HTTP)", "Outlook Service", "POP3", "Reporting Web Services", "Other clients"]);
+let legacy_user_agents = dynamic(["BAV2ROPC", "CBAinPROD", "CBAinTAR", "MSRPC"]);
+let _ExpectedLocations = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "CorporateGeolocation"
+    | summarize make_list(Auxiliar)
+);
+let _UntrustedResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has "[MFA]" and Notes has_any ("[Unconfigured]", "[NotCompliant]")
+    | summarize make_list(ResultType)
+);
+let _ExpectedIPRanges = dynamic([]);
+let _UnfamiliarAlerts = materialize(
+    SecurityAlert
+    | where TimeGenerated > ago(query_period)
+    | where ProductName has "Azure Active Directory Identity Protection" and AlertName has "Unfamiliar sign-in properties"
+    | extend ExtendedProperties = todynamic(ExtendedProperties)
+    | extend OriginalRequestId = tostring(ExtendedProperties["Request Id"])
+    | summarize minTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by OriginalRequestId, AlertName, AlertSeverity
+    | where minTimeGenerated > ago(query_frequency)
+    | project
+        Alert_TimeGenerated = TimeGenerated,
+        ProductName,
+        AlertName,
+        Description,
+        AlertSeverity,
+        Status,
+        Tactics,
+        Techniques,
+        Entities,
+        ExtendedProperties,
+        OriginalRequestId
+    | evaluate bag_unpack(ExtendedProperties, OutputColumnPrefix="Alert_", ignoredProperties=dynamic(["Alert generation status", "ProcessedBySentinel", "Request Id", "Tenant Login Source", "User Account", "User Name"]))
+    | as _Alerts
+    | lookup kind=leftouter (
+        (SigninLogs
+        | where TimeGenerated > ago(query_period)
+        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+        | extend
+            DeviceDetail = tostring(DeviceDetail),
+            TimeReceived = _TimeReceived
+        )
+        | summarize
+            arg_max(TimeReceived, *),
+            MFASuccess_TimeGenerated = minif(TimeGenerated, ConditionalAccessStatus == "success" and AuthenticationRequirement == "multiFactorAuthentication")
+            by OriginalRequestId
+        | project
+            MFASuccess_TimeGenerated,
+            TimeGenerated,
+            Type,
+            UserPrincipalName,
+            UserDisplayName,
+            IPAddress,
+            Location,
+            ResultType,
+            ResultDescription,
+            ClientAppUsed,
+            AppDisplayName,
+            ResourceDisplayName,
+            DeviceDetail,
+            UserAgent,
+            AuthenticationDetails,
+            RiskEventTypes,
+            RiskLevelDuringSignIn,
+            RiskLevelAggregated,
+            UserId,
+            OriginalRequestId,
+            CorrelationId
+        )
+        on OriginalRequestId
+    );
+let _UntrustedUserIds = toscalar(
+    _UnfamiliarAlerts
+    | join kind=innerunique (
+        SigninLogs
+        | where TimeGenerated > ago(query_period)
+        | where ResultType in (_UntrustedResultTypes)
+        | project UserId
+        )
+        on UserId
+    | summarize make_list(UserId)
+    );
+_UnfamiliarAlerts
+| extend
+    Alert_State = column_ifexists("Alert_State", ""),
+    ["Alert_Detection Subcategory"] = column_ifexists("Alert_Detection Subcategory", ""),
+    RecentlyConfiguredMFA = UserId in (_UntrustedUserIds)
+| extend
+    BenignAlert = case(
+        // Remove cases where Identity Protection considers the alert solved and the account had MFA configured long ago
+        (Status == "Resolved" or Alert_State == "Closed") and not(RecentlyConfiguredMFA), true,
+        // Remove cases where MFA was used successfully and the account had MFA configured long ago (this condition should not be needed with the above one)
+        isnotempty(MFASuccess_TimeGenerated) and not(RecentlyConfiguredMFA), true,
+        // Remove cases from expected locations, depending on detection, severity and legacy protocols
+        Location in (_ExpectedLocations) and ["Alert_Detection Subcategory"] == "UnfamiliarLocation" and AlertSeverity in ("Medium", "Low") and not(ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)), true,
+        // Remove cases from expected IP addresses, depending on severity
+        ipv4_is_in_any_range(IPAddress, _ExpectedIPRanges) and AlertSeverity in ("Medium", "Low"), true,
+        false
+    ),
+    // If a user is put at high risk, the alert severity should be High and the incident name should have the string "User at risk"
+    AlertSeverity = case(
+        RiskLevelAggregated in (disallowed_risks) or RiskLevelDuringSignIn in (disallowed_risks), "High",
+        AlertSeverity
+    ),
+    IncidentName = case(
+        RiskLevelAggregated in (disallowed_risks), strcat(AlertName, " - User at risk"),
+        AlertName
+    )
+// Remove benign cases where alert severity is not High
+| where not(BenignAlert and not(AlertSeverity in ("High")))
+| project-reorder
+    TimeGenerated,
+    ProductName,
+    AlertName,
+    Description,
+    Alert_*,
+    Type,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    ResultType,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    AuthenticationDetails,
+    AlertSeverity,
+    RiskEventTypes,
+    RiskLevelDuringSignIn,
+    RiskLevelAggregated,
+    Entities,
+    UserId,
+    OriginalRequestId,
+    CorrelationId
