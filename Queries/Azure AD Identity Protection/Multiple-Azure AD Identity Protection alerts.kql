@@ -1,6 +1,6 @@
 let query_frequency = 5m;
 let query_period = 2d;
-let untolerated_risks = dynamic(["high"]);
+let disallowed_risks = dynamic(["high"]);
 let _SubstitutedAlert = toscalar(
     _GetWatchlist('AlertName-SubstitutedDetections')
     | where ProductName == "Azure Active Directory Identity Protection"
@@ -63,11 +63,11 @@ SecurityAlert
     ) on OriginalRequestId
 | extend
     AlertSeverity = case(
-        RiskLevelAggregated in (untolerated_risks) or RiskLevelDuringSignIn in (untolerated_risks), "High",
+        RiskLevelAggregated in (disallowed_risks) or RiskLevelDuringSignIn in (disallowed_risks), "High",
         AlertSeverity
     ),
     IncidentName = case(
-        RiskLevelAggregated in (untolerated_risks), strcat(AlertName, " - User at risk"),
+        RiskLevelAggregated in (disallowed_risks), strcat(AlertName, " - User at risk"),
         AlertName
     )
 | project-reorder
