@@ -72,14 +72,32 @@ union SigninLogs, AADNonInteractiveUserSignInLogs
     by UserId, IPAddress, AppDisplayName, AppId
 | join kind=leftouter _Users on $left.UserId == $right.AccountObjectId
 | extend UserPrincipalName = tolower(case(isnotempty(UserPrincipalName), UserPrincipalName, isnotempty(MailAddress), MailAddress, AccountUPN))
-| project-reorder
+| project
     TimeGenerated,
     UserPrincipalName,
+    AccountDisplayName,
     IPAddress,
+    Location,
     ResultTypes,
     AppDisplayName,
+    ResourceDisplayName,
+    ClientAppUsed,
     UserType,
-    AccountDisplayName,
     GroupMembership,
     AssignedRoles,
-    CorrelationIds
+    AccountSID,
+    OnPremisesDistinguishedName,
+    MailAddress,
+    JobTitle,
+    Department,
+    Manager,
+    UserAccountControl,
+    RiskLevel,
+    RiskState,
+    CorrelationIds,
+    AuthenticationDetails,
+    RiskEventTypes,
+    RiskLevelDuringSignIn,
+    RiskLevelAggregated,
+    AppId,
+    UserId
