@@ -1,5 +1,5 @@
-let query_frequency = 7d;
-let query_period = 14d;
+let query_frequency = 1h;
+let query_period = 7d;
 let disallowed_risks = dynamic(["high"]);
 let legacy_auth_protocols = dynamic(["Authenticated SMTP", "AutoDiscover", "Exchange ActiveSync", "Exchange Online PowerShell", "Exchange Web Services", "IMAP4", "MAPI Over HTTP", "Outlook Anywhere (RPC over HTTP)", "Outlook Service", "POP3", "Reporting Web Services", "Other clients"]);
 let legacy_user_agents = dynamic(["BAV2ROPC", "CBAinPROD", "CBAinTAR", "MSRPC"]);
@@ -74,16 +74,20 @@ let _UnfamiliarAlerts = materialize(
         on OriginalRequestId
     );
 let _UntrustedUserIds = toscalar(
-    _UnfamiliarAlerts
-    | join kind=innerunique (
-        SigninLogs
-        | where TimeGenerated > ago(query_period)
-        | where ResultType in (_UntrustedResultTypes)
-        | project UserId
+    union
+        (_UnfamiliarAlerts
+        | join kind=innerunique (
+            SigninLogs
+            | where TimeGenerated > ago(query_period)
+            | where ResultType in (_UntrustedResultTypes)
+            | project UserId
+            )
+            on UserId
+        ),
+        (AuthenticationMethodChanges(query_period, toscalar(_UnfamiliarAlerts | summarize make_set(UserId)))
         )
-        on UserId
-    | summarize make_list(UserId)
-    );
+    | summarize make_set(UserId)
+);
 _UnfamiliarAlerts
 | extend
     Alert_State = column_ifexists("Alert_State", ""),
