@@ -97,8 +97,8 @@ _UnfamiliarAlerts
     BenignAlert = case(
         // Remove cases where Identity Protection considers the alert solved and the account had MFA configured long ago
         (Status == "Resolved" or Alert_State == "Closed") and not(RecentlyConfiguredMFA), true,
-        // Remove cases where MFA was used successfully and the account had MFA configured long ago (this condition should not be needed with the above one)
-        isnotempty(MFASuccess_TimeGenerated) and not(RecentlyConfiguredMFA), true,
+        // // Remove cases where MFA was used successfully and the account had MFA configured long ago (this condition should not be needed with the above one)
+        // isnotempty(MFASuccess_TimeGenerated) and not(RecentlyConfiguredMFA), true,
         // Remove cases from expected locations, depending on detection, severity and legacy protocols
         Location in (_ExpectedLocations) and ["Alert_Detection Subcategory"] == "UnfamiliarLocation" and AlertSeverity in ("Medium", "Low") and not(ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)), true,
         // Remove cases from expected IP addresses, depending on severity
