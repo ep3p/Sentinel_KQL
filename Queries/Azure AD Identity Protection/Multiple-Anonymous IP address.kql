@@ -1,0 +1,134 @@
+// Anonymous IP address events might not be in your SignInLogs events (you might not find events with the OriginalRequestId), but you might find events with the same CorrelationId.
+let query_frequency = 1h;
+let query_period = 7d;
+let disallowed_risks = dynamic(["high"]);
+let _UntrustedResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has "[MFA]" and Notes has_any ("[Unconfigured]", "[NotCompliant]")
+    | summarize make_list(ResultType)
+);
+let _AnonymousIPAddressAlerts = materialize(
+    SecurityAlert
+    | where TimeGenerated > ago(query_period)
+    | where ProductName has "Azure Active Directory Identity Protection" and AlertName has "Anonymous IP address"
+    | extend ExtendedProperties = todynamic(ExtendedProperties)
+    | extend OriginalRequestId = tostring(ExtendedProperties["Request Id"])
+    | summarize minTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by OriginalRequestId, AlertName, AlertSeverity
+    | where minTimeGenerated > ago(query_frequency)
+    | project
+        Alert_TimeGenerated = TimeGenerated,
+        ProductName,
+        AlertName,
+        Description,
+        AlertSeverity,
+        Status,
+        Tactics,
+        Techniques,
+        Entities,
+        ExtendedProperties,
+        OriginalRequestId
+    | evaluate bag_unpack(ExtendedProperties, OutputColumnPrefix="Alert_", ignoredProperties=dynamic(["Alert generation status", "ProcessedBySentinel", "Request Id", "Tenant Login Source", "User Account", "User Name"]))
+    | as _Alerts
+    | lookup kind=leftouter (
+        union
+            (SigninLogs
+            | where TimeGenerated > ago(query_period)
+            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+            | extend
+                DeviceDetail = tostring(DeviceDetail),
+                TimeReceived = _TimeReceived
+            ),
+            (AADNonInteractiveUserSignInLogs
+            | where TimeGenerated > ago(query_period)
+            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+            | extend TimeReceived = _TimeReceived
+            )
+        | summarize arg_max(TimeReceived, *) by OriginalRequestId
+        | project
+            TimeGenerated,
+            Type,
+            UserPrincipalName,
+            UserDisplayName,
+            IPAddress,
+            Location,
+            ResultType,
+            ResultDescription,
+            ClientAppUsed,
+            AppDisplayName,
+            ResourceDisplayName,
+            DeviceDetail,
+            UserAgent,
+            AuthenticationDetails,
+            RiskEventTypes,
+            RiskLevelDuringSignIn,
+            RiskLevelAggregated,
+            UserId,
+            OriginalRequestId,
+            CorrelationId
+        )
+        on OriginalRequestId
+);
+let _UntrustedUserIds = toscalar(
+    union
+        (_AnonymousIPAddressAlerts
+        | join kind=innerunique (
+            SigninLogs
+            | where TimeGenerated > ago(query_period)
+            | where ResultType in (_UntrustedResultTypes)
+            | project UserId
+            )
+            on UserId
+        ),
+        (AuthenticationMethodChanges(query_period, toscalar(_AnonymousIPAddressAlerts | summarize make_set(UserId)))
+        )
+    | summarize make_set(UserId)
+);
+_AnonymousIPAddressAlerts
+| extend
+    Alert_State = column_ifexists("Alert_State", ""),
+    ["Alert_Detection Subcategory"] = column_ifexists("Alert_Detection Subcategory", ""),
+    RecentlyConfiguredMFA = UserId in (_UntrustedUserIds)
+| extend
+    BenignAlert = case(
+        // Remove cases where Identity Protection considers the alert solved and the account had MFA configured long ago
+        (Status == "Resolved" or Alert_State == "Closed") and not(RecentlyConfiguredMFA), true,
+        false
+    ),
+    // If a user is put at high risk, the alert severity should be High and the incident name should have the string "User at risk"
+    AlertSeverity = case(
+        RiskLevelAggregated in (disallowed_risks) or RiskLevelDuringSignIn in (disallowed_risks), "High",
+        AlertSeverity
+    ),
+    IncidentName = case(
+        RiskLevelAggregated in (disallowed_risks), strcat(AlertName, " - User at risk"),
+        AlertName
+    )
+// Remove benign cases where alert severity is not High
+| where not(BenignAlert and not(AlertSeverity in ("High")))
+| project-reorder
+    TimeGenerated,
+    ProductName,
+    AlertName,
+    Description,
+    Alert_*,
+    Type,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    ResultType,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    AuthenticationDetails,
+    AlertSeverity,
+    RiskEventTypes,
+    RiskLevelDuringSignIn,
+    RiskLevelAggregated,
+    Entities,
+    UserId,
+    OriginalRequestId,
+    CorrelationId
