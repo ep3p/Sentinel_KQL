@@ -134,7 +134,7 @@ dynamic({
 ```
 ```TITableLookback```, ```TITableAdditionalLets``` and ```TITableConditions``` are placeholders in the query scheme. Each element should have a dictionary with the *same placeholders keys*, even if the placeholders values are empty.
 
-At the end, this function tries to substitute, in the query scheme, any placeholder found in the dictionaries of each datatable. **If you need to change the threat intelligence indicator detections**, you just need to change the query scheme or some datatable elements, and make sure the placeholder keys are named the same everywhere. You can add or remove as many placeholders as you want, the ```scan``` KQL operator will try to replace all the placeholder keys found in the dictionaries.
+At the end, this function tries to substitute, in the query scheme, any placeholder found in the dictionaries of each datatable. **If you need to change the threat intelligence indicator detections**, you just need to change the query scheme or some datatable elements, and make sure the placeholder keys are named the same everywhere. **You can add or remove as many placeholders as you want**, the ```scan``` KQL operator will try to replace all the placeholder keys found in the dictionaries.
 
 You can call the function only once, and it will return a query for each indicatortype-table combination defined in the third datatable.
 ![image](https://user-images.githubusercontent.com/2527990/197820399-c4b7e18a-5211-480e-a65d-8b29ac2df468.png)
