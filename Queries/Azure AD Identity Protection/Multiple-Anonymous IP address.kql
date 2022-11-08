@@ -43,8 +43,12 @@ let _AnonymousIPAddressAlerts = materialize(
             | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
             | extend TimeReceived = _TimeReceived
             )
-        | summarize arg_max(TimeReceived, *) by OriginalRequestId
+        | summarize
+            arg_max(TimeReceived, *),
+            MFASuccess_TimeGenerated = minif(TimeGenerated, ConditionalAccessStatus == "success" and AuthenticationRequirement == "multiFactorAuthentication")
+            by OriginalRequestId
         | project
+            MFASuccess_TimeGenerated,
             TimeGenerated,
             Type,
             UserPrincipalName,
@@ -92,6 +96,8 @@ _AnonymousIPAddressAlerts
     BenignAlert = case(
         // Remove cases where Identity Protection considers the alert solved and the account had MFA configured long ago
         (Status == "Resolved" or Alert_State == "Closed") and not(RecentlyConfiguredMFA), true,
+        // // Remove cases where MFA was used successfully and the account had MFA configured long ago (this condition should not be needed with the above one)
+        // isnotempty(MFASuccess_TimeGenerated) and not(RecentlyConfiguredMFA), true,
         false
     ),
     // If a user is put at high risk, the alert severity should be High and the incident name should have the string "User at risk"
