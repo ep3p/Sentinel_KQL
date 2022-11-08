@@ -2,27 +2,25 @@
 
 This folder contains queries created with the help of the function [TIMapQueryGenerator.kql](https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/TIMapQueryGenerator.kql).
 
-The default rules created by Microsoft for threat intelligence indicators can't be expected to adapt to each Sentinel workspace and their indicators, and some of the rules might contain unexpected mistakes. For example, Microsoft has developed a rule that matches Windows Security AppLocker Events with file hashes, but AppLocker does not generate SHA256 hashes, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work.
+The [default rules created by Microsoft](https://github.com/Azure/Azure-Sentinel/tree/master/Detections/ThreatIntelligenceIndicator) for threat intelligence indicators can't be expected to adapt to each Sentinel workspace and their indicators, and some rules might behave unexpectedly.
 
-Also, the default rules check activity that happens *after* ingesting an indicator. When possible, you should also check the events that happened *before* the ingestion. Because of this, each Sentinel workspace should adapt, develop and review their own Threat Intelligence Indicator detections.
+For example, Microsoft developed a [rule that matches Windows Security AppLocker Events with file hashes](https://github.com/Azure/Azure-Sentinel/blob/master/Detections/ThreatIntelligenceIndicator/FileHashEntity_SecurityEvent.yaml), but *AppLocker does not generate SHA256 hashes*, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work for your workspace.
 
-Many data types or tables have columns that could be matched to several indicator types, like: email address, domain, url, file hash, IP address... And so each indicator type could also be matched with several data types. The query (or algorithm) that tries to match a certain indicator type with a certain data type will have common elements regardless of the indicator and data types checked.
+Also, these default rules check activity that happens *after* ingesting an indicator. When possible, it should also check events that happened *before* ingesting an indicator. Because of this, **each Sentinel workspace should adapt, develop and review their own threat intelligence indicator detections**.
 
-Developing and maintaining +40 queries with common elements between them, without making mistakes or keeping track of changes, is a difficult task, so it would be beneficial to develop a function or a generator for these queries. You pick an indicator type and a data type and the function generates the appropiate query, reusing and defining only once the common query parts. The part of the query that will be unique to each pair indicatortype-datatype should be small.
+Some data types (tables) have columns that could be matched to several indicator types like: email address, domain, url, file hash, IP address... And also each indicator type could be matched with several tables. Regardless of the indicator type and table checked, the detection query (or algorithm) will have common elements.
 
-Usually developing this query generator would require a programming language, but KQL is also capable of solving this problem. You could define in KQL:
-1. A datatable of indicator types.
-2. A datatable of data types (or ingested tables).
-3. A datatable of indicatortype-datatype pairs.
-4. A query scheme (the common algorithm) with some variables (or placeholders), which will be substituted by query code, depending on the indicator and data types.
+Developing and maintaining +40 detections with common elements, without making mistakes or keeping track of changes, is a difficult task. It would be beneficial to develop a function that generates all the detection queries, one query for each indicator type and table combination. This way the common query parts are defined only once, and reused when needed. The query part that is unique to each indicatortype-table combination should be relativelly small. Another advantage of this function is that all the information related to threat intelligence indicator queries is contained in a single file, thus facilitating the search and replacement of similar detection parts.
 
-This generator could check the third datatable to know which indicators and tables do you want to match, substitute the appropiate parts in the query scheme, and a query will be generated for each pair.
+Developing this generative function would usually require a programming language, but KQL is also capable of solving this problem. You could define a KQL function with:
+1. A datatable of your indicator types.
+2. A datatable of your ingested tables.
+3. A datatable of indicatortype-table combinations.
+4. A query scheme (the common algorithm) with some variables (or placeholders), which will be substituted by query parts, depending on the indicator type and table.
 
-One example of this generator function is [TIMapQueryGenerator.kql](https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/TIMapQueryGenerator.kql).
+This function checks the third datatable to know which indicators and tables have to be matched, and to substitute the appropiate parts in the query scheme, generating a query for each combination.
 
-An advantage of this generator is that all the information related to threat indicator queries is contained in a single file, and is easier to search and replace similar query parts.
-
-The query scheme of this generator example is:
+One example of this generative function is [TIMapQueryGenerator.kql](https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/TIMapQueryGenerator.kql). The query scheme in this example is:
 ```
 Query:string=
     ```// This query assumes a feed of threat indicators is ingested/synchronized periodically, and each synchronization ingests all the indicators that are to be monitored.
@@ -105,13 +103,15 @@ Query:string=
     | extend
         timestamp = <<<TableName>>>_TimeGenerated<<<TableCustomEntityExtend>>><<<TICustomEntityExtend>>>```
 ```
-You will notice this "query" has some placeholders indicated by the strings ```<<< xxxxx >>>```, in this state the query won't work. The three defined datatables contain the query parts that substitute these placeholders. In this example the datatables are called:
+You can notice this query scheme has some placeholders indicated by the strings ```<<< xxxxx >>>```, this "query" won't work in this state. But the defined datatables contain the query parts that substitute the placeholders. In this example the datatables have been called:
 ```
 _IndicatorTypesDatatable = datatable(EntityType:string, IndicatorDictionary:dynamic)
 _TablesDatatable = datatable(EntityType:string, TableDictionary:dynamic)
 _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableConditions:dynamic)
 ```
-In this example each datable *element* has a dictionary that contains the placeholders. An element for the third datatable, for the match between URL indicators and the Syslog table, would be:
+Each datable *element* has a dictionary that will contain the placeholders.
+
+An example element for the ```_IndicatorXTableDatatable``` datatable, that represents the combination of *URL indicators* and the *Syslog table*, would be:
 ```
 'URL', 'Syslog',
 dynamic({
@@ -132,17 +132,17 @@ dynamic({
 })
 ,
 ```
-```TITableLookback```, ```TITableAdditionalLets``` and ```TITableConditions``` are placeholders in the query scheme. In this example, *each element of the datatables should have a dictionary with the same placeholders*, even if some of them are empty.
+```TITableLookback```, ```TITableAdditionalLets``` and ```TITableConditions``` are placeholders in the query scheme. Each element should have a dictionary with the *same placeholders keys*, even if the placeholders values are empty.
 
-This generator tries to substitute, in the query scheme, any placeholder found in the datatable dictionaries. **If you want to change the generated queries**, you just need to change the datatable elements or the query scheme, and making sure the placeholders are named the same in both places. You can add or remove as many placeholders you want, the ```scan``` KQL operator will try to replace all the placeholders found in the element dictionaries.
+At the end, this function tries to substitute, in the query scheme, any placeholder found in the dictionaries of each datatable. **If you need to change the threat intelligence indicator detections**, you just need to change the query scheme or some datatable elements, and make sure the placeholder keys are named the same everywhere. You can add or remove as many placeholders as you want, the ```scan``` KQL operator will try to replace all the placeholder keys found in the dictionaries.
 
-You can call the generator only once, and generate a query for each indicatortype-datatype pair defined in the third datatable.
+You can call the function only once, and it will return a query for each indicatortype-table combination defined in the third datatable.
 ![image](https://user-images.githubusercontent.com/2527990/197820399-c4b7e18a-5211-480e-a65d-8b29ac2df468.png)
 
-Then, you just need to copy and paste the generated query in a new tab, press "Format query" for readability, and you will have one query ready to use in an Analytics Rule.
+The next steo would be to copy-paste the generated query in a new tab, press "Format query" for readability, and you will have one query ready to use in an Analytics rule.
 
 ![image](https://user-images.githubusercontent.com/2527990/197820972-5d9aa918-17ca-44f1-9369-8c229613477f.png) ![image](https://user-images.githubusercontent.com/2527990/197821197-f25ce94e-3a3d-480e-a464-59e1ab3f5616.png)
 
-Check the generated [URL Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Detections/ThreatIntelligenceIndicator/URLEntity_Syslog.kql).
+For example, check the generated [URL-Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Detections/ThreatIntelligenceIndicator/URLEntity_Syslog.kql).
 
-This generator matches 5 indicator types with 27 tables, contains ~2200 lines in one file that is a little empty, and it generates 46 queries that contain ~4600 lines in total.
+In this example, the generative function matches 5 indicator types with 27 tables, generating 46 queries. The function contains ~2200 lines, and the 46 queries contain ~4600 lines in total.
