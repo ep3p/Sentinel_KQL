@@ -139,7 +139,7 @@ At the end, this function tries to substitute, in the query scheme, any placehol
 You can call the function only once, and it will return a query for each indicatortype-table combination defined in the third datatable.
 ![image](https://user-images.githubusercontent.com/2527990/197820399-c4b7e18a-5211-480e-a65d-8b29ac2df468.png)
 
-The next steo would be to copy-paste the generated query in a new tab, press "Format query" for readability, and you will have one query ready to use in an Analytics rule.
+The next step would be to copy-paste the generated query in a new tab, press "Format query" for readability, and you will have one query ready to use in an Analytics rule.
 
 ![image](https://user-images.githubusercontent.com/2527990/197820972-5d9aa918-17ca-44f1-9369-8c229613477f.png) ![image](https://user-images.githubusercontent.com/2527990/197821197-f25ce94e-3a3d-480e-a464-59e1ab3f5616.png)
 
