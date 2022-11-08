@@ -111,7 +111,7 @@ _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TI
 ```
 Each datable *element* has a dictionary that will contain the placeholders.
 
-An example element for the ```_IndicatorXTableDatatable``` datatable, that represents the combination of *URL indicators* and the *Syslog table*, would be:
+An example element for the ```_IndicatorXTableDatatable``` datatable, that represents the combination of *URL indicators* with the *Syslog table*, would be:
 ```
 'URL', 'Syslog',
 dynamic({
