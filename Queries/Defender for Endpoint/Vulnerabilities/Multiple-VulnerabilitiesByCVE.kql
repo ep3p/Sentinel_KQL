@@ -1,0 +1,8 @@
+DeviceTvmSoftwareVulnerabilities
+//| where SoftwareName has_any ("chrome", "edge", "cortex", "windows")
+//| where CveId has_any ("CVE-2021-29358", "CVE-2021-29359")
+//| where VulnerabilitySeverityLevel has_any ("Low", "Medium", "High", "Critical")
+| summarize DeviceNameList = make_list(DeviceName), DetailedDeviceList = make_list(bag_pack("DeviceName", DeviceName, "DeviceId", DeviceId)), take_any(SoftwareName, SoftwareVersion, VulnerabilitySeverityLevel, RecommendedSecurityUpdate) by CveId
+| lookup DeviceTvmSoftwareVulnerabilitiesKB on CveId, VulnerabilitySeverityLevel
+| project SoftwareName, SoftwareVersion, CveId, VulnerabilitySeverityLevel, CvssScore, IsExploitAvailable, DeviceNameList, DetailedDeviceList, PublishedDate, LastModifiedTime, VulnerabilityDescription, AffectedSoftware
+//| limit 100
