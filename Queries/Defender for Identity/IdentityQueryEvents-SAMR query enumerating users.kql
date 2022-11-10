@@ -1,0 +1,18 @@
+IdentityQueryEvents
+| where Protocol == "Samr"
+| where QueryType has "EnumerateUsers"
+| extend AdditionalFieldsCount = toint(AdditionalFields["Count"])
+| summarize Count = sum(AdditionalFieldsCount), QueryType = make_set_if(split(QueryType, ", "), isnotempty(QueryType)), QueryTarget = make_set_if(QueryTarget, isnotempty(QueryTarget)), TimeGenerated = min(TimeGenerated), maxTimeGenerated = max(TimeGenerated), take_any(ActionType, Protocol, DestinationPort), DestinationIPAddress = make_set(DestinationIPAddress), DestinationDeviceName = make_set(DestinationDeviceName) by IPAddress, DeviceName
+| project
+    TimeGenerated,
+    maxTimeGenerated,
+    DeviceName,
+    IPAddress,
+    ActionType,
+    Count,
+    Protocol,
+    QueryType,
+    QueryTarget,
+    DestinationDeviceName,
+    DestinationIPAddress,
+    DestinationPort
