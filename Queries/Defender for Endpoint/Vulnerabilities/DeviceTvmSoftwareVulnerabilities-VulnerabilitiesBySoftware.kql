@@ -1,0 +1,9 @@
+DeviceTvmSoftwareVulnerabilities
+//| where SoftwareName has_any ("chrome", "edge", "cortex", "windows")
+//| where CveId has_any ("CVE-2021-29358", "CVE-2021-29359")
+//| where VulnerabilitySeverityLevel has_any ("Low", "Medium", "High", "Critical")
+| summarize DeviceNameList = make_set(DeviceName), DetailedDeviceList = make_set(bag_pack("DeviceName", DeviceName, "DeviceId", DeviceId)), CVEs = array_sort_asc(make_set(bag_pack("CVE", CveId, "VulnerabilitySeverityLevel", VulnerabilitySeverityLevel))) by SoftwareName, SoftwareVersion
+| summarize DeviceNameList = array_sort_asc(make_set(DeviceNameList)), DetailedDeviceList = make_set(DetailedDeviceList), VersionList = array_sort_asc(make_list(bag_pack("SoftwareVersion", SoftwareVersion, "CVEs", CVEs))) by SoftwareName
+| project SoftwareName, VersionList, DeviceNameList, DetailedDeviceList
+//| mv-expand DeviceNameList to typeof(string)
+//| limit 100
