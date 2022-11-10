@@ -5,4 +5,5 @@ DeviceTvmSoftwareVulnerabilities
 | summarize CveIdList = make_list(bag_pack("CveId", CveId, "VulnerabilitySeverityLevel", VulnerabilitySeverityLevel, "RecommendedSecurityUpdate", RecommendedSecurityUpdate)), take_any(DeviceName, OSPlatform, OSVersion, OSArchitecture) by DeviceId, SoftwareName, SoftwareVersion
 | summarize Vulnerabilities = make_list(bag_pack("SoftwareName", SoftwareName, "SoftwareVersion", SoftwareVersion, "CVEs", CveIdList)), take_any(DeviceName, OSPlatform, OSVersion, OSArchitecture) by DeviceId
 | project DeviceName, Vulnerabilities, OSPlatform, OSVersion, OSArchitecture, DeviceId
+//| mv-expand Vulnerabilities
 //| limit 100
