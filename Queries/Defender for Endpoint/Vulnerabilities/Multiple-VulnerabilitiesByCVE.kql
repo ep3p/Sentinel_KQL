@@ -5,4 +5,5 @@ DeviceTvmSoftwareVulnerabilities
 | summarize DeviceNameList = make_list(DeviceName), DetailedDeviceList = make_list(bag_pack("DeviceName", DeviceName, "DeviceId", DeviceId)), take_any(SoftwareName, SoftwareVersion, VulnerabilitySeverityLevel, RecommendedSecurityUpdate) by CveId
 | lookup DeviceTvmSoftwareVulnerabilitiesKB on CveId, VulnerabilitySeverityLevel
 | project SoftwareName, SoftwareVersion, CveId, VulnerabilitySeverityLevel, CvssScore, IsExploitAvailable, DeviceNameList, DetailedDeviceList, PublishedDate, LastModifiedTime, VulnerabilityDescription, AffectedSoftware
+//| mv-expand DeviceNameList to typeof(string)
 //| limit 100
