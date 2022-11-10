@@ -19,9 +19,9 @@ let _PrivilegedObjects =
     | project SID, SAMAccountName
 ;
 IdentityQueryEvents
+| where Protocol == "Ldap"
 | where not(DeviceName has_any (_ExpectedDomains))
 | parse Query with "LDAP Search Scope: " SearchScope ", Base Object:" BaseObject ", Search Filter: " SearchFilter
-| where Protocol == "Ldap"
 | where (QueryType has_any ("AllUsers", "AllGroups", "AllComputers", "AllTrustDomains", "AllDomains", "AllSecurityPrincipals", "AllObjects") and SearchScope == "WholeSubtree")
     or trim(@"\s", QueryTarget) in (toscalar(_PrivilegedObjects | summarize make_list(SAMAccountName)))
     or Query has_any (toscalar(_PrivilegedObjects | summarize make_list(SID)))
