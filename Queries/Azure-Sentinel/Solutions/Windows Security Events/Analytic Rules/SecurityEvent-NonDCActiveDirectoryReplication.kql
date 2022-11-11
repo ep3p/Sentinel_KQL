@@ -1,0 +1,62 @@
+let query_frequency = 15m;
+let query_period = 3d;
+let query_wait = 15m;
+let replication_threshold = 10;
+let _BenignDSReplication =
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "DSReplication"
+    | project Account = ActorPrincipalName, IpAddress = SourceAddress
+;
+SecurityEvent
+| where ingestion_time() between (ago(query_frequency + query_wait) .. ago(query_wait))
+| where EventID == 4662 and ObjectServer == "DS" and AccountType != "Machine"
+| where Properties has_any (
+    // https://learn.microsoft.com/en-us/windows/win32/adschema/extended-rights
+    "{1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}", //DS-Replication-Get-Changes-All
+    "{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}", //DS-Replication-Get-Changes
+    "{89e95b76-444d-4c62-991a-0facbeda640c}", //DS-Replication-Get-Changes-In-Filtered-Set
+    "{9923a32a-3607-11d2-b9be-0000f87a36b2}"  //DS-Install-Replica
+    //"{19195a5b-6da0-11d0-afd3-00c04fd930c9}", //Domain-DNS class WRITE_DAC
+    //"{1131f6ab-9c07-11d1-f79f-00c04fc2dcd2}", //DS-Replication-Synchronize'
+    //"{1131f6ac-9c07-11d1-f79f-00c04fc2dcd2}"  //DS-Replication-Manage-Topology'
+    )
+| project-away TargetLogonId, IpAddress
+| join kind=leftouter (
+    SecurityEvent
+    | where ingestion_time() > ago(query_period)
+    | where EventID == 4624 and AccountType != "Machine" and LogonType == 3
+    | distinct
+        Logon_TimeGenerated = TimeGenerated,
+        Logon_Account = Account,
+        TargetLogonId,
+        IpAddress,
+        Computer
+    ) on Computer, $left.SubjectLogonId == $right.TargetLogonId
+| project-away Computer1
+| where not(isnotempty(Logon_TimeGenerated) and TimeGenerated < Logon_TimeGenerated)
+| summarize arg_min(Logon_TimeGenerated, *), PropertiesList = array_sort_asc(make_set(split(replace_string(Properties, "\t", ""), " "))), OperationCount = count() by Computer, Account, IpAddress, SubjectLogonId, ObjectName
+// If Account was not registered, substitute by Logon_Account
+| extend Account = iff(Account == @"-\-", Logon_Account, Account)
+// Remove expected DS replications
+| join kind=leftanti _BenignDSReplication on IpAddress, Account
+| summarize arg_min(Logon_TimeGenerated, *), PropertiesList = array_sort_asc(make_set(PropertiesList)), OperationCount = sum(OperationCount), SubjectLogonIdList = make_list(SubjectLogonId, 250), TargetLogonIdList = make_list_if(TargetLogonId, isnotempty(TargetLogonId), 250) by Computer, Account, IpAddress, ObjectName
+// Events where logon was not registered, thus IpAddress is not available, are assumed to be benign and happen infrequently
+| where not(array_length(TargetLogonIdList) == 0 and OperationCount < replication_threshold and Account in (toscalar(_BenignDSReplication | summarize make_set(Account))))
+| project
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    Activity,
+    AccessList,
+    AccessMask,
+    ObjectServer,
+    ObjectType,
+    OperationType,
+    OperationCount,
+    PropertiesList,
+    SubjectLogonIdList,
+    TargetLogonIdList,
+    Logon_TimeGenerated,
+    Logon_Account,
+    IpAddress
