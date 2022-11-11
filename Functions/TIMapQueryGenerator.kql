@@ -1531,10 +1531,11 @@
             ,
             "TITableConditions":
                 ```
-                | where isnotempty(ClientIP)
-                //| where not(_IndicatorsPrefilterLength < 10000 and not(ClientIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), ClientIP)[0]
-                | extend IPAddress = tostring(ClientIPValues[0])
+                | mv-expand IPAddress = pack_array(ClientIP, Client_IPAddress) to typeof(string)
+                | where isnotempty(IPAddress)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | extend IPAddressValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), IPAddress)[0]
+                | extend IPAddress = tostring(IPAddressValues[0])
                 | where isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
