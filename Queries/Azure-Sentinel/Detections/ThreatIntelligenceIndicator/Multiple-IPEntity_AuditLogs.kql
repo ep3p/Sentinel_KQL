@@ -70,7 +70,7 @@ let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: date
         | extend UserPrincipalName = tostring(InitiatedBy.user.userPrincipalName)
         | extend IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])].ipAddress)
         // Filter events that may contain indicators
-        | where not(Category == "UserManagement" and LoggedByService == "Self-service Password Management" and OperationName == "Self-service password reset flow activity progress" and Result == "failure")
+        | where not(Category == "UserManagement" and LoggedByService == "Self-service Password Management" and OperationName == "Self-service password reset flow activity progress" and (Result == "failure" or (Result == "success" and ResultReason == "User submitted their user ID")))
         | where isnotempty(IPAddress)
         //| where not(_IndicatorsPrefilterLength < 10000 and not(InitiatedBy has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
         //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
