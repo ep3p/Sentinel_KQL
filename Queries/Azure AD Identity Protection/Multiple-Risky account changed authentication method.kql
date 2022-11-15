@@ -1,0 +1,65 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let auth_method_change_period_diff = 2d;
+let _ExpectedLocations = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "CorporateGeolocation"
+    | summarize make_list(Auxiliar)
+);
+let _ExpectedIPRanges = dynamic([]);
+);
+let _RiskEvents = materialize(
+    AADUserRiskEvents
+    | where TimeGenerated > ago(query_frequency + auth_method_change_period_diff)
+    | summarize arg_max(TimeGenerated, *) by Id
+    | where not(Source == "IdentityProtection" and RiskState == "dismissed" and RiskDetail == "aiConfirmedSigninSafe")
+    | where not(Source == "IdentityProtection" and RiskState == "remediated" and RiskDetail == "userPassedMFADrivenByRiskBasedPolicy")
+    | summarize arg_min(TimeGenerated, *) by CorrelationId, IpAddress, RiskEventType, RiskLevel
+    | project-away Location
+    | join kind=leftouter (
+        union AADNonInteractiveUserSignInLogs, SigninLogs
+        | where TimeGenerated > ago(query_period)
+        | summarize TimeGenerated = min(TimeGenerated), take_anyif(Location, isnotempty(Location)) by CorrelationId
+        | project-rename SignIn_TimeGenerated = TimeGenerated
+        ) on CorrelationId
+    | project-away CorrelationId1
+    | mv-apply ExpandedAdditionalInfo = AdditionalInfo on (
+        summarize BagToUnpack = make_bag(pack(tostring(ExpandedAdditionalInfo["Key"]), ExpandedAdditionalInfo["Value"]))
+    )
+    | evaluate bag_unpack(BagToUnpack, OutputColumnPrefix = "AdditionalInfo_", ignoredProperties = dynamic(["requestId", "correlationId", "userAgent", "alertUrl"]))
+    | extend
+        RelatedLocation_IpAddress = tostring(column_ifexists("AdditionalInfo_relatedLocation", dynamic(null))["clientIP"]),
+        RelatedLocation_Location = tostring(column_ifexists("AdditionalInfo_relatedLocation", dynamic(null))["countryCode"]),
+        RelatedLocation_SignIn_TimeGenerated = column_ifexists("AdditionalInfo_relatedEventTimeInUtc", datetime(null))
+    | project TimeGenerated, RelatedLocation_SignIn_TimeGenerated, RelatedLocation_IpAddress, RelatedLocation_Location, SignIn_TimeGenerated, IpAddress, Location, UserPrincipalName, UserDisplayName, Source, RiskEventType, DetectionTimingType, RiskLevel, RiskState, RiskDetail, CorrelationId, RequestId, UserId, AdditionalInfo, RiskEventId = Id
+);
+let _AuthenticationMethodChanges =
+    AuthenticationMethodChanges(query_period, toscalar(_RiskEvents | summarize make_set(UserId)))
+    | project BagToUnpack = pack_all()
+    | evaluate bag_unpack(BagToUnpack, OutputColumnPrefix = "AuthMethodChange_", ignoredProperties = dynamic(["SignInLogs_TimeGenerated", "UserPrincipalName", "UserDisplayName", "SignInLogs_IPAddress", "Location", "ResultType", "ClientAppUsed", "AppDisplayName", "ResourceDisplayName", "DeviceDetail", "AuthenticationDetails", "RiskState", "RiskEventTypes", "RiskLevelDuringSignIn", "RiskLevelAggregated", "OriginalRequestId", "SignInLogs_CorrelationId"]))
+    | extend
+        AuthMethodChange_TimeGenerated = column_ifexists("AuthMethodChange_TimeGenerated", datetime(null)),
+        AuthMethodChange_UserId = column_ifexists("AuthMethodChange_UserId", ""),
+        AuthMethodChange_IPAddress = column_ifexists("AuthMethodChange_IPAddress", "")
+;
+_RiskEvents
+| join kind=inner _AuthenticationMethodChanges on $left.UserId == $right.AuthMethodChange_UserId
+// Filter cases where the risk event or the authentication method change happened in the last query frequency timespan
+| where AuthMethodChange_TimeGenerated > ago(query_frequency) or TimeGenerated > ago(query_frequency)
+// Remove cases where the authentication method change event did not happen within "auth_method_change_period_diff" days of the signin event (which generated the risk event)
+| where not(isnotempty(SignIn_TimeGenerated) and not(AuthMethodChange_TimeGenerated between ((SignIn_TimeGenerated - auth_method_change_period_diff) .. (SignIn_TimeGenerated + auth_method_change_period_diff))))
+| extend
+    BenignAlert = case(
+        // Remove Unfamiliar sign-in properties cases where MFA was not set previously and the location or IP address is expected, depending on severity
+        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationMethod", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)), true,
+        // Remove Atypical travel cases from expected locations, depending on severity
+        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and RelatedLocation_Location == Location and RelatedLocation_Location in (_ExpectedLocations) and Location in (_ExpectedLocations) , true,
+        // Remove Atypical travel cases from expected IP addresses, depending on severity
+        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and ipv4_is_in_any_range(RelatedLocation_IpAddress, _ExpectedIPRanges)    and Location in (_ExpectedLocations), true,
+        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)                    and RelatedLocation_Location in (_ExpectedLocations), true,
+        false
+    )
+// Remove benign cases where risk level is not High
+| where not(BenignAlert and not(RiskLevel in ("high")))
+| summarize arg_min(TimeGenerated, *) by UserId, RiskEventType, RiskLevel, AuthMethodChange_TimeGenerated, IpAddress
+| project-reorder TimeGenerated, RelatedLocation_SignIn_TimeGenerated, RelatedLocation_IpAddress, RelatedLocation_Location, SignIn_TimeGenerated, IpAddress, Location, AuthMethodChange_TimeGenerated, UserPrincipalName, UserDisplayName, Source, RiskEventType, DetectionTimingType, RiskLevel, RiskState, RiskDetail, CorrelationId, RequestId, UserId, AdditionalInfo, RiskEventId, AuthMethodChange_*
