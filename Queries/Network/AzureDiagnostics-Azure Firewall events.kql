@@ -13,5 +13,5 @@ AzureDiagnostics
     Protocol = iff(isnotempty(Protocol), Protocol, Protocol2),
     SourceAddress = iff(isnotempty(SourceAddress1), SourceAddress1, SourceAddress2),
     DestinationAddress = iff(isnotempty(DestinationAddress1), DestinationAddress1, DestinationAddress2)
-| project Resource, Category, OperationName, FirewallAction, Protocol, SourceAddress, DestinationAddress, NatDestinationAddress, SourcePort, DestinationPort, msg_s, ResourceId, ResourceType
+| project TimeGenerated, Resource, Category, OperationName, FirewallAction, Protocol, SourceAddress, DestinationAddress, NatDestinationAddress, SourcePort, DestinationPort, msg_s, ResourceId, ResourceType
 | limit 1000
