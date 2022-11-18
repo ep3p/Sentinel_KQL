@@ -1,0 +1,34 @@
+SecurityAlert
+| where AlertName has "Suspicious request to Kubernetes API" and ProviderName != "ASI Scheduled Alerts"
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend
+    APIRequest = tostring(ExtendedProperties["API Request"]),
+    ContainerID = tostring(ExtendedProperties["Container ID"]),
+    ImageName = tostring(ExtendedProperties["Image Name"]),
+    UserName = tostring(ExtendedProperties["User Name"]),
+    ResourceType = tostring(ExtendedProperties["resourceType"]),
+    GroupName = tostring(ExtendedProperties.GroupName)
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    ContainerIDs = make_set(ContainerID, 250),
+    AlertLinks = make_list(AlertLink, 250),
+    take_any(RemediationSteps)
+    by AlertName, AlertSeverity, Description, ResourceId, APIRequest, ImageName, UserName, ResourceType, Tactics
+| project
+    TimeGenerated,
+    AlertName,
+    AlertSeverity,
+    Description,
+    RemediationSteps,
+    ResourceId,
+    ResourceType,
+    StartTime,
+    EndTime,
+    ImageName,
+    UserName,
+    APIRequest,
+    ContainerIDs,
+    AlertLinks,
+    Tactics
