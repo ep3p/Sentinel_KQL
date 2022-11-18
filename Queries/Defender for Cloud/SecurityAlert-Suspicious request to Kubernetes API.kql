@@ -6,8 +6,7 @@ SecurityAlert
     ContainerID = tostring(ExtendedProperties["Container ID"]),
     ImageName = tostring(ExtendedProperties["Image Name"]),
     UserName = tostring(ExtendedProperties["User Name"]),
-    ResourceType = tostring(ExtendedProperties["resourceType"]),
-    GroupName = tostring(ExtendedProperties.GroupName)
+    ResourceType = tostring(ExtendedProperties["resourceType"])
 | summarize
     TimeGenerated = min(TimeGenerated),
     StartTime = min(StartTime),
