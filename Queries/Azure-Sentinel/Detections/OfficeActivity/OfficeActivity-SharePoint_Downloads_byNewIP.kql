@@ -49,7 +49,7 @@ OfficeActivity
 // Add geolocation from IP address
 | lookup kind=leftouter (
     union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs
-    | where TimeGenerated > ago(query_frequency)
+    | where TimeGenerated > ago(query_period)
     | summarize hint.strategy=shuffle take_anyif(Location, isnotempty(Location)) by IPAddress
     )
     on $left.ClientIP == $right.IPAddress
