@@ -17,7 +17,7 @@ You could check other resources like:
 | [Kaidja/Azure-Sentinel](https://github.com/Kaidja/Azure-Sentinel) |
 | [samilamppu/Sentinel-queries](https://github.com/samilamppu/Sentinel-queries) |
 | [ashwin-patil/blue-teaming-with-kql](https://github.com/ashwin-patil/blue-teaming-with-kql) |
-| [e0li9ht/Microsoft-Sentinel-Queries](https://github.com/le0li9ht/Microsoft-Sentinel-Queries) |
+| [le0li9ht/Microsoft-Sentinel-Queries](https://github.com/le0li9ht/Microsoft-Sentinel-Queries) |
 | ... |
 
 Other links:
