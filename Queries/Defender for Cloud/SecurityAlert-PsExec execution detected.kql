@@ -1,0 +1,35 @@
+SecurityAlert
+| where AlertName has "PsExec execution detected" and ProviderName != "ASI Scheduled Alerts"
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend
+    Computer = tostring(ExtendedProperties["Machine Name"]),
+    Account = tostring(ExtendedProperties["Account"]),
+    AccountSID = tostring(ExtendedProperties["User SID"]),
+    AccountLogonId = tostring(ExtendedProperties["Account Logon Id"]),
+    ProcessName = tostring(ExtendedProperties["Process Name"]),
+    CommandLine = tostring(ExtendedProperties["Command Line"])
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    AccountLogonIds = make_set(AccountLogonId, 250),
+    AlertLinks = make_list(AlertLink, 250),
+    take_any(RemediationSteps)
+    by AlertName, AlertSeverity, Description, ResourceId, Computer, Account, AccountSID, ProcessName, CommandLine, Tactics
+| project
+    TimeGenerated,
+    AlertName,
+    AlertSeverity,
+    Description,
+    RemediationSteps,
+    ResourceId,
+    StartTime,
+    EndTime,
+    Computer,
+    Account,
+    AccountSID,
+    ProcessName,
+    CommandLine,
+    AccountLogonIds,
+    AlertLinks,
+    Tactics
