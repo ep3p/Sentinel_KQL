@@ -18,6 +18,7 @@ You could check other resources like:
 | [samilamppu/Sentinel-queries](https://github.com/samilamppu/Sentinel-queries) |
 | [ashwin-patil/blue-teaming-with-kql](https://github.com/ashwin-patil/blue-teaming-with-kql) |
 | [le0li9ht/Microsoft-Sentinel-Queries](https://github.com/le0li9ht/Microsoft-Sentinel-Queries) |
+| [DanielChronlund/DCSecurityOperations](https://github.com/DanielChronlund/DCSecurityOperations) |
 | ... |
 
 Other links:
