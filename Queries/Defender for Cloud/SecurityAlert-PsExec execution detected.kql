@@ -13,9 +13,24 @@ SecurityAlert
     StartTime = min(StartTime),
     EndTime = max(EndTime),
     AccountLogonIds = make_set(AccountLogonId, 250),
+    CommandLines = make_set(CommandLine, 250),
     AlertLinks = make_list(AlertLink, 250),
+    Entities = make_set(todynamic(Entities)),
     take_any(RemediationSteps)
-    by AlertName, AlertSeverity, Description, ResourceId, Computer, Account, AccountSID, ProcessName, CommandLine, Tactics
+    by AlertName, AlertSeverity, Description, ResourceId, Computer, Account, AccountSID, ProcessName, Tactics
+| mv-apply Entities on (
+    extend
+        EntityValue = tostring(Entities[tostring(bag_keys(Entities)[1])]),
+        EntityType = tostring(Entities["Type"])
+    | where isnotempty(EntityType)
+    | summarize take_any(Entities) by EntityValue, EntityType
+    | sort by EntityType desc
+    | summarize Entities = make_list(Entities)
+    )
+| mv-apply with_itemindex = Index_aux Entities on (
+    extend Entities = bag_merge(bag_pack(@"$id", Index_aux + 2), bag_remove_keys(Entities, dynamic(["$id", "Account", "Host"])))
+    | summarize Entities = tostring(array_sort_asc(make_list(Entities)))
+    )
 | project
     TimeGenerated,
     AlertName,
@@ -29,7 +44,8 @@ SecurityAlert
     Account,
     AccountSID,
     ProcessName,
-    CommandLine,
+    CommandLines,
     AccountLogonIds,
     AlertLinks,
-    Tactics
+    Tactics,
+    Entities
