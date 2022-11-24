@@ -1,0 +1,63 @@
+SecurityAlert
+| where AlertName has "Rare SVCHOST service group executed" and ProviderName != "ASI Scheduled Alerts"
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend
+    Account = tostring(ExtendedProperties["user name"]),
+    AccountSID = tostring(ExtendedProperties["User SID"]),
+    AccountLogonId = tostring(ExtendedProperties["account logon id"]),
+    ProcessName = tostring(ExtendedProperties["process name"]),
+    CommandLine = tostring(ExtendedProperties["command line"]),
+    ProcessId = tostring(ExtendedProperties["process id"]),
+    ParentProcess = tostring(ExtendedProperties["parent process"]),
+    ParentProcessId = tostring(ExtendedProperties["parent process id"]),
+    ResourceType = tostring(ExtendedProperties["resourceType"]),
+    MachineName = CompromisedEntity
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    AccountLogonIds = make_set(AccountLogonId, 250),
+    ProcessNames = make_set(ProcessName, 250),
+    CommandLines = make_set(CommandLine, 250),
+    ProcessIds = make_set(ProcessId, 250),
+    ParentProcesses = make_set(ParentProcess, 250),
+    ParentProcessIds = make_set(ParentProcessId, 250),
+    AlertLinks = make_list(AlertLink, 250),
+    Entities = make_set(todynamic(Entities)),
+    take_any(RemediationSteps)
+    by AlertName, AlertSeverity, Description, ResourceId, MachineName, Account, AccountSID, ResourceType, Tactics
+| mv-apply Entities on (
+    extend
+        EntityValue = tostring(Entities[tostring(bag_keys(Entities)[1])]),
+        EntityType = tostring(Entities["Type"])
+    | where isnotempty(EntityType)
+    | summarize take_any(Entities) by EntityValue, EntityType
+    | sort by EntityType desc
+    | summarize Entities = make_list(Entities)
+    )
+| mv-apply with_itemindex = Index_aux Entities on (
+    extend Entities = bag_merge(bag_pack(@"$id", Index_aux + 2), bag_remove_keys(Entities, dynamic(["$id", "Host"])))
+    | summarize Entities = tostring(array_sort_asc(make_list(Entities)))
+    )
+| project
+    TimeGenerated,
+    AlertName,
+    AlertSeverity,
+    Description,
+    RemediationSteps,
+    ResourceId,
+    ResourceType,
+    StartTime,
+    EndTime,
+    MachineName,
+    Account,
+    AccountSID,
+    AccountLogonIds,
+    ProcessNames,
+    CommandLines,
+    ProcessIds,
+    ParentProcesses,
+    ParentProcessIds,
+    AlertLinks,
+    Tactics,
+    Entities
