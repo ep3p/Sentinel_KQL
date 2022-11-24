@@ -1,12 +1,20 @@
 SecurityAlert
 | where AlertName has "Unusual number of failed sign-in attempts" and ProviderName == "Azure Security Center"
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend
+    MachineName = tostring(ExtendedProperties["Machine Name"]),
+    IPAddress = tostring(ExtendedProperties["IP Address"]),
+    ResourceType = tostring(ExtendedProperties["resourceType"])
 | summarize
     TimeGenerated = min(TimeGenerated),
-    minTimeGenerated = min(TimeGenerated),
-    maxTimeGenerated = max(TimeGenerated),
-    take_any(RemediationSteps, ExtendedLinks, AlertLink, CompromisedEntity, Tactics),
-    Entities = make_set(todynamic(Entities))
-    by AlertName, AlertSeverity, AlertType, Description, ProviderName, ResourceId
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    IPAddresses = make_set_if(IPAddress, isnotempty(IPAddress), 250),
+    ExtendedLinks = make_set(ExtendedLinks, 250),
+    AlertLinks = make_list(AlertLink, 250),
+    Entities = make_set(todynamic(Entities)),
+    take_any(RemediationSteps)
+    by AlertName, AlertSeverity, Description, ResourceId, MachineName, ResourceType, Tactics
 | mv-apply Entities on (
     extend
         EntityValue = tostring(Entities[tostring(bag_keys(Entities)[1])]),
@@ -21,17 +29,17 @@ SecurityAlert
     )
 | project
     TimeGenerated,
-    AlertName, 
+    AlertName,
     AlertSeverity,
     Description,
-    CompromisedEntity,
-    minTimeGenerated,
-    maxTimeGenerated,
-    ResourceId,
-    AlertLink,
     RemediationSteps,
+    ResourceId,
+    ResourceType,
+    StartTime,
+    EndTime,
+    MachineName,
+    IPAddresses,
     ExtendedLinks,
-    ProviderName,
-    AlertType,
+    AlertLinks,
     Tactics,
     Entities
