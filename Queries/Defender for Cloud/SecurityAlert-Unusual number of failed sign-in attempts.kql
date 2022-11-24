@@ -19,6 +19,7 @@ SecurityAlert
     extend
         EntityValue = tostring(Entities[tostring(bag_keys(Entities)[1])]),
         EntityType = tostring(Entities["Type"])
+    | where isnotempty(EntityType)
     | summarize take_any(Entities) by EntityValue, EntityType
     | sort by EntityType desc
     | summarize Entities = make_list(Entities)
