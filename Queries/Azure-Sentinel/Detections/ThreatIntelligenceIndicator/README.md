@@ -21,76 +21,75 @@ Developing this generative function would usually require a programming language
 This function checks the third datatable to know which indicators and tables have to be matched, and to substitute the appropiate parts in the query scheme, generating a query for each combination.
 
 One example of this generative function is [TIMapQueryGenerator.kql](https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/TIMapQueryGenerator.kql). The query scheme in this example is:
-```
-Query:string=
-    ```// This query assumes a feed of threat indicators is ingested/synchronized periodically, and each synchronization ingests new indicators and only old indicators that have been modified.
-            // Active threat indicators in Sentinel are renovated as ThreatIntelligenceIndicator events every ~12 days.
-            let query_frequency = 1h;
-            let query_period = 14d;
-            let query_wait = <<<TableQueryWait>>>;
-            let table_query_lookback = <<<TITableLookback>>>;
-            let _TIBenignProperty =
-                _GetWatchlist('ID-TIBenignProperty')
-                | where Notes has_any (<<<TIWatchlistNoteType>>>)
-                | project IndicatorId, BenignProperty
-            ;
-            let _TIExcludedSources = toscalar(
-                _GetWatchlist('Activity-ExpectedSignificantActivity')
-                | where Activity == "ThreatIndicatorSource"
-                | summarize make_list(Auxiliar)
-            );<<<TIAdditionalLets>>><<<TableAdditionalLets>>><<<TITableAdditionalLets>>>
-            let _TITableMatch = (table_start:datetime, table_end:datetime, only_new_ti:boolean, ti_start:datetime = datetime(null)) {
-                // Scheduled Analytics rules have a query period limit of 14d
-                let _Indicators =// materialize(
-                    ThreatIntelligenceIndicator
-                    | where TimeGenerated > ago(query_period)
-                    // Take the earliest TimeGenerated and the latest column info
-                    | summarize hint.strategy=shuffle
-                        minTimeGenerated = min(TimeGenerated),
-                        arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId<<<TIProjectColumns>>>)
-                        by IndicatorId
-                    // Remove inactive or expired indicators
-                    | where not(not(Active) or ExpirationDateTime < now())
-                    // Pick indicators that contain the desired entity type<<<TIOperators>>>
-                    // Remove indicators from specific sources
-                    | where not(AdditionalInformation has_any (_TIExcludedSources))
-                    // Remove excluded indicators with benign properties
-                    | join kind=leftanti _TIBenignProperty on IndicatorId, $left.<<<TIGroupByColumn>>> == $right.BenignProperty
-                    // Deduplicate indicators by <<<TIGroupByColumn>>> column, equivalent to using join kind=innerunique afterwards
-                    | summarize hint.strategy=shuffle
-                        minTimeGenerated = min(minTimeGenerated),
-                        take_any(*)
-                        by <<<TIGroupByColumn>>>
-                    // If we want only new indicators, remove indicators received previously
-                    | where not(only_new_ti and minTimeGenerated < ti_start)
-                //)
-                ;<<<TIPrefilter>>>
-                let _TableEvents =
-                    <<<TableName>>>
-                    | where <<<TableTimeColumn>>> between (table_start .. table_end)<<<PreTableOperators>>>
-                    // Filter events that may contain indicators<<<TITableConditions>>><<<PostTableOperators>>>
-                    | project-rename <<<TableName>>>_TimeGenerated = TimeGenerated
-                ;
-                _Indicators
-                | join kind=inner hint.strategy=shuffle _TableEvents on <<<TIGroupByColumn>>>
-                // Take only a single event by key columns
-                //| summarize hint.strategy=shuffle take_any(*) by <<<TIGroupByColumn>>><<<TableGroupByColumn>>>
-                | project
-                    <<<TableName>>>_TimeGenerated,
-                    Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIExtendColumns>>><<<TIProjectColumns>>>,
-                    <<<TableColumns&LookUp>>>
-            };
-            union// isfuzzy=true
-                // Match      current table events                                all indicators available
-                _TITableMatch(ago(query_frequency + query_wait), ago(query_wait),                           false),
-                // Match      past table events                                                          new indicators since last query execution
-                _TITableMatch(ago(table_query_lookback + query_wait), ago(query_frequency + query_wait),    true, ago(query_frequency))
-            | summarize arg_max(<<<TableName>>>_TimeGenerated, *) by IndicatorId<<<TableGroupByColumn>>>
-            | extend
-                timestamp = <<<TableName>>>_TimeGenerated<<<TableCustomEntityExtend>>><<<TICustomEntityExtend>>><<<TableExclusion>>>```
+```kql
+// This query assumes a feed of threat indicators is ingested/synchronized periodically, and each synchronization ingests new indicators and only old indicators that have been modified.
+// Active threat indicators in Sentinel are renovated as ThreatIntelligenceIndicator events every ~12 days.
+let query_frequency = 1h;
+let query_period = 14d;
+let query_wait = <<<TableQueryWait>>>;
+let table_query_lookback = <<<TITableLookback>>>;
+let _TIBenignProperty =
+    _GetWatchlist('ID-TIBenignProperty')
+    | where Notes has_any (<<<TIWatchlistNoteType>>>)
+    | project IndicatorId, BenignProperty
+;
+let _TIExcludedSources = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "ThreatIndicatorSource"
+    | summarize make_list(Auxiliar)
+);<<<TIAdditionalLets>>><<<TableAdditionalLets>>><<<TITableAdditionalLets>>>
+let _TITableMatch = (table_start:datetime, table_end:datetime, only_new_ti:boolean, ti_start:datetime = datetime(null)) {
+    // Scheduled Analytics rules have a query period limit of 14d
+    let _Indicators =// materialize(
+        ThreatIntelligenceIndicator
+        | where TimeGenerated > ago(query_period)
+        // Take the earliest TimeGenerated and the latest column info
+        | summarize hint.strategy=shuffle
+            minTimeGenerated = min(TimeGenerated),
+            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId<<<TIProjectColumns>>>)
+            by IndicatorId
+        // Remove inactive or expired indicators
+        | where not(not(Active) or ExpirationDateTime < now())
+        // Pick indicators that contain the desired entity type<<<TIOperators>>>
+        // Remove indicators from specific sources
+        | where not(AdditionalInformation has_any (_TIExcludedSources))
+        // Remove excluded indicators with benign properties
+        | join kind=leftanti _TIBenignProperty on IndicatorId, $left.<<<TIGroupByColumn>>> == $right.BenignProperty
+        // Deduplicate indicators by <<<TIGroupByColumn>>> column, equivalent to using join kind=innerunique afterwards
+        | summarize hint.strategy=shuffle
+            minTimeGenerated = min(minTimeGenerated),
+            take_any(*)
+            by <<<TIGroupByColumn>>>
+        // If we want only new indicators, remove indicators received previously
+        | where not(only_new_ti and minTimeGenerated < ti_start)
+    //)
+    ;<<<TIPrefilter>>>
+    let _TableEvents =
+        <<<TableName>>>
+        | where <<<TableTimeColumn>>> between (table_start .. table_end)<<<PreTableOperators>>>
+        // Filter events that may contain indicators<<<TITableConditions>>><<<PostTableOperators>>>
+        | project-rename <<<TableName>>>_TimeGenerated = TimeGenerated
+    ;
+    _Indicators
+    | join kind=inner hint.strategy=shuffle _TableEvents on <<<TIGroupByColumn>>>
+    // Take only a single event by key columns
+    //| summarize hint.strategy=shuffle take_any(*) by <<<TIGroupByColumn>>><<<TableGroupByColumn>>>
+    | project
+        <<<TableName>>>_TimeGenerated,
+        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIExtendColumns>>><<<TIProjectColumns>>>,
+        <<<TableColumns&LookUp>>>
+};
+union// isfuzzy=true
+    // Match      current table events                                all indicators available
+    _TITableMatch(ago(query_frequency + query_wait), ago(query_wait),                           false),
+    // Match      past table events                                                          new indicators since last query execution
+    _TITableMatch(ago(table_query_lookback + query_wait), ago(query_frequency + query_wait),    true, ago(query_frequency))
+| summarize arg_max(<<<TableName>>>_TimeGenerated, *) by IndicatorId<<<TableGroupByColumn>>>
+| extend
+    timestamp = <<<TableName>>>_TimeGenerated<<<TableCustomEntityExtend>>><<<TICustomEntityExtend>>><<<TableExclusion>>>
 ```
 You can notice this query scheme has some placeholders indicated by the strings ```<<< xxxxx >>>```, this "query" won't work in this state. But the defined datatables contain the query parts that substitute the placeholders. In this example the datatables have been called:
-```
+```kql
 _IndicatorTypesDatatable = datatable(EntityType:string, IndicatorDictionary:dynamic)
 _TablesDatatable = datatable(EntityType:string, TableDictionary:dynamic)
 _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableConditions:dynamic)
@@ -98,7 +97,7 @@ _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TI
 Each datable *element* has a dictionary that will contain the placeholders.
 
 An example element for the ```_IndicatorXTableDatatable``` datatable, that represents the combination of *URL indicators* with the *Syslog table*, would be:
-```
+```kql
 'URL', 'Syslog',
 dynamic({
     "TITableLookback":
