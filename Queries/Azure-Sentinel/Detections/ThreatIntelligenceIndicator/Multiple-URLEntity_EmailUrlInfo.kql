@@ -1,11 +1,8 @@
-// This query assumes a feed of threat indicators is ingested/synchronized periodically, and each synchronization ingests all the indicators that are to be monitored.
-// Additionally, threat indicators that were added manually in Sentinel are renovated as ThreatIntelligenceIndicator events every ~12 days.
-// Matching indicators with table events will require taking into account these different processes.
-// The function defined below has some datetime parameters, these will affect only the feed threat indicators, not the manually added indicators.
+// This query assumes a feed of threat indicators is ingested/synchronized periodically, and each synchronization ingests new indicators and only old indicators that have been modified.
+// Active threat indicators in Sentinel are renovated as ThreatIntelligenceIndicator events every ~12 days.
 let query_frequency = 1h;
 let query_period = 14d;
-let ti_feed_sync_frequency = 1d;
-let ti_feed_sync_duration = 6h;
+let query_wait = 1h;
 let table_query_lookback = 14d;
 let _TIBenignProperty =
     _GetWatchlist('ID-TIBenignProperty')
@@ -22,29 +19,26 @@ let _URLRegex = toscalar(
     | where UseCase == "Threat Intelligence Indicator URL"
     | project RegEx
     );
-let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: datetime, table_end: datetime) {
+let _ExpectedEmails =
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "MaliciousURLSentEmail"
+    | project
+        SenderFromAddress = SourceAddress,
+        RecipientEmailAddress = DestinationAddress,
+        Subject = Auxiliar
+;
+let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: boolean, ti_start: datetime = datetime(null)) {
     // Scheduled Analytics rules have a query period limit of 14d
-    let ti_feed_start = max_of(ago(query_period), ti_start - iff(only_new_ti, ti_feed_sync_frequency + ti_feed_sync_duration, 0s));
-    let ti_feed_end = now();
     let _Indicators =// materialize(
-        union
-            // Manually added indicators
-            (ThreatIntelligenceIndicator
-            | where TimeGenerated > ago(query_period) and ExternalIndicatorId has "indicator--"
-            ),
-            // Feed ingested indicators
-            (ThreatIntelligenceIndicator
-            | where TimeGenerated between (ti_feed_start .. ti_feed_end) and not(ExternalIndicatorId has "indicator--")
-            )
+        ThreatIntelligenceIndicator
+        | where TimeGenerated > ago(query_period)
         // Take the earliest TimeGenerated and the latest column info
         | summarize hint.strategy=shuffle
             minTimeGenerated = min(TimeGenerated),
             arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId)
             by IndicatorId
         // Remove inactive or expired indicators
-        | where not(not(Active) or ExpirationDateTime < ti_feed_end)
-        // Remove feed indicators not received in the specified period
-        | where not(TimeGenerated < ti_start and not(ExternalIndicatorId has "indicator--"))
+        | where not(not(Active) or ExpirationDateTime < now())
         // Pick indicators that contain the desired entity type
         | where isnotempty(Url)
         | extend Url = trim_end(@"\/", Url)
@@ -89,7 +83,7 @@ let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: date
         UrlLocation, EmailUrlInfo_Url, UrlDomain, NetworkMessageId, ReportId
     | join kind=leftouter hint.strategy=shuffle (
         EmailEvents
-        | where ingestion_time() between(table_start .. table_end)
+        | where ingestion_time() between(table_start .. now())
         | project
             SenderFromAddress,
             SenderFromDomain,
@@ -125,11 +119,12 @@ let _TITableMatch = (ti_start: datetime, only_new_ti: boolean, table_start: date
     | project-away NetworkMessageId1
 };
 union// isfuzzy=true
-    // Match      all indicators available                                    with current table events
-    _TITableMatch(ago(ti_feed_sync_frequency + ti_feed_sync_duration), false, ago(query_frequency), now()),
-    // Match      new indicators since last query execution                   with past table events
-    _TITableMatch(ago(query_frequency), true, ago(table_query_lookback), ago(query_frequency))
+    // Match      current table events                                all indicators available
+    _TITableMatch(ago(query_frequency + query_wait), ago(query_wait), false),
+    // Match      past table events                                                          new indicators since last query execution
+    _TITableMatch(ago(table_query_lookback + query_wait), ago(query_frequency + query_wait), true, ago(query_frequency))
 | summarize arg_max(EmailUrlInfo_TimeGenerated, *) by IndicatorId, NetworkMessageId
 | extend
     timestamp = EmailUrlInfo_TimeGenerated,
     URLCustomEntity = Url
+| join kind=leftanti _ExpectedEmails on SenderFromAddress
