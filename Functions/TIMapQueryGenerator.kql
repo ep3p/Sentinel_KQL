@@ -2110,7 +2110,7 @@
                 ```
                 | where isnotempty(UrlDomain)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(UrlDomain has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = tolower(UrlDomain)
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = tolower(UrlDomain), NetworkMessageId
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
