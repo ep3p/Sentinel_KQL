@@ -6,7 +6,7 @@ let query_wait = 0h;
 let table_query_lookback = 14d;
 let _TIBenignProperty =
     _GetWatchlist('ID-TIBenignProperty')
-    | where Notes has_any ("[SourceEmailAddress]", "[DestinationEmailAddress]")
+    | where Notes has_any ("[SourceEmailAddress]")
     | project IndicatorId, BenignProperty
 ;
 let _TIExcludedSources = toscalar(
