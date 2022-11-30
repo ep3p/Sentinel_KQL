@@ -1,0 +1,186 @@
+// This query can help you to filter certain security alerts depending on the auditor of the events.
+// This function will need the list of auditors you want to filter, and the rule ids that generate the security alerts.
+//
+// Click "Save as function", in Parameters write in the fields:
+// "dynamic"  "rule_auditors"      "dynamic([])"
+// "dynamic"  "monitored_rule_ids" "dynamic([])"
+//
+// If you name the function "AuditorGroupAlerts", you can check the function with queries like the following:
+//
+// AuditorGroupAlerts(dynamic(["SOC", "Security Architecture"]), dynamic(["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"]))
+//
+//let Function = (rule_auditors:dynamic = dynamic([]), monitored_rule_ids:dynamic = dynamic([])){
+    let add_member_eventids = dynamic([4728, 4732, 4756]);
+    let remove_member_eventids = dynamic([4729, 4733, 4757]);
+    let alert_description =
+        'This is a detection for activity related to monitored AD groups.\n\nThe detected activity type is "<<<Activity>>>".\n\nThis activity was performed by the account "<<<ActorAccount>>>".\n\nThis activity was performed in the device "<<<Computer>>>".<<<CustomDescription>>>'
+    ;
+    let _Alerts = materialize(
+        AuditorAlerts(rule_auditors, monitored_rule_ids)
+        | extend CustomDescription = '\n\nThis activity was performed on the group "<<<GroupName>>>".\n'
+        | extend
+            AlertDescription =
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                    alert_description
+                , "<<<CustomDescription>>>", CustomDescription)
+                , "<<<Activity>>>", Activity)
+                , "<<<ActorAccount>>>", ActorAccount)
+                , "<<<Computer>>>", Computer)
+                , "<<<GroupName>>>", GroupName)
+    );
+    let _MultipleMembers =
+        _Alerts
+        | summarize
+            TimeGenerated = min(TimeGenerated),
+            Members = make_set_if(tostring(pack_array(MemberAccount, MemberSid, EventData)), isnotempty(MemberSid)),
+            Entities = make_set(todynamic(Entities)),
+            take_any(AlertName, AlertSeverity, ActorSid, ActorDomainName, ActorAccountType, Tactics, Auditor, Auditors, GroupSid)
+            by Computer, Activity, ActorAccount, GroupName
+        | where array_length(Members) > 1
+        | mv-apply Entities to typeof(string) on (
+            sort by Entities asc
+            | summarize Entities = make_list(todynamic(Entities))
+            )
+        | mv-apply with_itemindex = Index_aux Entities on (
+            extend Entities = bag_merge(bag_pack(@"$id", Index_aux + 2), bag_remove_keys(Entities, dynamic(["$id"])))
+            | summarize Entities = tostring(array_sort_asc(make_list(Entities)))
+            )
+        | mv-apply Members_aux = Members to typeof(string) on (
+            extend Members_aux = todynamic(Members_aux)
+            | summarize MembersList = strcat_array(array_sort_asc(make_set(iff(isnotempty(Members_aux[0]), Members_aux[0], Members_aux[1]))), '\n\n- ')
+        )
+        | extend CustomDescription =
+        '\n\nThis activity was performed on the group "<<<GroupName>>>".\n\nThis activity was performed on the accounts:\n\n- <<<MembersList>>>\n'
+        | extend
+            AlertName = strcat(AlertName, case(
+                Activity has_any (add_member_eventids), strcat(" - Account added to ", GroupName),
+                Activity has_any (remove_member_eventids), strcat(" - Account removed from ", GroupName),
+                ""
+                )),
+            AlertDescription =
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                    alert_description
+                , "<<<CustomDescription>>>", CustomDescription)
+                , "<<<Activity>>>", Activity)
+                , "<<<ActorAccount>>>", ActorAccount)
+                , "<<<Computer>>>", Computer)
+                , "<<<GroupName>>>", GroupName)
+                , "<<<MembersList>>>", MembersList)
+        | mv-expand Members to typeof(string)
+        | extend Members = todynamic(Members)
+        | extend
+            MemberAccount = tostring(Members[0]),
+            MemberSid = tostring(Members[1]),
+            EventData = tostring(Members[2])
+    ;
+    let _MultipleGroups =
+        _Alerts
+        | join kind=leftanti _MultipleMembers on Computer, Activity, ActorAccount, GroupName
+        | summarize
+            TimeGenerated = min(TimeGenerated),
+            Groups = make_set(tostring(pack_array(GroupName, GroupSid, EventData, AlertSeverity))),
+            DistinctGroups = dcount(GroupName),
+            Entities = make_set(todynamic(Entities)),
+            take_any(AlertName, ActorSid, ActorDomainName, ActorAccountType, Tactics, Auditor, Auditors, MemberAccount)
+            by Computer, Activity, ActorAccount, MemberSid
+        | where DistinctGroups > 1
+        | mv-apply Entities to typeof(string) on (
+            sort by Entities asc
+            | summarize Entities = make_list(todynamic(Entities))
+            )
+        | mv-apply with_itemindex = Index_aux Entities on (
+            extend Entities = bag_merge(bag_pack(@"$id", Index_aux + 2), bag_remove_keys(Entities, dynamic(["$id"])))
+            | summarize Entities = tostring(array_sort_asc(make_list(Entities)))
+            )
+        | mv-apply Groups_aux = Groups to typeof(string) on (
+            extend Groups_aux = todynamic(Groups_aux)
+            | summarize GroupsList = strcat_array(array_sort_asc(make_set(Groups_aux[0])), '\n\n- ')
+        )
+        | extend
+            MemberAccount = iff(isnotempty(MemberAccount), MemberAccount, MemberSid),
+            MemberDescription = 'This activity was performed on the account "<<<MemberAccount>>>".\n',
+            CustomDescription =
+        '\n\n<<<MemberDescription>>>This activity was performed on the groups:\n\n- <<<GroupsList>>>\n'
+        | extend
+            AlertDescription =
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                replace_string(
+                    alert_description
+                , "<<<CustomDescription>>>", CustomDescription)
+                , "<<<MemberDescription>>>", iff(isnotempty(MemberAccount), MemberDescription, ""))
+                , "<<<Activity>>>", Activity)
+                , "<<<ActorAccount>>>", ActorAccount)
+                , "<<<Computer>>>", Computer)
+                , "<<<GroupsList>>>", GroupsList)
+                , "<<<MemberAccount>>>", MemberAccount)
+        | mv-expand Groups to typeof(string)
+        | extend Groups = todynamic(Groups)
+        | extend
+            GroupName = tostring(Groups[0]),
+            GroupSid = tostring(Groups[1]),
+            EventData = tostring(Groups[2]),
+            AlertSeverity = tostring(Groups[3])
+    ;
+    let _MultipleEventDatas =
+        _Alerts
+        | join kind=leftanti _MultipleMembers on Computer, Activity, ActorAccount, GroupName
+        | join kind=leftanti _MultipleGroups on Computer, Activity, ActorAccount, MemberSid
+        | summarize
+            TimeGenerated = min(TimeGenerated),
+            EventDatas = make_set(EventData),
+            take_any(AlertName, AlertSeverity, ActorSid, ActorDomainName, ActorAccountType, Tactics, Auditor, Auditors, Entities, MemberAccount, GroupSid, AlertDescription)
+            by Computer, Activity, ActorAccount, GroupName, MemberSid
+        | where array_length(EventDatas) > 1
+        | extend
+            EventData = tostring(EventDatas)
+    ;
+    _Alerts
+    | join kind=leftanti _MultipleMembers on Computer, Activity, ActorAccount, GroupName
+    | join kind=leftanti _MultipleGroups on Computer, Activity, ActorAccount, MemberSid
+    | join kind=leftanti _MultipleEventDatas on Computer, Activity, ActorAccount, GroupName
+    | extend
+        AlertName = strcat(AlertName, case(
+            Activity has_any (add_member_eventids), strcat(" - Account added to ", GroupName),
+            Activity has_any (remove_member_eventids), strcat(" - Account removed from ", GroupName),
+            ""
+        )),
+        AlertDescription = strcat(AlertDescription, case(
+            Activity has_any (array_concat(add_member_eventids, remove_member_eventids)), strcat('\nThis activity was performed on the account "', iff(isnotempty(MemberAccount), MemberAccount, MemberSid), '".\n'),
+            ""
+        ))
+    | union _MultipleMembers, _MultipleGroups, _MultipleEventDatas
+    | project
+        TimeGenerated,
+        AlertName,
+        AlertSeverity,
+        AlertDescription,
+        Computer,
+        ActorAccount,
+        Activity,
+        GroupName,
+        MemberAccount,
+        ActorSid,
+        GroupSid,
+        MemberSid,
+        ActorAccountType,
+        ActorDomainName,
+        Entities,
+        EventData,
+        Auditor,
+        Auditors
+//};
+//Function(rule_auditors, monitored_rule_ids)
