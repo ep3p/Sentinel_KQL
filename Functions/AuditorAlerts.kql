@@ -7,7 +7,7 @@
 //
 // If you name the function "AuditorAlerts", you can check the function with queries like the following:
 //
-// AuditorAlerts(dynamic(["SOC","Security Architecture"]), dynamic(["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"]))
+// AuditorAlerts(dynamic(["SOC", "Security Architecture"]), dynamic(["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"]))
 //
 //let Function = (rule_auditors:dynamic = dynamic([]), monitored_rule_ids:dynamic = dynamic([])){
     SecurityAlert
@@ -18,25 +18,30 @@
         AlertDescription = Description,
         Tactics,
         Entities,
-        ExtractedEvents = extract_all(@"\'([^\']+)\'", dynamic([1]), tostring(todynamic(ExtendedProperties).Query))
+        ExtractedEvents = set_union(extract_all(@"\'([^\']+)\'", dynamic([1]), tostring(todynamic(ExtendedProperties).Query)), dynamic([]))
     | mv-expand ExtractedEvents to typeof(string)
     | extend BagToUnpack = todynamic(zlib_decompress_from_base64_string(ExtractedEvents))
     | evaluate bag_unpack(BagToUnpack, columnsConflict="replace_source")
-    | where column_ifexists("Auditor", "") in (rule_auditors)
+    | extend Auditors = column_ifexists("Auditors", "")
+    | mv-expand Auditor = split(Auditors, " & ") to typeof(string)
+    | where Auditor in (rule_auditors)
+    | extend AlertName = replace_string(AlertName, "monitored", strcat(iff(isnotempty(Auditor), strcat(Auditor, " "), ""), "monitored"))
     | project-away ExtractedEvents
     | extend
         TimeGenerated = column_ifexists("TimeGenerated", datetime(null)),
         Activity = column_ifexists("Activity", ""),
         ActorAccount = column_ifexists("ActorAccount", ""),
+        ActorSid = column_ifexists("ActorSid", ""),
         ActorAccountSid = column_ifexists("ActorAccountSid", ""),
+        ActorAccountType = column_ifexists("ActorAccountType", ""),
+        ActorDomainName = column_ifexists("ActorDomainName", ""),
         GroupName = column_ifexists("GroupName", ""),
         GroupSid = column_ifexists("GroupSid", ""),
         MemberAccount = column_ifexists("MemberAccount", ""),
         MemberSid = column_ifexists("MemberSid", ""),
         Computer = column_ifexists("Computer", ""),
-        Auditor = column_ifexists("Auditor", ""),
-        Auditors = column_ifexists("Auditors", "")
-    | project-away Auditor, Auditors
+        EventData = column_ifexists("EventData", "")
+    //| project-away Auditor, Auditors
     | project-reorder
         TimeGenerated
 //};
