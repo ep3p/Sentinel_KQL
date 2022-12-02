@@ -8,7 +8,7 @@ For example, Microsoft developed a [rule that matches Windows Security AppLocker
 
 Also, these default rules check events that happen *after* ingesting an indicator. When possible, it should also check events that happened *before* ingesting an indicator. Because of this, **each Sentinel workspace should adapt, develop and review their own threat intelligence indicator detections**.
 
-Some data types (tables) have columns that could be matched to several indicator types like: email address, domain, url, file hash, IP address... And also each indicator type could be matched with several tables. Regardless of the indicator type and table checked, the detection query (or algorithm) will have common elements.
+Some data types (tables) have several columns that could be matched to indicator types like: email address, domain, url, file hash, IP address... And also each indicator type could be matched with several tables. Regardless of the indicator type and table checked, the detection query (or algorithm) will have common elements.
 
 Developing and maintaining +40 detections with common elements, without making mistakes or keeping track of changes, is a difficult task. It would be beneficial to develop a function that generates all the detection queries, one query for each indicator type and table combination. This way the common query parts are defined only once, and reused when needed. The query part that is unique to each indicatortype-table combination should be relativelly small. Another advantage of this function is that all the information related to threat intelligence indicator queries is contained in a single file, thus facilitating the search and replacement of similar detection parts.
 
