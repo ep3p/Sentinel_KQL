@@ -2,9 +2,9 @@
 
 This folder contains queries created with the help of the function [TIMapQueryGenerator.kql](https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/TIMapQueryGenerator.kql).
 
-The [default rules created by Microsoft]([https://github.com/Azure/Azure-Sentinel/tree/master/Detections/ThreatIntelligenceIndicator](https://github.com/Azure/Azure-Sentinel/tree/master/Solutions/Threat%20Intelligence/Analytic%20Rules)) for threat intelligence indicators can't be expected to adapt to each Sentinel workspace and their indicators, and some rules might behave unexpectedly.
+The [default rules created by Microsoft](https://github.com/Azure/Azure-Sentinel/tree/master/Solutions/Threat%20Intelligence/Analytic%20Rules) for threat intelligence indicators can't be expected to adapt to each Sentinel workspace and their indicators, and some rules might behave unexpectedly.
 
-For example, Microsoft developed a [rule that matches Windows Security AppLocker Events with file hashes](https://github.com/Azure/Azure-Sentinel/blob/master/Detections/ThreatIntelligenceIndicator/FileHashEntity_SecurityEvent.yaml), but *AppLocker does not generate SHA256 hashes*, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work for your workspace. Also, the default rules might not check all the columns where an indicator may appear.
+For example, Microsoft developed a [rule that matches Windows Security AppLocker Events with file hashes](https://github.com/Azure/Azure-Sentinel/blob/master/Solutions/Threat%20Intelligence/Analytic%20Rules/FileHashEntity_SecurityEvent.yaml), but *AppLocker does not generate SHA256 hashes*, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work for your workspace. Also, the default rules might not check all the columns where an indicator may appear.
 
 Also, these default rules check events that happen *after* ingesting an indicator. When possible, it should also check events that happened *before* ingesting an indicator. Because of this, **each Sentinel workspace should adapt, develop and review their own threat intelligence indicator detections**.
 
