@@ -128,6 +128,6 @@ The next step would be to copy-paste the generated query in a new tab, press "Fo
 
 ![image](https://user-images.githubusercontent.com/2527990/197820972-5d9aa918-17ca-44f1-9369-8c229613477f.png) ![image](https://user-images.githubusercontent.com/2527990/197821197-f25ce94e-3a3d-480e-a464-59e1ab3f5616.png)
 
-For example, check the generated [URL-Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Detections/ThreatIntelligenceIndicator/Multiple-URLEntity_Syslog.kql).
+For example, check the generated [URL-Syslog query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Solutions/Threat%20Intelligence/Analytic%20Rules/Multiple-URLEntity_Syslog.kql).
 
 In this example, the generative function matches 5 indicator types with 27 tables, generating 46 queries. The function contains ~2200 lines (mostly empty), and the 46 queries contain ~4600 lines in total.
