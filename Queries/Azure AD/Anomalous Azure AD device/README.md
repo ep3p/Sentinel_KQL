@@ -1,4 +1,4 @@
-### Anomalous Azure AD device
+### Unexpected Azure AD device
 
 This query can help you to detect device addition/deletion events from Azure AD, that have predefined unexpected properties like: TrustType, Intune Group Tags, AD AAD Synchronization...
 
