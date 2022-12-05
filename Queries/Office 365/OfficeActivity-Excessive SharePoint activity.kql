@@ -56,40 +56,45 @@ OfficeActivity
 | mv-expand QueryRange = range(now() - query_frequency + query_frequency/query_window_checks, now(), query_frequency/query_window_checks) to typeof(datetime)
 | where TimeGenerated between ((QueryRange - query_frequency) .. QueryRange)
 | summarize
-    StartTime = min(TimeGenerated),    
+    StartTime = min(TimeGenerated),
     EndTime = max(TimeGenerated),
     DistinctSites = dcount(Site_),
     DistinctObjects = dcount(OfficeObjectId),
-    OperationsCount = count(),
-    Site_Urls = make_set(Site_Url, 200),
-    OfficeObjectIds = make_set(OfficeObjectId, 200),
+    OperationCount = count(),
+    Site_Urls = make_set(Site_Url, 500),
+    OfficeObjectIds = make_set(tostring(pack(Operation, OfficeObjectId)), 500),
     Operations = make_set(Operation, 200),
-    ClientIPs = make_set(ClientIP)
+    ClientIPs = make_set(ClientIP),
+    IsManagedDevices = make_set_if(IsManagedDevice, isnotempty(IsManagedDevice))
     by UserId, QueryRange
 | where DistinctSites > 1
 | where not(array_length(Operations) == 1 and Operations[0] == "FilePreviewed")
 | where EndTime > ago(query_frequency)
-| extend Score = toint(pow(DistinctObjects, 2) * pow(DistinctSites, 2) / tolong(OperationsCount))
+| extend Score = toint(pow(DistinctObjects, 2) * pow(DistinctSites, 2) / tolong(OperationCount))
 | where Score > score_threshold
 | summarize
     StartTime = min(StartTime),
+    EndTime = max(EndTime),
     DistinctSites = max(DistinctSites),
     DistinctObjects = max(DistinctObjects),
-    OperationsCount = max(OperationsCount),
-    Site_Urls = make_set(Site_Urls, 200),
-    OfficeObjectIds = make_set(OfficeObjectIds, 200),
+    OperationCount = max(OperationCount),
+    Site_Urls = array_sort_asc(make_set(Site_Urls, 500)),
+    OfficeObjectIds = array_sort_asc(make_set(OfficeObjectIds, 500)),
     Operations = make_set(Operations, 200),
     ClientIPs = make_set(ClientIPs),
+    IsManagedDevices = make_set(IsManagedDevices),
     Score = max(Score)
     by UserId
 | sort by Score desc
 | project
     StartTime,
+    EndTime,
     UserId,
     ClientIPs,
+    IsManagedDevices,
     Score,
     Operations,
-    OperationsCount,
+    OperationCount,
     DistinctSites,
     DistinctObjects,
     Site_Urls,
