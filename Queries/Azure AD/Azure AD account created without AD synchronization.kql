@@ -1,0 +1,28 @@
+let _AADADSyncAccounts = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "AADADSync"
+    | summarize make_list(ActorPrincipalName)
+);
+AuditLogs
+| where OperationName == "Add user" and Result == "success"
+| extend
+    UserPrincipalName = tostring(TargetResources[0].userPrincipalName),
+    InitiatedByUser = tostring(InitiatedBy.user.userPrincipalName),
+    InitiatedByApp = tostring(InitiatedBy.app.displayName)
+| where not(InitiatedByUser in (_AADADSyncAccounts))
+| mv-apply ModifiedProperty = TargetResources[0].modifiedProperties on (
+    summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperty.displayName), tostring(ModifiedProperty.newValue)))
+    )
+| evaluate bag_unpack(BagToUnpack, OutputColumnPrefix = "TargetResources_", columnsConflict = 'replace_source')
+| where todynamic(column_ifexists("TargetResources_UserType", ""))[0] != "Guest"
+| project
+    TimeGenerated,
+    InitiatedByUser,
+    InitiatedByApp,
+    OperationName,
+    Result,
+    UserPrincipalName,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    CorrelationId
