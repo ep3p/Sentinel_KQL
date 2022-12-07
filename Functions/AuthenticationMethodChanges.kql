@@ -88,14 +88,14 @@ let _SecurityInfoChanges_CorrelationIds = toscalar(
     _SecurityInfoChanges
     | summarize make_list(UpdateUser_CorrelationId)
 );
-// Some authentication method changes do not trigger a "Security Info" event (LoggedByService: CoreDirectory)
+// Some authentication method changes do not trigger a "security info" event (LoggedByService: CoreDirectory)
 let _StrongAuthenticationMethodUpdates =
     AuditLogs
     | where TimeGenerated > ago(query_period)
     | where OperationName == "Update user" //and Result == "success"
     | where not(CorrelationId in (_SecurityInfoChanges_CorrelationIds))
     | mv-expand modifiedProperty = TargetResources[0].modifiedProperties
-    | where modifiedProperty.displayName == "StrongAuthenticationMethod"
+    | where modifiedProperty.displayName startswith "StrongAuthentication"
     | project-away modifiedProperty
     | extend
         UserId = tolower(TargetResources[0].id),
