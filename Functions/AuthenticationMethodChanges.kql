@@ -97,7 +97,7 @@ let _StrongAuthenticationMethodUpdates =
     | mv-expand modifiedProperty = TargetResources[0].modifiedProperties
     | where modifiedProperty.displayName startswith "StrongAuthentication"
     | where not(modifiedProperty.displayName == "StrongAuthenticationPhoneAppDetail"
-    and tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(modifiedProperty.newValue)))) == tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(modifiedProperty.oldValue)))))
+        and tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(modifiedProperty.newValue)))) == tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(modifiedProperty.oldValue)))))
     | project-away modifiedProperty
     | extend
         UserId = tolower(TargetResources[0].id),
