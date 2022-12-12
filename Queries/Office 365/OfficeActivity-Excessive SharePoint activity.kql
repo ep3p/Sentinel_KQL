@@ -60,11 +60,12 @@ OfficeActivity
     EndTime = max(TimeGenerated),
     DistinctSites = dcount(Site_),
     DistinctObjects = dcount(OfficeObjectId),
+    FileExtensions = make_set_if(SourceFileExtension, isnotempty(SourceFileExtension)),
     OperationCount = count(),
     Site_Urls = make_set(Site_Url, 500),
     OfficeObjectIds = make_set(tostring(pack(Operation, OfficeObjectId)), 500),
     Operations = make_set(Operation, 200),
-    ClientIPs = make_set(ClientIP),
+    ClientIPs = make_set_if(ClientIP, isnotempty(ClientIP)),
     IsManagedDevices = make_set_if(IsManagedDevice, isnotempty(IsManagedDevice))
     by UserId, QueryRange
 | where DistinctSites > 1
@@ -77,6 +78,7 @@ OfficeActivity
     EndTime = max(EndTime),
     DistinctSites = max(DistinctSites),
     DistinctObjects = max(DistinctObjects),
+    FileExtensions = make_set(FileExtensions),
     OperationCount = max(OperationCount),
     Site_Urls = array_sort_asc(make_set(Site_Urls, 500)),
     OfficeObjectIds = array_sort_asc(make_set(OfficeObjectIds, 500)),
@@ -97,5 +99,6 @@ OfficeActivity
     OperationCount,
     DistinctSites,
     DistinctObjects,
+    FileExtensions,
     Site_Urls,
     OfficeObjectIds
