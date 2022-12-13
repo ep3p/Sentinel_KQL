@@ -65,7 +65,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where TimeGenerated between (table_start .. table_end)
         | where ResourceProvider == "MICROSOFT.CONTAINERSERVICE" and ResourceType == "MANAGEDCLUSTERS"
         // Filter events that may contain indicators
-        | where not(log_s has @'"status":"Failure"')
+        | where not(log_s has_any (@'"status":"Failure"', @'"message":"Authentication failed, no credentials provided"'))
         //| where not(_IndicatorsPrefilterLength < 10000 and not(log_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
         | mv-expand IPAddress = todynamic(dynamic_to_json(extract_all(strcat(@'\"', "(", _IPv4Regex, "|", _IPv6Regex, ")"), dynamic([1]), log_s)))
         | extend IPAddress = tostring(IPAddress[0])
