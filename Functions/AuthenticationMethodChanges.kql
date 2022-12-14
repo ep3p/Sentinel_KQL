@@ -1,8 +1,9 @@
 // This query can help you to check accounts that changed their MFA or Authentication Methods in Azure AD
 //
 // Click "Save as function", in Parameters write in the fields:
-// "timespan" "query_period"  "1d"
-// "dynamic"  "query_userids" "dynamic([])"
+// "timespan" "query_period"        "1d"
+// "dynamic"  "query_userids"       "dynamic([])"
+// "bool"     "check_signinlogs"    "true"
 //
 // If you name the function "AuthenticationMethodChanges", you can check the function with queries like the following:
 //
@@ -10,7 +11,7 @@
 //
 // AuthenticationMethodChanges(2d, dynamic(["00000000-0000-0000-0000-000000000000","00000000-0000-0000-0000-000000000001"]))
 //
-//let Function = (query_period:timespan = 1d, query_userids:dynamic = dynamic([])){
+//let Function = (query_period:timespan = 1d, query_userids:dynamic = dynamic([]), check_signinlogs:bool = true){
 // CoreDirectory Resources
 let MicrosoftGraph_id = "00000003-0000-0000-c000-000000000000"; // Microsoft Graph
 let WindowsAzureActiveDirectory_id = "00000002-0000-0000-c000-000000000000"; // Windows Azure Active Directory
@@ -62,7 +63,7 @@ let _SecurityInfoChanges =
 // "Azure MFA" authentication method change attempts may leave a trace at AADNonInteractiveUserSignInLogs
 let _AzureMFA_AuthMethodSignInLogs =
     AADNonInteractiveUserSignInLogs
-    | where TimeGenerated > ago(query_period)
+    | where check_signinlogs and TimeGenerated > ago(query_period)
     | where ResultType == 0
         //and HomeTenantId in (_HomeTenantIds)
         and UserId in (toscalar(_SecurityInfoChanges | summarize make_set(UserId)))
@@ -108,7 +109,7 @@ let _StrongAuthenticationMethodUpdates =
 // CoreDirectory authentication method change attempts may leave a trace at AADNonInteractiveUserSignInLogs
 let _CoreDirectory_AuthMethodSignInLogs =
     AADNonInteractiveUserSignInLogs
-    | where TimeGenerated > ago(query_period)
+    | where check_signinlogs and TimeGenerated > ago(query_period)
     | where ResultType == 0
         //and HomeTenantId in (_HomeTenantIds)
         and UserId in (toscalar(_StrongAuthenticationMethodUpdates | summarize make_set(UserId)))
@@ -186,4 +187,4 @@ union
     SecurityInfo_TargetResources,
     UserId
 //};
-//Function(query_period, query_userids)
+//Function(query_period, query_userids, check_signinlogs)
