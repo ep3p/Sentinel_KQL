@@ -25,7 +25,7 @@ SecurityAlert
     | summarize Entities = make_list(Entities)
     )
 | mv-apply with_itemindex = Index_aux Entities on (
-    extend Entities = bag_merge(bag_pack(@"$id", Index_aux + 2), bag_remove_keys(Entities, dynamic(["$id"])))
+    extend Entities = bag_merge(bag_pack(@"$id", tostring(Index_aux + 2)), bag_remove_keys(Entities, dynamic(["$id"])))
     | summarize Entities = tostring(array_sort_asc(make_list(Entities)))
     )
 | project
