@@ -1,0 +1,13 @@
+// Tools like Active Directory Explorer (https://live.sysinternals.com/ADExplorer.exe) can let you check the name of an object
+let object_names = dynamic([]);
+SecurityEvent
+| where TimeGenerated > ago(14d) and EventData has_any (object_names)
+| extend Auxiliar = parse_xml(EventData)["EventData"]["Data"]
+| mv-apply Auxiliar on ( 
+    summarize BagToUnpack = make_bag(pack(tostring(Auxiliar["@Name"]), tostring(Auxiliar["#text"])))
+)
+| evaluate bag_unpack(BagToUnpack, columnsConflict="keep_source")
+| extend
+    SamAccountName = extract(@"(?i:CN\=)([^,]+)", 1, column_ifexists("ObjectDN", "")),
+    ObjectGUID = tolower(trim(@"[\{\}\s]+", column_ifexists("ObjectGUID", "")))
+| distinct SamAccountName, ObjectGUID
