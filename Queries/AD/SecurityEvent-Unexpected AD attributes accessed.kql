@@ -1,0 +1,114 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _Dictionary =
+    _GetWatchlist('Value-WindowsEventsDictionary')
+    | project Value = tostring(Value), Translation
+;
+let _ExpectedAccounts = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity in ("AccountOperator", "ADObjectAttributeAccess") and not(Notes has "[Group]")
+    | summarize make_list(ActorPrincipalName)
+);
+let _ExpectedGroups = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ADObjectAttributeAccess" and Notes has "[Group]"
+    | summarize make_list(Auxiliar)
+);
+let _Identities =
+    IdentityInfo
+    | where TimeGenerated > ago(query_period) and isnotempty(AccountDomain)
+    | summarize arg_max(TimeGenerated, *) by AccountObjectId
+    | project
+        AccountName = coalesce(extract(@"(?i:CN\=)([^,]+)", 1, OnPremisesDistinguishedName), AccountName),
+        GroupMembership = array_sort_asc(GroupMembership)
+;
+SecurityEvent
+| where TimeGenerated > ago(query_frequency)
+| where EventID == 4662
+    and not(Account in (_ExpectedAccounts))
+    and Properties has_all (
+        "%%7688",
+        "612cb747-c0e8-4f92-9221-fdd5f15b550d", // unixUserPassword
+        "6617e4ac-a2f1-43ab-b60c-11fbd1facf05", // ms-PKI-RoamingTimeStamp - Indicates the time of the last synchronization
+        "b3f93023-9239-4f7c-b99c-6745d87adbc2", // ms-PKI-DPAPIMasterKeys - Stores the DPAPI Master Keys. These symmetric keys encrypt the private keys and are themselves encrypted.
+        "b7ff5a38-0818-42b0-8110-d3d154c97f24", // ms-PKI-Credential-Roaming-Tokens
+        "b8dfa744-31dc-4ef1-ac7c-84baf7ef9da7"  // ms-PKI-AccountCredentials - Stores certificates, certificate signing requests, private keys and saved passwords.
+    )
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    EventCount = count(),
+    ObjectNameCount = dcount(ObjectName),
+    ObjectNamesSample = array_sort_asc(make_set_if(trim(@"[\%\{\}\s]+", ObjectName), isnotempty(ObjectName), 100)),
+    SubjectLogonId = make_set_if(SubjectLogonId, isnotempty(SubjectLogonId), 50),
+    Properties = make_set_if(Properties, isnotempty(Properties), 50),
+    take_any(Activity, OperationType, AccountType, SubjectUserName, EventOriginId)
+    by Computer, Account, AccessList, ObjectType//, bin(TimeGenerated, 1h)
+| where ObjectNameCount > 50
+| lookup kind=leftouter _Identities on $left.SubjectUserName == $right.AccountName
+| project-away SubjectUserName//, TimeGenerated
+| where not(array_length(_ExpectedGroups) > 0 and GroupMembership has_all (_ExpectedGroups))
+| extend AccessList = trim(@"\s+", AccessList)
+| lookup kind=leftouter (
+    _Dictionary
+    | project
+        AccessList = Value,
+        AccessListTranslated = Translation
+    )
+    on AccessList
+| extend ObjectType = trim(@"[\%\{\}\s]+", ObjectType)
+| lookup kind=leftouter (
+    _Dictionary
+    | project
+        ObjectType = Value,
+        ObjectTypeTranslated = Translation
+    )
+    on ObjectType
+| mv-expand Properties to typeof(string)
+| mv-expand PropertiesKey = split(translate("{}", "", trim(@"\s+", replace_regex(Properties, @"\s+", " "))), " ") to typeof(string)
+| lookup kind=leftouter (
+    _Dictionary
+    | project
+        PropertiesKey = Value,
+        PropertiesKeyTranslated = Translation
+    )
+    on PropertiesKey
+| summarize
+    take_any(*),
+    PropertiesTranslated = strcat_array(make_list(iff(isnotempty(PropertiesKeyTranslated), PropertiesKeyTranslated, PropertiesKey)), " | ")
+    by EventOriginId
+| as hint.materialized=true _Auxiliar
+| mv-expand SubjectLogonId to typeof(string)
+| lookup kind=leftouter (
+    SecurityEvent
+    | where TimeGenerated > ago(query_frequency + 1h)
+    | where EventID == 4624 and Account in (toscalar(_Auxiliar | summarize make_list(Account)))
+    | project Computer, Account, TargetLogonId, IpAddress
+    )
+    on Computer, Account, $left.SubjectLogonId == $right.TargetLogonId
+| summarize
+    take_any(*),
+    SubjectLogonIds = make_set(SubjectLogonId),
+    IpAddresses = make_set_if(IpAddress, isnotempty(IpAddress))
+    by EventOriginId
+| project
+    StartTime,
+    EndTime,
+    Computer,
+    Account,
+    AccountType,
+    SubjectLogonIds,
+    IpAddress = tostring(IpAddresses[0]),
+    IpAddresses,
+    Activity,
+    EventCount,
+    OperationType,
+    AccessList,
+    AccessListTranslated,
+    ObjectType,
+    ObjectTypeTranslated,
+    ObjectNameCount,
+    ObjectNamesSample,
+    Properties,
+    PropertiesTranslated,
+    AccountGroupMembership = GroupMembership
