@@ -1,0 +1,18 @@
+Anomalies
+| where RuleName endswith "Suspicious volume of failed login attempts to AWS Console by each group user account" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"],
+    AttemptCount = toint(AnomalyDetails["Observables"][0]["Value"])
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserName,
+    AttemptCount,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics,
+    Techniques,
+    ExtendedLinks
