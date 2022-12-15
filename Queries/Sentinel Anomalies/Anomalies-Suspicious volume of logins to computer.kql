@@ -16,4 +16,6 @@ Anomalies
     Score,
     AnomalyDetails,
     Entities,
-    Tactics
+    Tactics,
+    Techniques,
+    ExtendedLinks
