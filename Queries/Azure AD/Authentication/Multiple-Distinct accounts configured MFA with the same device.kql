@@ -1,0 +1,51 @@
+let query_frecuency = 1h;
+let query_period = 14d;
+let _AuthMethodChanges = materialize(
+    AuthenticationMethodChanges(query_period=query_period)
+    | extend
+        PhoneNumber = extract_all(@'PhoneNumber\"\:\"([^\"]+)', tostring(column_ifexists("StrongAuthenticationUserDetails", dynamic(null)).newValue)),
+        DeviceToken = extract_all(@'DeviceToken\"\:\"([^\"]+)', tostring(column_ifexists("StrongAuthenticationPhoneAppDetail", dynamic(null)).newValue))
+    | mv-expand Target = SecurityInfo_TargetResources
+    | mv-apply ModifiedProperties = Target["modifiedProperties"] on (
+        summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties["displayName"]), trim(@'\"', tostring(ModifiedProperties["newValue"]))))
+        )
+    | evaluate bag_unpack(BagToUnpack, columnsConflict = 'keep_source', ignoredProperties = dynamic(["Phone.Id", "Phone.PhoneType"]))
+    | extend ["Phone.PhoneNumber"] = column_ifexists("Phone.PhoneNumber", "")
+    | extend PhoneNumber = iff(isnotempty(["Phone.PhoneNumber"]), set_union(PhoneNumber, pack_array(["Phone.PhoneNumber"])), PhoneNumber)
+    | project-away Target, ["Phone.PhoneNumber"]
+    | mv-expand PhoneNumber to typeof(string), DeviceToken to typeof(string)
+    | extend DeviceToken = iff(DeviceToken == "NO_DEVICE_TOKEN", "", DeviceToken)
+);
+let _RepeatedPhoneNumbers = toscalar(
+    _AuthMethodChanges
+    | where isnotempty(PhoneNumber)
+    | summarize DistinctUserCount = dcount(UserId), LastChangeTimeGenerated = max(TimeGenerated) by PhoneNumber
+    | where DistinctUserCount > 1 and LastChangeTimeGenerated > ago(query_frecuency)
+    | summarize make_list(PhoneNumber)
+);
+let _RepeatedDeviceTokens = toscalar(
+    _AuthMethodChanges
+    | where isnotempty(DeviceToken)
+    | summarize DistinctUserCount = dcount(UserId), LastChangeTimeGenerated = max(TimeGenerated) by DeviceToken
+    | where DistinctUserCount > 1 and LastChangeTimeGenerated > ago(query_frecuency)
+    | summarize make_list(DeviceToken)
+);
+_AuthMethodChanges
+| where PhoneNumber in (_RepeatedPhoneNumbers) or DeviceToken in (_RepeatedDeviceTokens)
+| project-reorder
+    TimeGenerated,
+    ActorPrincipalName,
+    IPAddress,
+    OperationName,
+    TargetUserPrincipalName,
+    Result,
+    ResultDescription,
+    PhoneNumber,
+    DeviceToken,
+    Strong*,
+    LoggedByService,
+    InitiatedBy,
+    UpdateUser_TargetResources,
+    SecurityInfo_TargetResources,
+    UserId,
+    CorrelationId
