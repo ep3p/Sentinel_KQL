@@ -13,4 +13,5 @@ Anomalies
     AnomalyDetails,
     Entities,
     Tactics,
-    Techniques
+    Techniques,
+    ExtendedLinks
