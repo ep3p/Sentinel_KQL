@@ -14,7 +14,7 @@ Anomalies
     TimeGenerated = min(TimeGenerated),
     SourceIPAddresses = make_set(SourceIPAddress),
     SourceIPAddressesCount = dcount(SourceIPAddress),
-    take_any(Tactics)
+    take_any(Tactics, Techniques)
     by Domain, RuleName
 | extend
     SLD = extract(@"([^\.]+\.[^\.]+)$", 1, Domain),
@@ -28,4 +28,5 @@ Anomalies
     TLD,
     SourceIPAddressesCount,
     SourceIPAddresses,
-    Tactics
+    Tactics,
+    Techniques
