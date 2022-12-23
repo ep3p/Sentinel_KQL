@@ -26,13 +26,11 @@ let _AccountOperators = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "AccountOperator"
     | summarize make_list(ActorPrincipalName)
-    );
+);
 let add_member_eventids = dynamic([4728, 4732, 4756]);
 let remove_member_eventids = dynamic([4729, 4733, 4757]);
 SecurityEvent
 | where isnotempty(TargetSid)
-// Remove events "A security-enabled xxx group was changed"
-| where not(EventID in (4735, 4737, 4755))
 // Remove local group events where the domain of the actor account is not the expected tenant domain
 | where not(EventID in (4732, 4733) and SubjectDomainName !in (_ExpectedADGroupDomains))
 // Remove group enumeration events where the domain of the actor account is not the expected tenant domain
@@ -42,6 +40,47 @@ SecurityEvent
 | lookup kind=inner _ADGroups on $left.TargetSid == $right.GroupSID
 | where not(array_length(ValidEventIDs) > 0 and not(ValidEventIDs has tostring(EventID)))
 | where not(array_length(ExcludedEventIDs) > 0 and ExcludedEventIDs has tostring(EventID))
+| as _AuxiliarEvents
+| join kind=leftanti (
+    _AuxiliarEvents
+    | where EventID in (array_concat(add_member_eventids, remove_member_eventids))
+    | extend EventID = case(
+        EventID in (4728, 4729), 4737,
+        EventID in (4732, 4733), 4735,
+        EventID in (4756, 4757), 4755,
+        int(null)
+    )
+) on Account, SourceComputerId, EventID, SubjectLogonId, TargetSid
+| as _FilteredAuxiliarEvents
+| lookup kind=leftouter (
+    _FilteredAuxiliarEvents
+    | where EventID in (4735, 4737, 4755)
+    | project Account, SourceComputerId, EventID, SubjectLogonId, TargetUserName
+    | join kind=inner (
+        SecurityEvent
+        | where EventID == 5136
+        | project Account, SourceComputerId, SubjectLogonId, OperationType, EventData
+        | mv-apply Auxiliar = parse_xml(EventData)["EventData"]["Data"] on (
+            summarize BagToUnpack = make_bag(pack(tostring(Auxiliar["@Name"]), tostring(Auxiliar["#text"])))
+        )
+        | evaluate bag_unpack(BagToUnpack, columnsConflict="keep_source") : (Account:string, SourceComputerId:string, SubjectLogonId:string, OperationType:string, EventData:string, OpCorrelationID:string, ObjectDN:string, ObjectGUID:string, AttributeLDAPDisplayName:string, AttributeValue:string)
+        | extend TargetUserName = extract(@"(?i:CN\=)([^,]+)", 1, ObjectDN)
+    ) on Account, SourceComputerId, SubjectLogonId, TargetUserName
+    | extend SplitAttributeValue = iff(AttributeLDAPDisplayName =~ "nTSecurityDescriptor", split(AttributeValue, "("), pack_array(AttributeValue))
+    | summarize
+        ValueAdded = take_anyif(SplitAttributeValue, OperationType == "%%14674"),
+        ValueDeleted = take_anyif(SplitAttributeValue, OperationType == "%%14675"),
+        AttributeValue_EventData = take_anyif(EventData, OperationType == "%%14674"),
+        take_any(Account, SourceComputerId, EventID, SubjectLogonId, TargetUserName, AttributeLDAPDisplayName)
+        by OpCorrelationID, ObjectGUID
+    | extend
+        ValueAdded = set_difference(ValueAdded, ValueDeleted),
+        ValueDeleted = set_difference(ValueDeleted, ValueAdded)
+    | mv-expand OperationTypeTranslated = pack_array("ValueAdded", "ValueDeleted") to typeof(string), ModifiedAttributeValue = pack_array(ValueAdded, ValueDeleted) to typeof(dynamic)
+    | mv-expand ModifiedAttributeValue to typeof(string)
+    | where isnotempty(ModifiedAttributeValue)
+    | project Account, SourceComputerId, EventID, SubjectLogonId, TargetUserName, OperationTypeTranslated, AttributeLDAPDisplayName, ModifiedAttributeValue, AttributeValue_EventData
+) on Account, SourceComputerId, EventID, SubjectLogonId, TargetUserName
 | extend
     Activity = trim_end(@"\.", Activity),
     ActorAccount = SubjectAccount,
@@ -49,7 +88,21 @@ SecurityEvent
 // Remove expected activity
 | join kind=leftanti _ExpectedActivityADGroups on Activity, ActorAccount, GroupSid
 | extend
-    MemberAccount = iff(MemberSid == SubjectUserSid, SubjectUserName, extract(@'[Cc][Nn]=([^,]*).*$', 1, MemberName)),
+    AttributeValue_MemberSid = extract(@"([^;]+)\)\s*$", 1, ModifiedAttributeValue),
+    AttributeValue_MemberName = extract(@"^((?i:CN\=.*))$", 1, ModifiedAttributeValue),
+    ModifiedAttributeValue = trim_end(@"\)\s*$", ModifiedAttributeValue)
+| extend
+    MemberAccount = case(
+        MemberSid == SubjectUserSid, SubjectUserName,
+        isnotempty(MemberName), extract(@"(?i:CN\=)([^,]+)", 1, MemberName),
+        isnotempty(AttributeValue_MemberName), extract(@"(?i:CN\=)([^,]+)", 1, AttributeValue_MemberName),
+        ""
+    ),
+    MemberSid = case(
+        isnotempty(MemberSid), MemberSid,
+        isnotempty(AttributeValue_MemberSid), AttributeValue_MemberSid,
+        MemberSid
+    ),
     GroupName = SAMAccountName,
     ActorSid = SubjectUserSid,
     ActorAccountType = AccountType,
@@ -72,4 +125,8 @@ SecurityEvent
     ActorDomainName,
     AlertSeverity,
     Auditors,
-    EventData
+    EventData,
+    AttributeValue_EventData,
+    AttributeLDAPDisplayName,
+    OperationTypeTranslated,
+    ModifiedAttributeValue
