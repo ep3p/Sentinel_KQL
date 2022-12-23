@@ -36,7 +36,7 @@
         _Alerts
         | summarize
             TimeGenerated = min(TimeGenerated),
-            Members = make_set_if(tostring(pack_array(MemberAccount, MemberSid, EventData)), isnotempty(MemberSid)),
+            Members = make_set_if(tostring(pack_array(MemberAccount, MemberSid, EventData, AttributeValue_EventData, AttributeLDAPDisplayName, OperationTypeTranslated, ModifiedAttributeValue)), isnotempty(MemberSid) or isnotempty(MemberAccount)),
             Entities = make_set(todynamic(Entities)),
             take_any(AlertName, AlertSeverity, ActorSid, ActorDomainName, ActorAccountType, Tactics, Auditor, Auditors, GroupSid)
             by Computer, Activity, ActorAccount, GroupName
@@ -80,7 +80,11 @@
         | extend
             MemberAccount = tostring(Members[0]),
             MemberSid = tostring(Members[1]),
-            EventData = tostring(Members[2])
+            EventData = tostring(Members[2]),
+            AttributeValue_EventData = tostring(Members[3]),
+            AttributeLDAPDisplayName = tostring(Members[4]),
+            OperationTypeTranslated = tostring(Members[5]),
+            ModifiedAttributeValue = tostring(Members[6])
     ;
     let _MultipleGroups =
         _Alerts
@@ -180,6 +184,10 @@
         ActorDomainName,
         Entities,
         EventData,
+        AttributeValue_EventData,
+        AttributeLDAPDisplayName,
+        OperationTypeTranslated,
+        ModifiedAttributeValue,
         Auditor,
         Auditors
 //};
