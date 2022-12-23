@@ -332,6 +332,8 @@ EventID,Field,Value,Hexadecimal,Translation,Notes
 ,,"%%7686",,"Delete Tree",
 ,,"%%7687",,"List Object",
 ,,"%%7688",,"Control Access",
+,,"%%14674",,"Value Added",
+,,"%%14675",,"Value Deleted",
 4625,Status,0x0,,,
 4625,Status,0xC000005E,,"There are currently no logon servers available to service the logon request",
 4625,Status,0xC0000064,,"User logon with misspelled or bad user account",
