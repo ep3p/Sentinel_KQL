@@ -40,8 +40,11 @@
         MemberAccount = column_ifexists("MemberAccount", ""),
         MemberSid = column_ifexists("MemberSid", ""),
         Computer = column_ifexists("Computer", ""),
-        EventData = column_ifexists("EventData", "")
-    //| project-away Auditor, Auditors
+        EventData = column_ifexists("EventData", ""),
+        AttributeValue_EventData = column_ifexists("AttributeValue_EventData", ""),
+        AttributeLDAPDisplayName = column_ifexists("AttributeLDAPDisplayName", ""),
+        OperationTypeTranslated = column_ifexists("OperationTypeTranslated", ""),
+        ModifiedAttributeValue = column_ifexists("ModifiedAttributeValue", "")
     | project-reorder
         TimeGenerated
 //};
