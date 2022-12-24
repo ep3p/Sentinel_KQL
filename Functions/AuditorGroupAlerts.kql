@@ -36,10 +36,10 @@
         _Alerts
         | summarize
             TimeGenerated = min(TimeGenerated),
-            Members = make_set_if(tostring(pack_array(MemberAccount, MemberSid, EventData, AttributeValue_EventData, AttributeLDAPDisplayName, OperationTypeTranslated, ModifiedAttributeValue)), isnotempty(MemberSid) or isnotempty(MemberAccount)),
+            Members = make_set_if(tostring(pack_array(MemberAccount, MemberSid, EventData, AttributeValue_EventData, AttributeLDAPDisplayName, ModifiedAttributeValue)), isnotempty(MemberSid) or isnotempty(MemberAccount)),
             Entities = make_set(todynamic(Entities)),
             take_any(AlertName, AlertSeverity, ActorSid, ActorDomainName, ActorAccountType, Tactics, Auditor, Auditors, GroupSid)
-            by Computer, Activity, ActorAccount, GroupName
+            by Computer, Activity, ActorAccount, GroupName, OperationTypeTranslated
         | where array_length(Members) > 1
         | mv-apply Entities to typeof(string) on (
             sort by Entities asc
@@ -57,8 +57,8 @@
         '\n\nThis activity was performed on the group "<<<GroupName>>>".\n\nThis activity was performed on the accounts:\n\n- <<<MembersList>>>\n'
         | extend
             AlertName = strcat(AlertName, case(
-                Activity has_any (add_member_eventids), strcat(" - Account added to ", GroupName),
-                Activity has_any (remove_member_eventids), strcat(" - Account removed from ", GroupName),
+                Activity has_any (add_member_eventids) or OperationTypeTranslated == "ValueAdded", strcat(" - Account added to ", GroupName),
+                Activity has_any (remove_member_eventids) or OperationTypeTranslated == "ValueDeleted", strcat(" - Account removed from ", GroupName),
                 ""
                 )),
             AlertDescription =
