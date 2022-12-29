@@ -38,8 +38,6 @@ SecurityEvent
 // Remove local group event where account "NT AUTHORITY\NETWORK SERVICE" is added to "IIS_IUSRS" group
 | where not(EventID in (4732, 4733) and MemberSid == "S-1-5-20" and TargetSid == "S-1-5-32-568")
 | lookup kind=inner _ADGroups on $left.TargetSid == $right.GroupSID
-| where not(array_length(ValidEventIDs) > 0 and not(ValidEventIDs has tostring(EventID)))
-| where not(array_length(ExcludedEventIDs) > 0 and ExcludedEventIDs has tostring(EventID))
 | as _AuxiliarEvents
 | join kind=leftanti (
     _AuxiliarEvents
@@ -51,6 +49,8 @@ SecurityEvent
         int(null)
     )
 ) on Account, SourceComputerId, EventID, SubjectLogonId, TargetSid
+| where not(array_length(ValidEventIDs) > 0 and not(ValidEventIDs has tostring(EventID)))
+| where not(array_length(ExcludedEventIDs) > 0 and ExcludedEventIDs has tostring(EventID))
 | as _FilteredAuxiliarEvents
 | lookup kind=leftouter (
     _FilteredAuxiliarEvents
