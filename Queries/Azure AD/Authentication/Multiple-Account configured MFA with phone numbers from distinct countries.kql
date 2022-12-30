@@ -1,0 +1,37 @@
+let query_frequency = 1h;
+let _ExpectedCountryCodes = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "CorporateCountryCallingCode"
+    | summarize make_list(Auxiliar)
+);
+AuthenticationMethodChanges(query_period=query_frequency)
+| extend PhoneNumber = extract_all(@'PhoneNumber\"\:\"([^\"]+)', tostring(column_ifexists("StrongAuthenticationUserDetails", dynamic(null)).newValue))
+| mv-expand Target = SecurityInfo_TargetResources
+| mv-apply ModifiedProperties = Target["modifiedProperties"] on (
+    summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties["displayName"]), trim(@'\"', tostring(ModifiedProperties["newValue"]))))
+    )
+| evaluate bag_unpack(BagToUnpack, columnsConflict = 'keep_source', ignoredProperties = dynamic(["Phone.Id", "Phone.PhoneType"]))
+| extend ["Phone.PhoneNumber"] = column_ifexists("Phone.PhoneNumber", "")
+| extend PhoneNumber = iff(isnotempty(["Phone.PhoneNumber"]), set_union(PhoneNumber, pack_array(["Phone.PhoneNumber"])), PhoneNumber)
+| project-away Target, ["Phone.PhoneNumber"]
+| where array_length(PhoneNumber) > 1
+| extend DistinctCountryCodes = set_union(extract_all(@'\"(\+\d+)\s+', tostring(PhoneNumber)), dynamic(null))
+| where array_length(DistinctCountryCodes) > 1
+| where not(array_length(set_difference(DistinctCountryCodes, _ExpectedCountryCodes)) == 0)
+| project-reorder
+    TimeGenerated,
+    ActorPrincipalName,
+    IPAddress,
+    OperationName,
+    TargetUserPrincipalName,
+    Result,
+    ResultDescription,
+    PhoneNumber,
+    DistinctCountryCodes,
+    Strong*,
+    LoggedByService,
+    InitiatedBy,
+    UpdateUser_TargetResources,
+    SecurityInfo_TargetResources,
+    UserId,
+    CorrelationId
