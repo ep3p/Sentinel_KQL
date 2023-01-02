@@ -17,7 +17,8 @@ let unreported_denied_message_types = dynamic([
     "MFA denied; user did not respond to mobile app notification",
     "MFA denied; invalid authentication",
     "MFA denied; invalid verification code",
-    "MFA denied; user did not select the correct number"
+    "MFA denied; user did not select the correct number",
+    "MFA denied; Verification code already used"
 ]);
 // Other messages:
 //  MFA denied; user declined the authentication
