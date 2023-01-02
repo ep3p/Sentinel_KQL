@@ -3,4 +3,4 @@
 //
 // https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/PotentialMFASpam.kql
 //
-PotentialMFASpam(1h, 14d)
+PotentialMFASpam(query_frequency = 1h, query_period = 14d)
