@@ -11,7 +11,7 @@ Currently NRT rules don't allow multiple data types (tables) to be used in the s
 OfficeActivity
 | where Operation == "ExampleText"
 ```
-The query has only called the table ```OfficeActivity```, but ```Operation``` is the name of a table *and also* of a column in the table ```OfficeActivity```. But there are certain ways to rewrite queries without using certain strings and **bypass the Analytics rule wizard**. So the previous query could be rewrited and used in a NRT rule like:
+The query has only called the table ```OfficeActivity```, but unfortunately ```Operation``` is *also* the name of a column in the table ```OfficeActivity```. But there are certain ways to rewrite queries without using certain strings and **bypass the Analytics rule wizard**. So the previous query could be rewrited and used in a NRT rule like:
 ```
 OfficeActivity
 | where ['O''peration'] == "ExampleText"
