@@ -1,0 +1,7 @@
+OperationName,Field,Value,Translation,Notes
+,MethodType,0,"Call authentication phone","TwoWayVoiceMobile - PhoneNumber"
+,MethodType,2,"Call office phone","TwoWayVoiceOffice - VoiceOnlyPhoneNumber"
+,MethodType,3,"Call alternate authentication phone","TwoWayVoiceMobile - AlternativePhoneNumber"
+,MethodType,5,"Text code authentication phone","OneWaySMS - PhoneNumber"
+,MethodType,6,"Microsoft authenticator app","PhoneAppNotification"
+,MethodType,7,"Authenticator app or hardware token","PhoneAppOTP"
