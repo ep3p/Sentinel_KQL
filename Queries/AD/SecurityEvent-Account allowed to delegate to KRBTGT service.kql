@@ -1,0 +1,16 @@
+SecurityEvent
+| where EventData has "AllowedToDelegateTo"// and isempty(AllowedToDelegateTo)
+| mv-apply Auxiliar = parse_xml(EventData)["EventData"]["Data"] on (
+    where tostring(Auxiliar["@Name"]) == "AllowedToDelegateTo"
+    | extend AllowedToDelegateTo = tostring(Auxiliar["#text"])
+    | where not(AllowedToDelegateTo == "-") and AllowedToDelegateTo contains "krbtgt"
+)
+| project
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    Activity,
+    TargetAccount,
+    AllowedToDelegateTo,
+    EventData
