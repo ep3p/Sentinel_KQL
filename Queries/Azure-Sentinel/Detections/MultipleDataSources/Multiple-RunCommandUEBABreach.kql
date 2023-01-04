@@ -1,0 +1,58 @@
+let query_frequency = 1h;
+let query_lookback = 1h;
+let query_lookahead = 6h;
+let query_period = query_frequency + max_of(query_lookback, query_lookahead);
+AzureActivity
+| where TimeGenerated > ago(query_frequency + query_lookback)
+| where OperationNameValue =~ "Microsoft.Compute/virtualMachines/runCommand/action"
+| summarize
+    StartTime = arg_min(TimeGenerated, *),
+    EndTime = max(TimeGenerated),
+    ActivityStatusValueList = make_list(ActivityStatus)
+    by CorrelationId
+| where ActivityStatusValueList has_any ("Succeeded", "Success")
+| extend AuxiliarCaller = tolower(Caller)
+| join kind=inner (
+    BehaviorAnalytics
+    | where TimeGenerated > ago(query_period)
+    | where ActivityType in ("LogOn", "FailedLogOn") and ActivityInsights["ActionUncommonlyPerformedByUser"] == "True"
+    | where isnotempty(UserPrincipalName)
+    | project
+        UEBA_TimeGenerated = TimeGenerated,
+        UEBA_EventSource = EventSource,
+        UEBA_ActivityType = ActivityType,
+        UEBA_ActionType = ActionType,
+        UEBA_SourceIPAddress = SourceIPAddress,
+        UEBA_SourceIPLocation = SourceIPLocation,
+        UEBA_SourceDevice = SourceDevice,
+        UEBA_ActivityInsights = ActivityInsights,
+        UEBA_UsersInsights = UsersInsights,
+        AuxiliarCaller = tolower(UserPrincipalName)
+) on AuxiliarCaller
+// Deduplicate alerts
+| where UEBA_TimeGenerated > ago(query_frequency) or StartTime > ago(query_frequency)
+| where StartTime between ((UEBA_TimeGenerated - query_lookback) .. (UEBA_TimeGenerated + query_lookahead))
+| project
+    UEBA_TimeGenerated,
+    StartTime,
+    EndTime,
+    Caller,
+    CallerIpAddress,
+    OperationName,
+    OperationNameValue,
+    ActivityStatusValueList,
+    SubscriptionId,
+    ResourceGroup,
+    Resource,
+    Authorization,
+    Properties,
+    HTTPRequest,
+    ResourceId,
+    UEBA_EventSource,
+    UEBA_ActivityType,
+    UEBA_ActionType,
+    UEBA_SourceIPAddress,
+    UEBA_SourceIPLocation,
+    UEBA_SourceDevice,
+    UEBA_ActivityInsights,
+    UEBA_UsersInsights
