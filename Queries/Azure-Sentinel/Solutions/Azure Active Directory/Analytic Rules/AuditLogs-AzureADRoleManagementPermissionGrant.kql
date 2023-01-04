@@ -6,7 +6,7 @@ AuditLogs
 | where tostring(modifiedProperty["displayName"]) in ("AppRole.Value", "DelegatedPermissionGrant.Scope")
 | extend PermissionGrant = trim(@'[\"\s]+', tostring(modifiedProperty["newValue"]))
 | where PermissionGrant has "RoleManagement.ReadWrite.Directory"
-| mv-apply modifiedProperty = TargetResource.modifiedProperties on (
+| mv-apply modifiedProperty = TargetResource["modifiedProperties"] on (
     summarize modifiedProperties = make_bag(
         pack(tostring(modifiedProperty["displayName"]),
             pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])),
