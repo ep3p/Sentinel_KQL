@@ -1,0 +1,28 @@
+AuditLogs
+| where Category == "ApplicationManagement" and LoggedByService == "Core Directory" and OperationName in ("Add delegated permission grant", "Add app role assignment to service principal")
+| mv-expand TargetResource = TargetResources
+//| where tostring(TargetResource["displayName"]) == "Microsoft Graph"
+| mv-expand modifiedProperty = TargetResource["modifiedProperties"]
+| where tostring(modifiedProperty["displayName"]) in ("AppRole.Value", "DelegatedPermissionGrant.Scope")
+| extend PermissionGrant = trim(@'[\"\s]+', tostring(modifiedProperty["newValue"]))
+| where PermissionGrant has "RoleManagement.ReadWrite.Directory"
+| mv-apply modifiedProperty = TargetResource.modifiedProperties on (
+    summarize modifiedProperties = make_bag(
+        pack(tostring(modifiedProperty["displayName"]),
+            pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])),
+                "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
+)
+| project
+    TimeGenerated,
+    OperationName,
+    Result,
+    PermissionGrant,
+    //AppDisplayName for operation "Add delegated permission grant" will be in operation "Consent to application" (usually same CorrelationId)
+    AppDisplayName = tostring(modifiedProperties["ServicePrincipal.DisplayName"]["newValue"]),
+    AppServicePrincipalId = tostring(modifiedProperties["ServicePrincipal.ObjectID"]["newValue"]),
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    InitiatedBy,
+    TargetResources,
+    AdditionalDetails,
+    CorrelationId
