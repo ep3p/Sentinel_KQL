@@ -2012,6 +2012,27 @@
                 //| where not(_IndicatorsLength < 1000000 and not(EmailAddress in (toscalar(_Indicators | summarize make_list(EmailAddress))))) // "in" limit 1.000.000```
         })
         ,
+        'Domain', 'VMConnection',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(RemoteDnsQuestions) or isnotempty(RemoteDnsCanonicalNames)
+                | mv-expand Domain = array_concat(todynamic(RemoteDnsQuestions), todynamic(RemoteDnsCanonicalNames)) to typeof(string)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(Domain has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = tolower(Domain)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
         'Domain', 'Syslog',
         dynamic({
             "TITableLookback":
