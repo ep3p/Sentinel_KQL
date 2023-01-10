@@ -60,7 +60,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where ingestion_time() between (table_start .. table_end)
         // Filter events that may contain indicators
         | where not(ResultType in (_UncompromisedFailureResultTypes))
-        | where not(todynamic(AuthenticationDetails)[0].authenticationMethod == "Integrated Windows Authentication")
+        //| where not(todynamic(AuthenticationDetails)[0].authenticationMethod == "Integrated Windows Authentication")
         //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
         //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
         | project-rename ADFSSignInLogs_TimeGenerated = TimeGenerated
