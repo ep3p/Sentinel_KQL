@@ -55,6 +55,7 @@ OfficeActivity
 // One example could be a welcome SharePoint site that is visited automatically by all users when opening a browser
 | mv-expand QueryRange = range(now() - query_frequency + query_frequency/query_window_checks, now(), query_frequency/query_window_checks) to typeof(datetime)
 | where TimeGenerated between ((QueryRange - query_frequency) .. QueryRange)
+| where TimeGenerated between ((QueryRange - query_frequency) .. QueryRange)
 | summarize
     StartTime = min(TimeGenerated),
     EndTime = max(TimeGenerated),
@@ -63,7 +64,7 @@ OfficeActivity
     FileExtensions = make_set_if(SourceFileExtension, isnotempty(SourceFileExtension)),
     OperationCount = count(),
     Site_Urls = make_set(Site_Url, 500),
-    OfficeObjectIds = make_set(tostring(pack(Operation, OfficeObjectId)), 500),
+    SampleOfficeObjectIds = make_set(tostring(pack(Operation, OfficeObjectId)), 250),
     Operations = make_set(Operation, 200),
     ClientIPs = make_set_if(ClientIP, isnotempty(ClientIP)),
     IsManagedDevices = make_set_if(IsManagedDevice, isnotempty(IsManagedDevice))
@@ -81,7 +82,7 @@ OfficeActivity
     FileExtensions = make_set(FileExtensions),
     OperationCount = max(OperationCount),
     Site_Urls = array_sort_asc(make_set(Site_Urls, 500)),
-    OfficeObjectIds = array_sort_asc(make_set(OfficeObjectIds, 500)),
+    SampleOfficeObjectIds = array_sort_asc(make_set(SampleOfficeObjectIds, 250)),
     Operations = make_set(Operations, 200),
     ClientIPs = make_set(ClientIPs),
     IsManagedDevices = make_set(IsManagedDevices),
@@ -101,4 +102,4 @@ OfficeActivity
     DistinctObjects,
     FileExtensions,
     Site_Urls,
-    OfficeObjectIds
+    SampleOfficeObjectIds
