@@ -1,0 +1,12 @@
+let query_frequency = 1h;
+let query_period = 14d;
+ADFSSignInLogs
+| where ingestion_time() > ago(query_frequency)
+| where UserId == "00000000-0000-0000-0000-000000000000"
+| join kind=leftanti (
+    ADFSSignInLogs
+    | where ingestion_time() between (ago(query_period) .. ago(query_frequency))
+    | where UserId == "00000000-0000-0000-0000-000000000000"
+    | distinct UserPrincipalName
+) on UserPrincipalName
+| summarize arg_min(TimeGenerated, *) by UserPrincipalName
