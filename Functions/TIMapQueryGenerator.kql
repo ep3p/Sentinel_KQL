@@ -1,7 +1,7 @@
 // This function can help you to achieve consistency when writing Analytics Rules for ThreatIntelligenceIndicators,
 // where usually you will have to match one type of indicator with one type of table, and keeping track of the same changes in multiple rules is difficult.
 //
-// You can find an explanation of this function at https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Solutions/Threat%20Intelligence/Analytic%20Rules/README.md
+// You can find an explanation of this function at https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure-Sentinel/Solutions/Threat%20Intelligence/Analytic%20Rules
 //
 // If you need to make changes to the algorithm that all these queries follow, you should modify this function once, and generate the queries again just by calling the function.
 // You can call this function by running this same query code, or if you save this function as TIMapQueryGenerator, by simply calling:
