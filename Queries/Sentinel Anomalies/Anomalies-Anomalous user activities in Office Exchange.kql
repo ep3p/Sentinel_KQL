@@ -1,0 +1,16 @@
+Anomalies
+| where RuleName endswith "Anomalous user activities in Office Exchange" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"]
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserPrincipalName,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics,
+    Techniques,
+    ExtendedLinks
