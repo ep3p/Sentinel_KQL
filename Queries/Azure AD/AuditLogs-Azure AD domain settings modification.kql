@@ -1,0 +1,19 @@
+AuditLogs
+| where OperationName has_any ("domain")
+| extend
+    Domain = tostring(TargetResources[0]["displayName"]),
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"]))
+| project
+    TimeGenerated,
+    Category,
+    AADOperationType,
+    OperationName,
+    Result,
+    Domain,
+    TargetResources,
+    Initiator,
+    InitiatorId,
+    InitiatedBy,
+    AdditionalDetails,
+    CorrelationId
