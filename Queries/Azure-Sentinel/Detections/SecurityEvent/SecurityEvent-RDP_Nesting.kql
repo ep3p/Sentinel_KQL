@@ -1,0 +1,148 @@
+let query_frequency = 1h;
+let query_lookback = 2h;
+let query_period = query_frequency + query_lookback;
+let join_timespan_step = 5m;
+// Check second RDP happened
+SecurityEvent
+| where TimeGenerated > ago(query_frequency)
+| where EventID == 4624 and LogonType in (7, 10)
+| where not(LogonType == 7 and IpAddress in ("-", "127.0.0.1"))
+| project
+    SecondRDP_TimeGenerated = TimeGenerated,
+    Activity,
+    SecondRDP_SourceIPAddress = IpAddress,
+    SecondRDP_DestinationComputer = toupper(trim_end(@"\$", SubjectUserName)),
+    SecondRDP_DestinationAccount = tolower(Account),
+    binSecondRDP_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+//| distinct *
+// Obtain name of source device in second RDP
+| join hint.strategy = shuffle kind=leftouter (
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID == 4624
+        and not(LogonType in (7, 10))
+        and not(IpAddress in ("", "::1", "-", "127.0.0.1"))
+    | project
+        SourceComputer_TimeGenerated = TimeGenerated,
+        SecondRDP_SourceIPAddress = IpAddress,
+        SecondRDP_SourceComputer = case(
+            AccountType == "Machine", toupper(extract(@"([^\\]+\\)?(.*)\$", 2, Account)),
+            LogonProcessName has "NtLmSsp" and WorkstationName != "-", toupper(WorkstationName),
+            ""
+        ),
+        binSourceComputer_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+    | where isnotempty(SecondRDP_SourceComputer)
+    | mv-expand binSourceComputer_TimeGenerated = range(binSourceComputer_TimeGenerated, binSourceComputer_TimeGenerated + query_lookback, join_timespan_step) to typeof(datetime)
+    ) on SecondRDP_SourceIPAddress, $left.binSecondRDP_TimeGenerated == $right.binSourceComputer_TimeGenerated
+// Empty SourceComputers that happened after the second RDP,
+// or SourceComputers that are the DestinationComputer,
+// or SourceComputers that happened long before the second RDP,
+| extend
+    SourceComputer_TimeGenerated = case(
+        isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated > SecondRDP_TimeGenerated, datetime(null),
+        isnotempty(SecondRDP_SourceComputer) and SecondRDP_SourceComputer == SecondRDP_DestinationComputer, datetime(null),
+        isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated < SecondRDP_TimeGenerated - query_lookback, datetime(null),
+        SourceComputer_TimeGenerated
+    ),
+    SecondRDP_SourceComputer = case(
+        isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated > SecondRDP_TimeGenerated, "",
+        isnotempty(SecondRDP_SourceComputer) and SecondRDP_SourceComputer == SecondRDP_DestinationComputer, "",
+        isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated < SecondRDP_TimeGenerated - query_lookback, "",
+        SecondRDP_SourceComputer
+    )
+| summarize
+    arg_max(SourceComputer_TimeGenerated, SecondRDP_SourceComputer),
+    take_any(Activity)
+    by
+    SecondRDP_TimeGenerated,
+    SecondRDP_SourceIPAddress,
+    SecondRDP_DestinationComputer,
+    SecondRDP_DestinationAccount
+| project-away SourceComputer_TimeGenerated
+// Check first RDP happened
+| join kind=inner (
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID == 4624
+        and LogonType in (7, 10)
+    | where not(LogonType == 7 and IpAddress in ("-", "127.0.0.1"))
+    | project
+        Activity,
+        FirstRDP_TimeGenerated = TimeGenerated,
+        FirstRDP_SourceIPAddress = IpAddress,
+        FirstRDP_DestinationComputer = toupper(trim_end(@"\$", SubjectUserName)),
+        FirstRDP_DestinationAccount = tolower(Account),
+        binFirstRDP_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+    //| distinct *
+    // Obtain IP address of destination device in first RDP
+    | lookup kind=inner (
+        SecurityEvent
+        | where TimeGenerated > ago(query_period)
+        | where EventID == 4624
+            and AccountType == "Machine"
+            and not(IpAddress in ("", "::1", "-", "127.0.0.1"))
+        | distinct IpAddress, TargetUserName
+        | project
+            FirstRDP_DestinationIPAddress = IpAddress,
+            FirstRDP_DestinationComputer = toupper(trim_end(@"\$", TargetUserName))
+        ) on FirstRDP_DestinationComputer
+    // Obtain name of source device in first RDP
+    | join hint.strategy = shuffle kind=leftouter (
+        SecurityEvent
+        | where TimeGenerated > ago(query_period)
+        | where EventID == 4624
+            and not(LogonType in (7, 10))
+            and not(IpAddress in ("", "::1", "-", "127.0.0.1"))
+        | project
+            SourceComputer_TimeGenerated = TimeGenerated,
+            FirstRDP_SourceIPAddress = IpAddress,
+            FirstRDP_SourceComputer = case(
+                AccountType == "Machine", toupper(extract(@"([^\\]+\\)?(.*)\$", 2, Account)),
+                LogonProcessName has "NtLmSsp" and WorkstationName != "-", toupper(WorkstationName),
+                ""
+            ),
+            binSourceComputer_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+        | where isnotempty(FirstRDP_SourceComputer)
+        | mv-expand binSourceComputer_TimeGenerated = range(binSourceComputer_TimeGenerated, binSourceComputer_TimeGenerated + query_lookback, join_timespan_step) to typeof(datetime)
+        ) on FirstRDP_SourceIPAddress, $left.binFirstRDP_TimeGenerated == $right.binSourceComputer_TimeGenerated
+    // Empty SourceComputers that happened after the first RDP,
+    // or SourceComputers that are the DestinationComputer,
+    // or SourceComputers that happened long before the first RDP,
+    | extend
+        SourceComputer_TimeGenerated = case(
+            isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated > FirstRDP_TimeGenerated, datetime(null),
+            isnotempty(FirstRDP_SourceComputer) and FirstRDP_SourceComputer == FirstRDP_DestinationComputer, datetime(null),
+            isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated < FirstRDP_TimeGenerated - query_lookback, datetime(null),
+            SourceComputer_TimeGenerated
+        ),
+        FirstRDP_SourceComputer = case(
+            isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated > FirstRDP_TimeGenerated, "",
+            isnotempty(FirstRDP_SourceComputer) and FirstRDP_SourceComputer == FirstRDP_DestinationComputer, "",
+            isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated < FirstRDP_TimeGenerated - query_lookback, "",
+            FirstRDP_SourceComputer
+        )
+    | summarize
+        arg_max(SourceComputer_TimeGenerated, FirstRDP_SourceComputer),
+        take_any(Activity)
+        by
+        FirstRDP_TimeGenerated,
+        FirstRDP_SourceIPAddress,
+        FirstRDP_DestinationComputer,
+        FirstRDP_DestinationIPAddress,
+        FirstRDP_DestinationAccount
+    | project-away SourceComputer_TimeGenerated
+    ) on Activity, $left.SecondRDP_SourceIPAddress == $right.FirstRDP_DestinationIPAddress
+// Keep events where the first RDP happened before the second RDP
+| where SecondRDP_TimeGenerated - FirstRDP_TimeGenerated between (time(0s) .. query_lookback)
+| project
+    FirstRDP_TimeGenerated,
+    FirstRDP_SourceComputer,
+    FirstRDP_SourceIPAddress,
+    FirstRDP_DestinationComputer,
+    FirstRDP_DestinationIPAddress,
+    FirstRDP_DestinationAccount,
+    SecondRDP_TimeGenerated,
+    SecondRDP_SourceComputer,
+    SecondRDP_SourceIPAddress,
+    SecondRDP_DestinationComputer,
+    SecondRDP_DestinationAccount
