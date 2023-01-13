@@ -4,7 +4,9 @@ This folder contains queries created with the help of the function [TIMapQueryGe
 
 The [default rules created by Microsoft](https://github.com/Azure/Azure-Sentinel/tree/master/Solutions/Threat%20Intelligence/Analytic%20Rules) for threat intelligence indicators can't be expected to adapt to each Sentinel workspace and their indicators, and some rules might behave unexpectedly.
 
-For example, Microsoft developed a [rule that matches Windows Security AppLocker Events with file hashes](https://github.com/Azure/Azure-Sentinel/blob/master/Solutions/Threat%20Intelligence/Analytic%20Rules/FileHashEntity_SecurityEvent.yaml), but *AppLocker does not generate SHA256 hashes*, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work for your workspace. Also, the default rules might not check all the columns where an indicator may appear.
+For example, Microsoft developed a [rule that matches Windows Security AppLocker Events with file hashes](https://github.com/Azure/Azure-Sentinel/blob/master/Solutions/Threat%20Intelligence/Analytic%20Rules/FileHashEntity_SecurityEvent.yaml), but *AppLocker does not generate SHA256 hashes*, it generates PE256 hashes for executables files, unless you ingest PE256 hashes, this rule will never work for your workspace.
+
+Another example is when comparing reached domains to a domain indicator. An indicator might be "example.com", if your organization made a DNS request of "backup.example.com", in this case the Microsoft default rules would not match your event to the indicator because they only look for exact matches, when all domain levels should be checked. Moreover, the default rules might not check all the columns where an indicator may appear.
 
 Also, these default rules check events that happen *after* ingesting an indicator. When possible, it should also check events that happened *before* ingesting an indicator. Because of this, **each Sentinel workspace should adapt, develop and review their own threat intelligence indicator detections**.
 
