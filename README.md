@@ -19,6 +19,7 @@ You could check other resources like:
 | [ashwin-patil/blue-teaming-with-kql](https://github.com/ashwin-patil/blue-teaming-with-kql) |
 | [le0li9ht/Microsoft-Sentinel-Queries](https://github.com/le0li9ht/Microsoft-Sentinel-Queries) |
 | [DanielChronlund/DCSecurityOperations](https://github.com/DanielChronlund/DCSecurityOperations) |
+| [ugurkocde/KQL_Intune](https://github.com/ugurkocde/KQL_Intune)|
 | ... |
 
 Other links:
