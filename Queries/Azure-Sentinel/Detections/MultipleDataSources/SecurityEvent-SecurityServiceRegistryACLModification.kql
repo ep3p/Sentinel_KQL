@@ -35,6 +35,7 @@ union isfuzzy=true
         summarize BagToUnpack = make_bag(bag_pack(tostring(Auxiliar["@Name"]), tostring(Auxiliar["#text"])))
         )
     | evaluate bag_unpack(BagToUnpack, columnsConflict="keep_source"): (TimeGenerated: datetime, Computer: string, Account: string, AccountType: string, SubjectLogonId: string, Activity: string, ProcessName: string, ObjectType: string, ObjectName: string, EventData: string, OldSd: string, NewSd: string)
+    // https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/f4296d69-1c0f-491f-9587-a960b292d070?redirectedfrom=MSDN
     | extend EntryType = substring(OldSd, 0, 1)
     //| where EntryType == "D"
     | extend
