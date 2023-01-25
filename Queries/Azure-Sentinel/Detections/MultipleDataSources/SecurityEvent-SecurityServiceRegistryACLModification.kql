@@ -20,7 +20,7 @@ let parameters = dynamic([
     @"n:SYSTEM;p:READ",
     @"n1:SYSTEM;ta:remtrst;w:dacl"
 ]);
-union isfuzzy=true
+union
     (SecurityEvent
     | where TimeGenerated > ago(query_frequency)
     | where EventID == 4688
