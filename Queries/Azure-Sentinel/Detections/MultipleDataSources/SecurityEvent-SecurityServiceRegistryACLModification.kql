@@ -1,0 +1,57 @@
+let query_frequency = 1h;
+let file_names = dynamic(["subinacl.exe","SetACL.exe"]);
+let registry_paths = dynamic([
+    @"Services\HealthService",
+    @"Services\Sense",
+    @"Services\WinDefend",
+    @"Services\MsSecFlt",
+    @"Services\DiagTrack",
+    @"Services\SgrmBroker",
+    @"Services\SgrmAgent",
+    @"Services\AATPSensorUpdater",
+    @"Services\AATPSensor",
+    @"Services\mpssvc"
+]);
+let parameters = dynamic([
+    @"/deny=SYSTEM",
+    @"/deny=S-1-5-18",
+    @"/grant=SYSTEM=r",
+    @"/grant=S-1-5-18=r",
+    @"n:SYSTEM;p:READ",
+    @"n1:SYSTEM;ta:remtrst;w:dacl"
+]);
+union isfuzzy=true
+    (SecurityEvent
+    | where TimeGenerated > ago(query_frequency)
+    | where EventID == 4688
+    | where Process has_any (file_names) and CommandLine has_any (registry_paths) and CommandLine has_any (parameters)
+    | project TimeGenerated, Computer, Account, AccountType, SubjectLogonId, TargetAccount, Activity, NewProcessName, CommandLine
+),
+    (SecurityEvent
+    | where TimeGenerated > ago(query_frequency)
+    | where EventID == 4670
+    | where ObjectType == "Key"
+    | mv-apply Auxiliar = parse_xml(EventData)["EventData"]["Data"] on (
+        summarize BagToUnpack = make_bag(bag_pack(tostring(Auxiliar["@Name"]), tostring(Auxiliar["#text"])))
+        )
+    | evaluate bag_unpack(BagToUnpack, columnsConflict="keep_source"): (TimeGenerated: datetime, Computer: string, Account: string, AccountType: string, SubjectLogonId: string, Activity: string, ProcessName: string, ObjectType: string, ObjectName: string, EventData: string, OldSd: string, NewSd: string)
+    | extend EntryType = substring(OldSd, 0, 1)
+    //| where EntryType == "D"
+    | extend
+        RemovedSd = iff(EntryType in ("O", "G"), split(OldSd, ":", 1), extract_all(@"\(([^\)]+)\)", OldSd)),
+        AddedSd = iff(EntryType in ("O", "G"), split(NewSd, ":", 1), extract_all(@"\(([^\)]+)\)", NewSd))
+    | extend
+        RemovedSd = iff(EntryType in ("O", "G"), RemovedSd, set_difference(RemovedSd, AddedSd)),
+        AddedSd = iff(EntryType in ("O", "G"), AddedSd, set_difference(AddedSd, RemovedSd))
+    | mv-expand RemovedSd to typeof(string)
+    | where RemovedSd endswith "SY"
+    | mv-expand AddedSd = iff(array_length(AddedSd) == 0, dynamic([""]), AddedSd) to typeof(string)
+    | where isempty(AddedSd) or AddedSd endswith "SY"
+    | where case(
+            isempty(AddedSd), true, // Local System access was removed
+            RemovedSd startswith "A" and AddedSd startswith "D", true, // Local System was denied
+            RemovedSd contains "KA" and not(AddedSd contains "KA"), true, // Local System Key All Access was removed
+            false
+        )
+    | project TimeGenerated, Computer, Account, AccountType, SubjectLogonId, Activity, ProcessName, ObjectType, ObjectName, EntryType, OldSd, NewSd, RemovedSd, AddedSd, EventData
+)
