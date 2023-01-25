@@ -1,7 +1,7 @@
 AzureDiagnostics
 | where ResourceProvider has "MICROSOFT.NETWORK" and ResourceType has "AZUREFIREWALLS"
 // Some kinds of operations could be excluded
-//| where not(OperationName in ("AzureFirewallNatRuleLog", "AzureFirewallNetworkRuleLog", "AzureFirewallApplicationRuleLog", "AzureFirewallIDSLog", "AzureFirewallThreatIntelLog"))
+//| where not(OperationName in ("AzureFirewallApplicationRuleLog", "AzureFirewallNetworkRuleLog", "AzureFirewallDnsProxyLog", "AzureFirewallNatRuleLog", "AzureFirewallIDSLog", "AzureFirewallThreatIntelLog"))
 // Filter previously by address here
 //| where msg_s has_all ("1.0.0.0", "10.0.0.0")
 | parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort: int " to " DestinationAddress1 ":" DestinationPort: int *
