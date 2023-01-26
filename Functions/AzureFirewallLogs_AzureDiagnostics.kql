@@ -1,0 +1,145 @@
+// This query can help you to parse Azure Firewall events received in AzureDiagnostics table.
+// Currently this table is the legacy logging for Azure Firewall and there are other tables that can receive this information.
+//
+// IPv6 is not supported yet by Azure Firewall
+//
+// Click "Save as function", in Parameters write in the fields:
+//  string   source                ""
+//  string   destination           ""
+//  int      source_port           int(null)
+//  int      destination_port      int(null)
+//  string   action                ""
+//  string   protocol              ""
+//  bool     network_log           true
+//  bool     application_log       true
+//  bool     nat_log               true
+//  bool     ids_log               true
+//  bool     threatintel_log       true
+//  string   policy                ""
+//  string   rule_collection_group ""
+//  string   rule_collection       ""
+//  string   rule                  ""
+//
+// If you name the function "AzureFirewallLogs", you can check the function with queries like the following:
+//
+// AzureFirewallLogs()
+//
+// AzureFirewallLogs("10.10.10.237/31", "172.29.55.47/24")
+//
+//let Function = (
+//     source:string = "",
+//     destination:string = "",
+//     source_port:int = int(null),
+//     destination_port:int = int(null),
+//     action:string = "",
+//     protocol:string = "",
+//     network_log:bool = true,
+//     application_log:bool = true,
+//     nat_log:bool = true,
+//     ids_log:bool = true,
+//     threatintel_log:bool = true,
+//     policy:string = "",
+//     rule_collection_group:string = "",
+//     rule_collection:string = "",
+//     rule:string = ""
+// ){
+// Check inputs
+let is_source_ipv4 = isnotempty(parse_ipv4(source));
+//let is_source_ipv6 = isempty(parse_ipv4(source)) and isnotempty(parse_ipv6(source));
+let is_destination_ipv4 = isnotempty(parse_ipv4(destination));
+//let is_destination_ipv6 = isempty(parse_ipv4(destination)) and isnotempty(parse_ipv6(destination));
+let is_input_valid =
+    (isempty(source) or is_source_ipv4)// or is_source_ipv6)
+    and (isempty(destination) or is_destination_ipv4)// or is_destination_ipv6)
+;
+// Limit how many different search terms there will be in the "has_any_ipv4_prefix" dynamic, not a literal threshold, higher number -> more limited
+let ipv4_search_terms_limit = 2;
+// Prepare source address ipv4 search terms
+let source_ipv4_netmask_step = ipv4_netmask_suffix(source);
+let source_ipv4_netmask = iff(source_ipv4_netmask_step % 8 <= ipv4_search_terms_limit, bin(source_ipv4_netmask_step, 8), source_ipv4_netmask_step);
+let source_constant_prefix = iff(bin(source_ipv4_netmask-1, 8)/8 == 0, "", strcat_array(array_slice(split(format_ipv4(source, source_ipv4_netmask), "."), 0, -1 + bin(source_ipv4_netmask-1, 8)/8), "."));
+let source_lower_variable_prefix = toint(split(format_ipv4(source, source_ipv4_netmask), ".")[-(1 + bin(32-source_ipv4_netmask, 8)/8)]);
+let source_search_terms = split(replace_string(strcat(strcat(iff(source_ipv4_netmask > 8 ,"<<>>", ""), strcat_array(range(source_lower_variable_prefix, toint(source_lower_variable_prefix + pow(2,(-source_ipv4_netmask)% 8)-1)), strcat(iff(source_ipv4_netmask <= 24, ".", ""), "|", iff(source_ipv4_netmask > 8 ,"<<>>", "")))), iff(source_ipv4_netmask between ((ipv4_search_terms_limit + 1) .. 24), ".", "")), "<<>>", strcat(source_constant_prefix, ".")), "|");
+// Prepare destination address ipv4 search terms
+let destination_ipv4_netmask_step = ipv4_netmask_suffix(destination);
+let destination_ipv4_netmask = iff(destination_ipv4_netmask_step % 8 <= ipv4_search_terms_limit, bin(destination_ipv4_netmask_step, 8), destination_ipv4_netmask_step);
+let destination_constant_prefix = iff(bin(destination_ipv4_netmask-1, 8)/8 == 0, "", strcat_array(array_slice(split(format_ipv4(destination, destination_ipv4_netmask), "."), 0, -1 + bin(destination_ipv4_netmask-1, 8)/8), "."));
+let destination_lower_variable_prefix = toint(split(format_ipv4(destination, destination_ipv4_netmask), ".")[-(1 + bin(32-destination_ipv4_netmask, 8)/8)]);
+let destination_search_terms = split(replace_string(strcat(strcat(iff(destination_ipv4_netmask > 8 ,"<<>>", ""), strcat_array(range(destination_lower_variable_prefix, toint(destination_lower_variable_prefix + pow(2,(-destination_ipv4_netmask)% 8)-1)), strcat(iff(destination_ipv4_netmask <= 24, ".", ""), "|", iff(destination_ipv4_netmask > 8 ,"<<>>", "")))), iff(destination_ipv4_netmask between ((ipv4_search_terms_limit + 1) .. 24), ".", "")), "<<>>", strcat(destination_constant_prefix, ".")), "|");
+// Prepare source address ipv6 search term
+// let source_ipv6_netmask_step = coalesce(toint(extract(@"\/(\d+)$", 1, source)), 128);
+// let source_ipv6_netmask = bin(source_ipv6_netmask_step, 16);
+// let source_ipv6_search_term = substring(parse_ipv6(source), 0, 5 * source_ipv6_netmask/16);
+// Prepare destination address ipv6 search term
+// let destination_ipv6_netmask_step = coalesce(toint(extract(@"\/(\d+)$", 1, destination)), 128);
+// let destination_ipv6_netmask = bin(destination_ipv6_netmask_step, 16);
+// let destination_ipv6_search_term = substring(parse_ipv6(destination), 0, 5 * destination_ipv6_netmask/16);
+// Prepare OperationName checks
+let removed_logs = set_difference(
+    array_iff(
+        pack_array(network_log, application_log, nat_log, ids_log, threatintel_log),
+        "",
+        dynamic(["AzureFirewallNetworkRuleLog", "AzureFirewallApplicationRuleLog", "AzureFirewallNatRuleLog", "AzureFirewallIDSLog", "AzureFirewallThreatIntelLog"])
+    ),
+    dynamic([""])
+);
+let all_logs = array_length(removed_logs) == 0;
+// Query
+AzureDiagnostics
+// Check input is valid
+| where is_input_valid
+// Filter by Resource
+| where ResourceProvider has "MICROSOFT.NETWORK"
+    and ResourceType has "AZUREFIREWALLS"
+    and Category has_any ("AzureFirewallNetworkRule","AzureFirewallApplicationRule")
+| project TimeGenerated, Category, OperationName, msg_s, ResourceId
+// Filter by OperationName
+| where all_logs or not(OperationName has_any (removed_logs))
+// Filter by Action
+| where isempty(action) or msg_s has action
+// Filter by protocol
+| where isempty(protocol) or msg_s has protocol
+// Filter by Policy
+| where isempty(policy) or msg_s has policy
+// Filter by RuleCollectionGroup
+| where isempty(rule_collection_group) or msg_s has rule_collection_group
+// Filter by RuleCollection
+| where isempty(rule_collection) or msg_s has rule_collection
+// Filter by Rule
+| where isempty(rule) or msg_s has rule
+// Filter by addresses
+| where isempty(source) or (source_ipv4_netmask < 16) or has_any_ipv4_prefix(source, source_search_terms)
+| where isempty(destination) or (destination_ipv4_netmask < 16) or has_any_ipv4_prefix(destination, destination_search_terms)
+// Parse msg_s
+| parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort:int " to " DestinationAddress1 ":" DestinationPort:int *
+| parse msg_s with * ". Action: " Action1a "." *
+| parse msg_s with * " was " Action1b " to " NatDestinationAddress ":" NatDestinationPort:int "." *
+| parse msg_s with Protocol2 " request from " SourceAddress2 " to " DestinationAddress2 ". Action: " Action2 "." *
+| parse msg_s with * ". Policy: " Policy ". Rule Collection Group: " RuleCollectionGroup ". Rule Collection: " RuleCollection ". Rule: " Rule
+| parse msg_s with * ". ThreatIntel: " ThreatIntel
+| extend
+    FirewallAction = case(isnotempty(Action1a), Action1a, isnotempty(Action1b), Action1b, Action2),
+    Protocol = iff(isnotempty(Protocol), Protocol, Protocol2),
+    SourceAddress = iff(isnotempty(SourceAddress1), SourceAddress1, SourceAddress2),
+    DestinationAddress = iff(isnotempty(DestinationAddress1), DestinationAddress1, DestinationAddress2)
+| project TimeGenerated, Category, OperationName, FirewallAction, Protocol, SourceAddress, DestinationAddress, NatDestinationAddress, SourcePort, DestinationPort, NatDestinationPort, Rule, RuleCollection, RuleCollectionGroup, Policy, ThreatIntel, msg_s, ResourceId
+// Filter by Action
+| where isempty(action) or FirewallAction has action
+// Filter by protocol
+| where isempty(protocol) or Protocol has protocol
+// Filter by Policy
+| where isempty(policy) or Policy == policy
+// Filter by RuleCollectionGroup
+| where isempty(rule_collection_group) or RuleCollectionGroup == rule_collection_group
+// Filter by RuleCollection
+| where isempty(rule_collection) or RuleCollection == rule_collection
+// Filter by Rule
+| where isempty(rule) or Rule == rule
+// Filter by addresses
+| where isempty(source) or ipv4_is_in_range(SourceAddress, source)
+| where isempty(destination) or ipv4_is_in_range(DestinationAddress, destination) or ipv4_is_in_range(NatDestinationAddress, destination)
+// Filter by ports, unfortunately ports can have less than 3 characters
+| where isempty(source_port) or SourcePort == source_port
+| where isempty(destination_port) or DestinationPort == destination_port or NatDestinationPort == destination_port
+//};
+//Function(source, destination)
