@@ -1,17 +1,6 @@
-AzureDiagnostics
-| where ResourceProvider has "MICROSOFT.NETWORK" and ResourceType has "AZUREFIREWALLS"
-// Some kinds of operations could be excluded
-//| where not(OperationName in ("AzureFirewallApplicationRuleLog", "AzureFirewallNetworkRuleLog", "AzureFirewallDnsProxyLog", "AzureFirewallNatRuleLog", "AzureFirewallIDSLog", "AzureFirewallThreatIntelLog"))
-// Filter previously by address here
-//| where msg_s has_all ("1.0.0.0", "10.0.0.0")
-| parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort: int " to " DestinationAddress1 ":" DestinationPort: int *
-| parse msg_s with * ". Action: " Action1a "." *
-| parse msg_s with * " was " Action1b " to " NatDestinationAddress ":" NatDestinationPort:int "." *
-| parse msg_s with Protocol2 " request from " SourceAddress2 " to " DestinationAddress2 ". Action: " Action2 "." *
-| extend
-    FirewallAction = case(isnotempty(Action1a), Action1a, isnotempty(Action1b), Action1b, Action2),
-    Protocol = iff(isnotempty(Protocol), Protocol, Protocol2),
-    SourceAddress = iff(isnotempty(SourceAddress1), SourceAddress1, SourceAddress2),
-    DestinationAddress = iff(isnotempty(DestinationAddress1), DestinationAddress1, DestinationAddress2)
-| project TimeGenerated, Resource, Category, OperationName, FirewallAction, Protocol, SourceAddress, DestinationAddress, NatDestinationAddress, SourcePort, DestinationPort, msg_s, ResourceId, ResourceType
-| limit 1000
+// Please, use the function you can find in:
+//
+// https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/AzureFirewallLogs_AzureDiagnostics.kql
+//
+AzureFirewallLogs()
+| limit 100
