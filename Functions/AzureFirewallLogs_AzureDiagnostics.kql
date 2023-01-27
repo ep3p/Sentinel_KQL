@@ -128,13 +128,13 @@ AzureDiagnostics
 // Filter by protocol
 | where isempty(protocol) or Protocol has protocol
 // Filter by Policy
-| where isempty(policy) or Policy == policy
+| where isempty(policy) or Policy has policy
 // Filter by RuleCollectionGroup
-| where isempty(rule_collection_group) or RuleCollectionGroup == rule_collection_group
+| where isempty(rule_collection_group) or RuleCollectionGroup has rule_collection_group
 // Filter by RuleCollection
-| where isempty(rule_collection) or RuleCollection == rule_collection
+| where isempty(rule_collection) or RuleCollection has rule_collection
 // Filter by Rule
-| where isempty(rule) or Rule == rule
+| where isempty(rule) or Rule has rule
 // Filter by addresses
 | where isempty(source) or ipv4_is_in_range(SourceAddress, source)
 | where isempty(destination) or ipv4_is_in_range(DestinationAddress, destination) or ipv4_is_in_range(NatDestinationAddress, destination)
