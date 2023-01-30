@@ -50,7 +50,7 @@ let is_destination_ipv4 = isnotempty(parse_ipv4(destination));
 //let is_destination_ipv6 = isempty(parse_ipv4(destination)) and isnotempty(parse_ipv6(destination));
 let is_input_valid =
     (isempty(source) or is_source_ipv4)// or is_source_ipv6)
-    and (isempty(destination) or is_destination_ipv4)// or is_destination_ipv6)
+    //and (isempty(destination) or is_destination_ipv4)// or is_destination_ipv6)
 ;
 // Limit how many different search terms there will be in the "has_any_ipv4_prefix" dynamic, not a literal threshold, higher number -> more limited
 let ipv4_search_terms_limit = 2;
@@ -108,8 +108,13 @@ AzureDiagnostics
 // Filter by Rule
 | where isempty(rule) or msg_s has rule
 // Filter by addresses
-| where isempty(source) or (source_ipv4_netmask < 16) or has_any_ipv4_prefix(msg_s, source_search_terms)
-| where isempty(destination) or (destination_ipv4_netmask < 16) or has_any_ipv4_prefix(msg_s, destination_search_terms)
+| where isempty(source) or source_ipv4_netmask < 16 or has_any_ipv4_prefix(msg_s, source_search_terms)
+| where case(
+    isempty(destination), true,
+    is_destination_ipv4, destination_ipv4_netmask < 16 or has_any_ipv4_prefix(msg_s, destination_search_terms),
+    not(is_destination_ipv4), msg_s has destination, 
+    false
+    )
 // Parse msg_s
 | parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort:int " to " DestinationAddress1 ":" DestinationPort:int *
 | parse msg_s with * ". Action: " Action1a "." *
@@ -137,7 +142,12 @@ AzureDiagnostics
 | where isempty(rule) or Rule has rule
 // Filter by addresses
 | where isempty(source) or ipv4_is_in_range(SourceAddress, source)
-| where isempty(destination) or ipv4_is_in_range(DestinationAddress, destination) or ipv4_is_in_range(NatDestinationAddress, destination)
+| where case(
+    isempty(destination), true,
+    is_destination_ipv4, ipv4_is_in_range(DestinationAddress, destination) or ipv4_is_in_range(NatDestinationAddress, destination),
+    not(is_destination_ipv4), DestinationAddress has destination, 
+    false
+    )
 // Filter by ports, unfortunately ports can have less than 3 characters
 | where isempty(source_port) or SourcePort == source_port
 | where isempty(destination_port) or DestinationPort == destination_port or NatDestinationPort == destination_port
