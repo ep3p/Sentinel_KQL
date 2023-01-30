@@ -108,8 +108,8 @@ AzureDiagnostics
 // Filter by Rule
 | where isempty(rule) or msg_s has rule
 // Filter by addresses
-| where isempty(source) or (source_ipv4_netmask < 16) or has_any_ipv4_prefix(source, source_search_terms)
-| where isempty(destination) or (destination_ipv4_netmask < 16) or has_any_ipv4_prefix(destination, destination_search_terms)
+| where isempty(source) or (source_ipv4_netmask < 16) or has_any_ipv4_prefix(msg_s, source_search_terms)
+| where isempty(destination) or (destination_ipv4_netmask < 16) or has_any_ipv4_prefix(msg_s, destination_search_terms)
 // Parse msg_s
 | parse msg_s with Protocol " request from " SourceAddress1 ":" SourcePort:int " to " DestinationAddress1 ":" DestinationPort:int *
 | parse msg_s with * ". Action: " Action1a "." *
