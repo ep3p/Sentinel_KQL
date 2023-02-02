@@ -1,0 +1,3 @@
+VMConnection
+| where isnotempty(RemoteDnsCanonicalNames) or isnotempty(RemoteDnsQuestions)
+| where RemoteDnsCanonicalNames has DomainNames or RemoteDnsQuestions has DomainNames
