@@ -19,6 +19,11 @@ let _URLRegex = toscalar(
     | where UseCase == "Threat Intelligence Indicator URL"
     | project RegEx
     );
+let _ExcludedAlerts =
+    _GetWatchlist('AlertName-MonitoredDetections')
+    | where Notes has "[ExcludedTIAlerts]"
+    | project ProductName, AlertName, AnalyticsId = tostring(AnalyticsId)
+;
 let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: boolean, ti_start: datetime = datetime(null)) {
     // Scheduled Analytics rules have a query period limit of 14d
     let _Indicators =// materialize(
@@ -60,6 +65,9 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         // Remove TI map alerts
         | extend MSTI = (VendorName == "Microsoft" and ProductName == 'Azure Sentinel' and (ProviderName == "Threat Intelligence Alerts" or AlertName has "TI map"))
         | where MSTI == false //or MSTI == true
+        // Remove excluded alerts
+        | extend AnalyticsId = iff(ProductName == "Azure Sentinel", tostring(split(AlertType, "_")[-1]), AlertType)
+        | join kind=leftanti _ExcludedAlerts on ProductName, AlertName, AnalyticsId
         // Filter events that may contain indicators
         | where isnotempty(Entities)
         //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
@@ -86,7 +94,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
     | project
         SecurityAlert_TimeGenerated,
         Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation,
-        AlertName, AlertSeverity, Entities, ProviderName, VendorName, Alert_Description, Alert_Account, Alert_IPAddress, Alert_HostName, CompromisedEntity
+        AlertName, AlertSeverity, Entities, ProviderName, ProductName, VendorName, AnalyticsId, Alert_Description, Alert_Account, Alert_IPAddress, Alert_HostName, CompromisedEntity
 };
 union// isfuzzy=true
     // Match      current table events                                all indicators available
