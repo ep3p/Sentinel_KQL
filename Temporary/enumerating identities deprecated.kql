@@ -1,0 +1,13 @@
+| mv-apply Entities on (
+    extend
+        EntityValue = tostring(Entities[tostring(bag_keys(Entities)[1])]),
+        EntityType = tostring(Entities["Type"])
+    | where isnotempty(EntityType)
+    | summarize take_any(Entities) by EntityValue, EntityType
+    | sort by EntityType desc
+    | summarize Entities = make_list(Entities)
+    )
+| mv-apply with_itemindex = Index_aux Entities on (
+    extend Entities = bag_merge(bag_pack(@"$id", tostring(Index_aux + 2)), bag_remove_keys(Entities, dynamic(["$id"])))
+    | summarize Entities = tostring(array_sort_asc(make_list(Entities)))
+    )
