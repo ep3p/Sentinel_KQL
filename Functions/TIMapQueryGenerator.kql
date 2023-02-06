@@ -563,7 +563,12 @@
                 '0h'
             ,
             "TableAdditionalLets":
-                ``````
+                ```
+                let _ExcludedAlerts =
+                    _GetWatchlist('AlertName-MonitoredDetections')
+                    | where Notes has "[ExcludedTIAlerts]"
+                    | project ProductName, AlertName, AnalyticsId = tostring(AnalyticsId)
+                ;```
             ,
             "TableName":
                 'SecurityAlert'
@@ -575,7 +580,10 @@
                 ```
                 // Remove TI map alerts
                 | extend MSTI = (VendorName == "Microsoft" and ProductName == 'Azure Sentinel' and (ProviderName == "Threat Intelligence Alerts" or AlertName has "TI map"))
-                | where MSTI == false //or MSTI == true```
+                | where MSTI == false //or MSTI == true
+                // Remove excluded alerts
+                | extend AnalyticsId = iff(ProductName == "Azure Sentinel", tostring(split(AlertType, "_")[-1]), AlertType)
+                | join kind=leftanti _ExcludedAlerts on ProductName, AlertName, AnalyticsId```
             ,
             "PostTableOperators":
                 ```
@@ -592,7 +600,7 @@
                 ', AlertName'
             ,
             "TableColumns&LookUp":
-                'AlertName, AlertSeverity, Entities, ProviderName, VendorName, Alert_Description, Alert_Account, Alert_IPAddress, Alert_HostName, CompromisedEntity'
+                'AlertName, AlertSeverity, Entities, ProviderName, ProductName, VendorName, AnalyticsId, Alert_Description, Alert_Account, Alert_IPAddress, Alert_HostName, CompromisedEntity'
             ,
             "TableCustomEntityExtend":
                 ```,
