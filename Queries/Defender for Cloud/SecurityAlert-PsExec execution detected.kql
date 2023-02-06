@@ -8,6 +8,8 @@ SecurityAlert
     AccountLogonId = tostring(ExtendedProperties["Account Logon Id"]),
     ProcessName = tostring(ExtendedProperties["Process Name"]),
     CommandLine = tostring(ExtendedProperties["Command Line"])
+// Clean Entities
+| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\,{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
 | summarize
     TimeGenerated = min(TimeGenerated),
     StartTime = min(StartTime),
@@ -18,19 +20,6 @@ SecurityAlert
     Entities = make_set(todynamic(Entities)),
     take_any(RemediationSteps)
     by AlertName, AlertSeverity, Description, ResourceId, Computer, Account, AccountSID, ProcessName, Tactics
-| mv-apply Entities on (
-    extend
-        EntityValue = tostring(Entities[tostring(bag_keys(Entities)[1])]),
-        EntityType = tostring(Entities["Type"])
-    | where isnotempty(EntityType)
-    | summarize take_any(Entities) by EntityValue, EntityType
-    | sort by EntityType desc
-    | summarize Entities = make_list(Entities)
-    )
-| mv-apply with_itemindex = Index_aux Entities on (
-    extend Entities = bag_merge(bag_pack(@"$id", tostring(Index_aux + 2)), bag_remove_keys(Entities, dynamic(["$id", "Account", "Host"])))
-    | summarize Entities = tostring(array_sort_asc(make_list(Entities)))
-    )
 | project
     TimeGenerated,
     AlertName,
