@@ -90,7 +90,7 @@ union// isfuzzy=true
 | extend
     timestamp = <<<TableName>>>_TimeGenerated<<<TableCustomEntityExtend>>><<<TICustomEntityExtend>>><<<TableExclusion>>>
 ```
-You can notice this query scheme has some placeholders indicated by the strings ```<<< xxxxx >>>```, this "query" won't work in this state. But the defined datatables contain the query parts that substitute the placeholders. In this example the datatables have been called:
+You can notice this query scheme has some placeholders indicated by the strings ```<<< xxxxx >>>```, this "query" won't work in this state. But the defined datatables contain the query parts that substitute the placeholders. In this example the datatables have been named as the following:
 ```kql
 _IndicatorTypesDatatable = datatable(EntityType:string, IndicatorDictionary:dynamic)
 _TablesDatatable = datatable(EntityType:string, TableDictionary:dynamic)
