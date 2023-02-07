@@ -11,7 +11,7 @@ SecurityAlert
     ParentProcess = tostring(ExtendedProperties["parent process"]),
     ParentProcessId = tostring(ExtendedProperties["parent process id"]),
     ResourceType = tostring(ExtendedProperties["resourceType"]),
-    MachineName = CompromisedEntity
+    Computer = CompromisedEntity
 // Clean Entities
 | extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\,{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
 | summarize
@@ -24,10 +24,10 @@ SecurityAlert
     ProcessIds = make_set(ProcessId, 250),
     ParentProcesses = make_set(ParentProcess, 250),
     ParentProcessIds = make_set(ParentProcessId, 250),
-    AlertLinks = make_list(AlertLink, 250),
+    AlertLinks = make_set(AlertLink, 250),
     Entities = make_set(todynamic(Entities)),
     take_any(RemediationSteps)
-    by AlertName, AlertSeverity, Description, ResourceId, MachineName, Account, AccountSID, ResourceType, Tactics
+    by AlertName, AlertSeverity, Description, ResourceId, Computer, Account, AccountSID, ResourceType, Tactics
 | project
     TimeGenerated,
     AlertName,
@@ -38,7 +38,7 @@ SecurityAlert
     ResourceType,
     StartTime,
     EndTime,
-    MachineName,
+    Computer,
     Account,
     AccountSID,
     AccountLogonIds,
