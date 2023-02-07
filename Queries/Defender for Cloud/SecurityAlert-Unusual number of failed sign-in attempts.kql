@@ -13,7 +13,7 @@ SecurityAlert
     EndTime = max(EndTime),
     IPAddresses = make_set_if(IPAddress, isnotempty(IPAddress), 250),
     ExtendedLinks = make_set(ExtendedLinks, 250),
-    AlertLinks = make_list(AlertLink, 250),
+    AlertLinks = make_set(AlertLink, 250),
     Entities = make_set(todynamic(Entities)),
     take_any(RemediationSteps)
     by AlertName, AlertSeverity, Description, ResourceId, MachineName, ResourceType, Tactics
