@@ -14,7 +14,7 @@ SecurityAlert
     StartTime = min(StartTime),
     EndTime = max(EndTime),
     ContainerIDs = make_set(ContainerID, 250),
-    AlertLinks = make_list(AlertLink, 250),
+    AlertLinks = make_set(AlertLink, 250),
     Entities = make_set(todynamic(Entities)),
     take_any(RemediationSteps)
     by AlertName, AlertSeverity, Description, ResourceId, APIRequest, ImageName, UserName, ResourceType, Tactics
