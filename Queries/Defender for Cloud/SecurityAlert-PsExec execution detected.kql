@@ -16,7 +16,7 @@ SecurityAlert
     EndTime = max(EndTime),
     AccountLogonIds = make_set(AccountLogonId, 250),
     CommandLines = make_set(CommandLine, 250),
-    AlertLinks = make_list(AlertLink, 250),
+    AlertLinks = make_set(AlertLink, 250),
     Entities = make_set(todynamic(Entities)),
     take_any(RemediationSteps)
     by AlertName, AlertSeverity, Description, ResourceId, Computer, Account, AccountSID, ProcessName, Tactics
