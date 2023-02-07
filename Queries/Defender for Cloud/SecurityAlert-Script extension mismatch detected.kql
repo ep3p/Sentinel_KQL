@@ -2,6 +2,7 @@ SecurityAlert
 | where AlertName has "Script extension mismatch detected" and ProviderName != "ASI Scheduled Alerts"
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend
+    Computer = tostring(ExtendedProperties["Compromised Host"]),
     UserName = tostring(ExtendedProperties["User Name"]),
     Process = tostring(ExtendedProperties["Suspicious Process"]),
     CommandLine = tostring(ExtendedProperties["Suspicious Command Line"]),
@@ -12,12 +13,13 @@ SecurityAlert
     TimeGenerated = min(TimeGenerated),
     StartTime = min(StartTime),
     EndTime = max(EndTime),
+    UserNames = make_set(UserName, 250),
     Processes = make_set(Process, 250),
     CommandLines = make_set(CommandLine, 250), 
     AlertLinks = make_set(AlertLink, 250),
     Entities = make_set(todynamic(Entities)),
     take_any(RemediationSteps)
-    by AlertName, AlertSeverity, Description, ResourceId, UserName, ResourceType, Tactics
+    by AlertName, AlertSeverity, Description, ResourceId, Computer, ResourceType, Tactics
 | project
     TimeGenerated,
     AlertName,
@@ -28,7 +30,8 @@ SecurityAlert
     ResourceType,
     StartTime,
     EndTime,
-    UserName,
+    Computer,
+    UserNames,
     Processes,
     CommandLines,
     AlertLinks,
