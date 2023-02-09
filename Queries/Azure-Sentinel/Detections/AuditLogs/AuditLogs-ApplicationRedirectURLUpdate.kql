@@ -1,0 +1,45 @@
+AuditLogs
+| where Category == "ApplicationManagement" and AADOperationType == "Update" //and OperationName == "Update Application" and Result == "success"
+| mv-expand TargetResource = TargetResources
+| mv-expand modifiedProperty = TargetResource["modifiedProperties"]
+| where modifiedProperty["displayName"] == "AppAddress"
+| extend NewAddresses = extract_all(@'\"Address\"\:\"([^"]+)\"', tostring(modifiedProperty["newValue"]))
+| extend OldAddresses = extract_all(@'\"Address\"\:\"([^"]+)\"', tostring(modifiedProperty["oldValue"]))
+| where isnotempty(NewAddresses)
+| extend AddedAddresses = set_difference(NewAddresses, OldAddresses)
+| where array_length(AddedAddresses) > 0
+| mv-expand AddedAddress = AddedAddresses to typeof(string)
+| extend
+    ResourceDisplayName = tostring(TargetResource["displayName"]),
+    TargetResources = pack(OperationName, TargetResources)
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    OperationNames = make_set(OperationName),
+    AddedAddresses = make_set(AddedAddresses),
+    OldAddresses = make_set(OldAddresses),
+    TargetResources = make_bag(TargetResources),
+    take_any(LoggedByService, Category, AADOperationType, AdditionalDetails, Identity, InitiatedBy)
+    by CorrelationId, Result, AddedAddress, ResourceDisplayName
+| extend
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| project
+    TimeGenerated,
+    Category,
+    AADOperationType,
+    Identity,
+    Initiator,
+    IPAddress,
+    OperationNames,
+    Result,
+    ResourceDisplayName,
+    AddedAddress,
+    AddedAddresses,
+    OldAddresses,
+    InitiatorId,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    LoggedByService,
+    CorrelationId
