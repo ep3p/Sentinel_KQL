@@ -3,12 +3,17 @@ AuditLogs
 | mv-apply AuxiliarTargetResources = TargetResources on (
     summarize AlertProperties = make_bag(pack(tostring(AuxiliarTargetResources["type"]), pack("id", AuxiliarTargetResources["id"], "displayName", AuxiliarTargetResources["displayName"])))
     )
-| extend AlertName = strcat("PIM alert", " - ", AlertProperties["AlertInfo"]["displayName"])
+| extend
+    AlertName = strcat("PIM alert", " - ", AlertProperties["AlertInfo"]["displayName"]),
+    Provider = tostring(AlertProperties["Provider"]["displayName"]),
+    Subscription = tostring(AlertProperties["subscription"]["displayName"])
 | project
     TimeGenerated,
     OperationName,
+    AlertName,
+    Provider,
+    Subscription,
     AlertProperties,
     InitiatedBy,
     TargetResources,
-    CorrelationId,
-    AlertName
+    CorrelationId
