@@ -1,0 +1,135 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let ipv4_prefix_mask = 23;
+let _ExpectedIPAddresses = toscalar(
+    union _GetWatchlist("IP-CorporateCollaborators"), _GetWatchlist("IP-Vendors")
+    | summarize make_list(IPAddress)
+);
+let _ExpectedLocations = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "CorporateGeolocation"
+    | summarize make_list(Auxiliar)
+);
+let _ExpectedASNs = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "CommonUserASN"
+    | summarize make_list(Auxiliar)
+);
+let _DisabledAttempts =
+    union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_frequency)
+    | where ResultType == "50057"
+    | summarize
+        TimeGenerated = arg_min(TimeGenerated, OriginalRequestId),
+        AppDisplayName = make_set(AppDisplayName),
+        ResourceDisplayName = make_set(ResourceDisplayName),
+        ClientAppUsed = make_set(ClientAppUsed),
+        take_any(ResultType, ResultDescription, UserAgent, AutonomousSystemNumber, DeviceDetail_dynamic, DeviceDetail_string),
+        take_anyif(UserPrincipalName, UserPrincipalName != UserId),
+        take_anyif(UserDisplayName, UserDisplayName != UserId),
+        take_anyif(Location, isnotempty(Location))
+        by Category, UserId, IPAddress
+    // Remove expected IP addresses
+    | where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
+    | lookup kind = leftouter (
+        AuditLogs
+        | where TimeGenerated > ago(query_period)
+        | where Category == "UserManagement" and OperationName has "Disable account" and Result == "success"
+        | project
+            AADDisable_TimeGenerated = TimeGenerated,
+            UserId = tostring(TargetResources[0]["id"])
+        ) on UserId
+    | lookup kind = leftouter (
+        IdentityInfo
+        | where TimeGenerated > ago(query_period)
+        | summarize arg_max(TimeGenerated, AccountSID) by AccountObjectId
+        | project
+            AccountSID,
+            AccountObjectId
+        ) on $left.UserId == $right.AccountObjectId
+    | lookup kind = leftouter (
+        SecurityEvent
+        | where TimeGenerated > ago(query_period)
+        | where EventID == 4725
+        | summarize arg_min(TimeGenerated, *) by Computer, SubjectLogonId, TargetSid
+        | project
+            ADDisable_TimeGenerated = TimeGenerated,
+            TargetSid
+        ) on $left.AccountSID == $right.TargetSid
+    | where not((isnotempty(ADDisable_TimeGenerated) and ADDisable_TimeGenerated > ago(query_period))
+        or (isnotempty(AADDisable_TimeGenerated) and AADDisable_TimeGenerated > ago(query_period)))
+    | extend
+        DeviceDetail = iff(isnotempty(DeviceDetail_string), todynamic(DeviceDetail_string), DeviceDetail_dynamic),
+        ParsedUserAgent = parse_user_agent(UserAgent, dynamic(["os", "browser"]))
+    | extend
+        DeviceId = tostring(DeviceDetail["deviceId"]),
+        DeviceName = tostring(DeviceDetail["displayName"]),
+        DeviceIsManaged = tostring(DeviceDetail["isManaged"]),
+        DeviceTrustType = tostring(DeviceDetail["trustType"]),
+        DeviceDetailOS = tostring(DeviceDetail["operatingSystem"]),
+        UserAgentOS = tostring(ParsedUserAgent["OperatingSystem"]["Family"]),
+        Browser = tostring(ParsedUserAgent["Browser"]["Family"])
+    | extend
+        OperatingSystem = case(
+            isempty(DeviceDetailOS), UserAgentOS,
+            isempty(UserAgent), extract(@"^([A-Za-z]+)", 1, DeviceDetailOS),
+            UserAgentOS == "Other", extract(@"^([A-Za-z]+)", 1, DeviceDetailOS),
+            UserAgentOS
+        ),
+        Browser = case(
+            Browser == "Other", iff(UserAgent != "-", extract(@"^([^\/\s]+)", 1, UserAgent), ""),
+            Browser
+        )
+    | extend
+        OperatingSystem = case(
+            OperatingSystem has "ios", "iOS",
+            OperatingSystem has_any ("mac", "macos"), "macOS",
+            OperatingSystem == "Ubuntu", "Linux",
+            Browser == "Samsung Internet", "Android",
+            Browser == "MacOutlook", "macOS",
+            OperatingSystem
+        )
+;
+let _MultipleUserAddresses = toscalar(
+    _DisabledAttempts
+    | summarize UserIds = make_set(UserId) by IPAddress
+    | where array_length(UserIds) > 1
+    | summarize make_list(IPAddress)
+);
+_DisabledAttempts
+| where not(not(IPAddress in (_MultipleUserAddresses)) and Location in (_ExpectedLocations) and AutonomousSystemNumber in (_ExpectedASNs) and (OperatingSystem in ("Android", "iOS") or isnotempty(DeviceTrustType)))
+| extend IPRange = parse_ipv6_mask(IPAddress, 128 - (32 - ipv4_prefix_mask))
+| extend HexCodes = split(extract(@"^(?i:0+\:0+\:0+\:0+\:0+\:ffff\:([a-f0-9]+\:[a-f0-9]+))$", 1, IPRange), ":")
+| extend
+    IPRange = todynamic(tostring(split(case(
+        array_length(HexCodes) == 2, format_ipv4_mask(tolong(strcat("0x", tostring(HexCodes[0])))*65536 + tolong(strcat("0x", tostring(HexCodes[1]))), ipv4_prefix_mask),
+        IPRange
+    ), "/", 0)))[0],
+    IPRangeAddressScope = case(
+        array_length(HexCodes) == 2, ipv4_prefix_mask,
+        128 - (32 - ipv4_prefix_mask)
+    )
+| project
+    TimeGenerated,
+    Category,
+    ResultType,
+    ResultDescription,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    AppDisplayName,
+    ResourceDisplayName,
+    ClientAppUsed,
+    UserAgent,
+    DeviceDetail,
+    DeviceId,
+    DeviceName,
+    DeviceIsManaged,
+    DeviceTrustType,
+    OperatingSystem,
+    Browser,
+    AutonomousSystemNumber,
+    IPRange,
+    IPRangeAddressScope,
+    UserId
