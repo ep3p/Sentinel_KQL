@@ -1,4 +1,7 @@
+
 # <p align="center">Sentinel KQL</p>
+<a href="https://learn.microsoft.com/en-us/azure/data-explorer/kusto/query/"><img src="https://img.shields.io/badge/Azure-KQL-00B2FF.svg?logo=microsoftazure&style=popout"></a>
+
 In this repository you may find KQL (Kusto Query Language) queries and Watchlist schemes for data sources related to Microsoft Sentinel (a SIEM tool).
 
 I will be commenting the queries in [this Twitter thread](https://twitter.com/ep3p/status/1556248792269066241).
