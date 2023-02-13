@@ -1,0 +1,12 @@
+let suspicious_subcategories = dynamic([
+    "Logoff",                       "0cce9216-69ae-11d9-bed3-505054503030",
+    "Account Lockout",              "0cce9217-69ae-11d9-bed3-505054503030",
+    "User Account Management",      "0cce9235-69ae-11d9-bed3-505054503030",
+    "Authorization Policy Change",  "0cce9231-69ae-11d9-bed3-505054503030"
+]);
+SecurityEvent
+//| where Process =~ "auditpol.exe" 
+| where (CommandLine has "auditpol" and CommandLine has @"/clear")
+    or (CommandLine has @"/remove" and CommandLine has_any (@"/user", @"/allusers"))
+    or (CommandLine has @"/set" and CommandLine has_any ("success:disable", "failure:disable"))// and  CommandLine has_any (suspicious_subcategories))
+| project TimeGenerated, Computer, Account, Activity, ParentProcessName, Process, CommandLine, SubjectLogonId
