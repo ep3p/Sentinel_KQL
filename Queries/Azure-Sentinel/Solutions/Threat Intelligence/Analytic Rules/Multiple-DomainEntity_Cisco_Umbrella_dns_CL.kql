@@ -66,15 +66,14 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
     _Indicators
     | join kind=inner hint.strategy=shuffle _TableEvents on Domain
     // Take only a single event by key columns
-    //| summarize hint.strategy=shuffle take_any(*) by Domain, Identities_s
+    //| summarize hint.strategy=shuffle take_any(*) by Domain, Identities
     | project
         Cisco_Umbrella_dns_CL_TimeGenerated,
         Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation,
         EventStartTime = todatetime(column_ifexists('Timestamp_t', column_ifexists('Timestamp_s', ''))),
         Dvc = "CiscoUmbrella",
         DvcAction = column_ifexists('Action_s', ''),
-        Identities_s,
-        Identity_Types_s,
+        QueryType_s,
         SrcIpAddr = column_ifexists('InternalIp_s', ''),
         SrcNatIpAddr = column_ifexists('ExternalIp_s', ''),
         DnsQuery = trim_end(@'\.', column_ifexists('Domain_s', '')),
@@ -85,22 +84,24 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         IdentityTypes = column_ifexists('Identity_Types_s', ''),
         Identities = column_ifexists('Identities_s', ''),
         PolicyIdentityType = column_ifexists('Policy_Identity_Type_s', ''),
-        PolicyIdentity = column_ifexists('Policy_Identity_s', '')                
+        PolicyIdentity = column_ifexists('Policy_Identity_s', '')
     | mv-apply
-        Identities_s_aux = todynamic(Identities_s) to typeof(string),
-        Identity_Types_s_aux = todynamic(Identity_Types_s) to typeof(string) on ( 
+        Identities_s_aux = todynamic(Identities) to typeof(string),
+        Identity_Types_s_aux = todynamic(IdentityTypes) to typeof(string) on ( 
         summarize IdentitiesDict = make_bag(pack(Identity_Types_s_aux, Identities_s_aux))
         )
     | extend
         HostName = tostring(IdentitiesDict["AD Computers"]),
         UserPrincipalName = tostring(IdentitiesDict["AD Users"])
+    | parse QueryType_s with DnsQueryType: int " (" DnsQueryTypeName: string ")"
+    | project-away QueryType_s, IdentitiesDict
 };
 union// isfuzzy=true
     // Match      current table events                                all indicators available
     _TITableMatch(ago(query_frequency + query_wait), ago(query_wait), false),
     // Match      past table events                                                          new indicators since last query execution
     _TITableMatch(ago(table_query_lookback + query_wait), ago(query_frequency + query_wait), true, ago(query_frequency))
-| summarize arg_max(Cisco_Umbrella_dns_CL_TimeGenerated, *) by IndicatorId, Identities_s
+| summarize arg_max(Cisco_Umbrella_dns_CL_TimeGenerated, *) by IndicatorId, Identities
 | extend
     timestamp = Cisco_Umbrella_dns_CL_TimeGenerated,
     HostCustomEntity = HostName,
