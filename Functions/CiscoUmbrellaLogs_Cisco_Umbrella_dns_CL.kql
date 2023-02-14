@@ -1,0 +1,35 @@
+// This query can help you to parse Cisco Umbrella DNS events received in Cisco_Umbrella_dns_CL table.
+Cisco_Umbrella_dns_CL
+| parse QueryType_s with DnsQueryType:int " (" DnsQueryTypeName:string ")"
+| extend
+    EventStartTime = todatetime(column_ifexists('Timestamp_t', column_ifexists('Timestamp_s',''))),
+    SrcIpAddr = column_ifexists('InternalIp_s', ''),
+    SrcNatIpAddr = column_ifexists('ExternalIp_s', ''),
+    DnsQuery = trim_end(@'\.', column_ifexists('Domain_s', '')),
+    EventResult = iff(ResponseCode_s =~ 'NOERROR', 'Success', 'Failure'),
+    EventResultDetails = ResponseCode_s,  // => ResponseCodeNames
+    DvcAction = column_ifexists('Action_s', ''),
+    UrlCategory = column_ifexists('Categories_s', ''),
+    ThreatCategory = column_ifexists('Blocked_Categories_s', ''),
+    PolicyIdentityType = column_ifexists('Policy_Identity_Type_s', ''),
+    PolicyIdentity = column_ifexists('Policy_Identity_s', ''),
+    Dvc = 'CiscoUmbrella'
+| mv-apply Identities_s_aux = todynamic(Identities_s) to typeof(string), Identity_Types_s_aux = todynamic(Identity_Types_s) to typeof(string) on ( 
+    summarize Identities = make_bag(bag_pack(Identity_Types_s_aux, Identities_s_aux))
+    )
+| project
+    EventStartTime,
+    Identities,
+    SrcIpAddr,
+    SrcNatIpAddr,
+    DnsQueryType,
+    DnsQueryTypeName,
+    DnsQuery,
+    EventResult,
+    EventResultDetails,
+    DvcAction,
+    UrlCategory,
+    ThreatCategory,
+    PolicyIdentityType,
+    PolicyIdentity,
+    Dvc
