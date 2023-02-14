@@ -1,0 +1,31 @@
+AuditLogs
+| where LoggedByService == "Core Directory" and Category == "ApplicationManagement" and OperationName has "owner"
+| mv-apply modifiedProperty = TargetResources[0]["modifiedProperties"] on (
+    summarize modifiedProperties = make_bag(
+        bag_pack(tostring(modifiedProperty["displayName"]),
+            bag_pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])),
+                "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
+    )
+| extend
+    OwnerId = TargetResources[0]["id"],
+    Owner = TargetResources[0]["userPrincipalName"],
+    AppDisplayName = tostring(modifiedProperties[case(OperationName has "application", "Application.DisplayName", OperationName has "service principal", "ServicePrincipal.DisplayName", "")][case(AADOperationType == "Assign", "newValue", AADOperationType == "Unassign", "oldValue", "")]),
+    AppId = tostring(modifiedProperties[case(OperationName has "application", "Application.AppId", OperationName has "service principal", "ServicePrincipal.AppId", "")]["newValue"]),
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| project
+    TimeGenerated,
+    Identity,
+    Initiator,
+    IPAddress,
+    OperationName,
+    Owner,
+    AppDisplayName,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    InitiatorId,
+    OwnerId,
+    AppId,
+    CorrelationId
