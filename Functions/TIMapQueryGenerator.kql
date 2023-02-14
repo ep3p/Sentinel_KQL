@@ -894,14 +894,13 @@
                 ``````
             ,
             "TableGroupByColumn":
-                ', Identities_s'
+                ', Identities'
             ,
             "TableColumns&LookUp":
                 ```EventStartTime = todatetime(column_ifexists('Timestamp_t', column_ifexists('Timestamp_s',''))),
                 Dvc = "CiscoUmbrella",
                 DvcAction = column_ifexists('Action_s', ''),
-                Identities_s,
-                Identity_Types_s,
+                QueryType_s,
                 SrcIpAddr = column_ifexists('InternalIp_s', ''),
                 SrcNatIpAddr = column_ifexists('ExternalIp_s', ''),
                 DnsQuery = trim_end(@'\.',column_ifexists('Domain_s', '')),
@@ -912,13 +911,15 @@
                 IdentityTypes = column_ifexists('Identity_Types_s', ''),
                 Identities = column_ifexists('Identities_s', ''),
                 PolicyIdentityType = column_ifexists('Policy_Identity_Type_s', ''),
-                PolicyIdentity = column_ifexists('Policy_Identity_s', '')                
-                | mv-apply Identities_s_aux = todynamic(Identities_s) to typeof(string), Identity_Types_s_aux = todynamic(Identity_Types_s) to typeof(string) on ( 
-                    summarize IdentitiesDict = make_bag(pack(Identity_Types_s_aux, Identities_s_aux))
-                    )
-                | extend
-                    HostName = tostring(IdentitiesDict["AD Computers"]),
-                    UserPrincipalName = tostring(IdentitiesDict["AD Users"])```
+                PolicyIdentity = column_ifexists('Policy_Identity_s', '')
+            | mv-apply Identities_s_aux = todynamic(Identities) to typeof(string), Identity_Types_s_aux = todynamic(IdentityTypes) to typeof(string) on ( 
+                summarize IdentitiesDict = make_bag(pack(Identity_Types_s_aux, Identities_s_aux))
+                )
+            | extend
+                HostName = tostring(IdentitiesDict["AD Computers"]),
+                UserPrincipalName = tostring(IdentitiesDict["AD Users"])
+            | parse QueryType_s with DnsQueryType:int " (" DnsQueryTypeName:string ")"
+            | project-away QueryType_s, IdentitiesDict```
             ,
             "TableCustomEntityExtend":
                 ```,
