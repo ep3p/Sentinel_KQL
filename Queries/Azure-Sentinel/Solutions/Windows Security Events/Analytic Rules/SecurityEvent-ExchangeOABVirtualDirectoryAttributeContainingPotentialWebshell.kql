@@ -1,0 +1,30 @@
+SecurityEvent
+| where EventID == 5136
+    and EventData has_all ("msExchOABVirtualDirectory", "script")
+    and EventData has_any ("msExchExternalHostName", "msExchInternalHostName")
+| project
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    SubjectLogonId,
+    Activity,
+    OperationType,
+    EventData
+| mv-apply Auxiliar = parse_xml(EventData)["EventData"]["Data"] on (
+    summarize BagToUnpack = make_bag(bag_pack(tostring(Auxiliar["@Name"]), tostring(Auxiliar["#text"])))
+    )
+| evaluate bag_unpack(BagToUnpack, OutputColumnPrefix = "EventData_", columnsConflict="keep_source")
+| where column_ifexists("EventData_ObjectClass", "") has "msExchOABVirtualDirectory"
+    and column_ifexists("EventData_AttributeLDAPDisplayName", "") has_any ("msExchExternalHostName", "msExchInternalHostName")
+    and column_ifexists("EventData_AttributeValue", "") has "script"
+| project-reorder
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    SubjectLogonId,
+    Activity,
+    OperationType,
+    EventData,
+    EventData_*
