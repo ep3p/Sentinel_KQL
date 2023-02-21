@@ -15,6 +15,7 @@
 //  bool     nat_log               true
 //  bool     ids_log               true
 //  bool     threatintel_log       true
+//  string   firewall              ""
 //  string   policy                ""
 //  string   rule_collection_group ""
 //  string   rule_collection       ""
@@ -38,6 +39,7 @@
 //     nat_log:bool = true,
 //     ids_log:bool = true,
 //     threatintel_log:bool = true,
+//     firewall:string = "",
 //     policy:string = "",
 //     rule_collection_group:string = "",
 //     rule_collection:string = "",
@@ -92,6 +94,7 @@ AzureDiagnostics
 | where ResourceProvider has "MICROSOFT.NETWORK"
     and ResourceType has "AZUREFIREWALLS"
     and Category has_any ("AzureFirewallNetworkRule","AzureFirewallApplicationRule")
+| where isempty(firewall) or Resource has firewall
 | project TimeGenerated, Category, OperationName, msg_s, ResourceId
 // Filter by OperationName
 | where all_logs or not(OperationName has_any (removed_logs))
@@ -112,7 +115,7 @@ AzureDiagnostics
 | where case(
     isempty(destination), true,
     is_destination_ipv4, destination_ipv4_netmask < 16 or has_any_ipv4_prefix(msg_s, destination_search_terms),
-    not(is_destination_ipv4), msg_s has destination, 
+    not(is_destination_ipv4), msg_s has destination,
     false
     )
 // Parse msg_s
