@@ -64,4 +64,4 @@ let _UmbrellaQueries = (start_time: datetime, end_time: datetime) {
         PolicyIdentity
 };
 _UmbrellaQueries(ago(query_frequency), now())
-| join kind=leftanti _UmbrellaQueries(ago(query_period), ago(query_frequency)) on DnsQuery
+| join kind=leftanti _UmbrellaQueries(ago(query_period), ago(query_frequency)) on SLD
