@@ -1,0 +1,80 @@
+let query_frequency = 1d;
+let query_period = 14d;
+let suspicious_categories = dynamic([
+    "Child Abuse Content",
+    "Dating",
+    "Gambling",
+    "German Youth Protection",
+    "Hate Speech",
+    "Hate/Discrimination",
+    "Illegal Activities",
+    "Illegal Downloads",
+    "P2P/File sharing",
+    "Peer File Transfer",
+    "Pornography",
+    "Sexuality",
+    "Tasteless",
+    "Terrorism"
+    //"Terrorism and Violent Extremism"
+]);
+let excluding_categories = dynamic([
+    "Blogs"
+]);
+let _StringToRegEx = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "StringToRegEx"
+    | project RegEx
+);
+let _ExpectedBlockedDomainsPartial = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ExpectedBlockedDomain" and Notes has "[PartialDomain]"
+    | project RegEx = replace_regex(DestinationAddress, _StringToRegEx, @"\\\1")
+    | summarize RegEx = make_list(RegEx)
+    | extend RegEx = strcat(@'\.(', strcat_array(RegEx, '|'), @')$')
+);
+let _ExpectedBlockedDomainsComplete = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ExpectedBlockedDomain" and Notes has "[CompleteDomain]"
+    | summarize make_list(DestinationAddress)
+);
+let _UmbrellaQueries = (start_time: datetime, end_time: datetime) {
+    CiscoUmbrellaLogs
+    | where EventStartTime between (start_time .. end_time)
+    | where UrlCategory has_any (suspicious_categories) and not(UrlCategory has_any (excluding_categories))
+    | where not(DnsQuery in (_ExpectedBlockedDomainsComplete))
+    | where not(DnsQuery matches regex _ExpectedBlockedDomainsPartial)
+    | extend
+        HostName = tostring(Identities["AD Computers"]),
+        UserPrincipalName = tostring(Identities["AD Users"])
+    | summarize
+        StartTime = min(EventStartTime),
+        EndTime = max(EventStartTime),
+        EventCount = count(),
+        HostNames = make_set(HostName),
+        UserPrincipalNames = make_set(UserPrincipalName),
+        SrcIpAddrs = make_set(SrcIpAddr),
+        SrcNatIpAddrs = make_set(SrcNatIpAddr),
+        DnsQueryTypeNames = make_set(DnsQueryTypeName),
+        take_any(EventResult, UrlCategory, ThreatCategory)
+        by EventResultDetails, DvcAction, DnsQuery, PolicyIdentityType, PolicyIdentity
+    | project
+        StartTime,
+        EndTime,
+        EventCount,
+        HostNames,
+        UserPrincipalNames,
+        SrcIpAddrs,
+        SrcNatIpAddrs,
+        DnsQueryTypeNames,
+        DnsQuery,
+        SLD = strcat_array(array_slice(split(DnsQuery, "."), -2, -1), "."),
+        EventResult,
+        EventResultDetails,
+        DvcAction,
+        UrlCategory,
+        ThreatCategory,
+        PolicyIdentityType,
+        PolicyIdentity
+};
+_UmbrellaQueries(ago(query_frequency), now())
+| join kind=leftanti _UmbrellaQueries(ago(query_period), ago(query_frequency)) on SLD
