@@ -1,0 +1,19 @@
+AuditLogs
+| where LoggedByService == "PIM" and OperationName has_all ("disable", "alert")
+| extend
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| project
+    TimeGenerated,
+    Category,
+    Initiator,
+    IPAddress,
+    OperationName,
+    Result,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    LoggedByService,
+    InitiatorId,
+    CorrelationId
