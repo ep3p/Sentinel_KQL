@@ -1,0 +1,29 @@
+AuditLogs
+| where LoggedByService == "Conditional Access"// and Category == "Policy" and Result == "success"
+| extend
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| mv-expand TargetResource = TargetResources
+| extend
+    ResourceName = tostring(TargetResource["displayName"]),
+    ResourceType = tostring(TargetResource["modifiedProperties"][0]["displayName"]),
+    ResourceOldValue = TargetResource["modifiedProperties"][0]["oldValue"],
+    ResourceNewValue = TargetResource["modifiedProperties"][0]["newValue"]
+| project
+    TimeGenerated,
+    Category,
+    Initiator,
+    IPAddress,
+    OperationName,
+    Result,
+    ResourceType,
+    ResourceName,
+    ResourceOldValue,
+    ResourceNewValue,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    LoggedByService,
+    InitiatorId,
+    CorrelationId
