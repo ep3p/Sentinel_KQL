@@ -1,0 +1,100 @@
+let _ResultCodeTable = datatable(ResultCode:int, EventResultDetails:string)[
+   0,   'NOERROR'
+ , 1,   'FORMERR'
+ , 2,   'SERVFAIL'
+ , 3,   'NXDOMAIN'
+ , 4,   'NOTIMP'
+ , 5,   'REFUSED'
+ , 6,   'YXDOMAIN'
+ , 7,   'YXRRSET'
+ , 8,   'NXRRSET'
+ , 9,   'NOTAUTH'
+ , 10,  'NOTZONE'
+ , 11,  'DSOTYPENI'
+ , 16,  'BADVERS'
+ , 16,  'BADSIG'
+ , 17,  'BADKEY'
+ , 18,  'BADTIME'
+ , 19,  'BADMODE'
+ , 20,  'BADNAME'
+ , 21,  'BADALG'
+ , 22,  'BADTRUNC'
+ , 23,  'BADCOOKIE'
+];
+let _IPv4Regex = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "Threat Intelligence Indicator IPv4"
+    | project RegEx
+);
+let _IPv6Regex = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "Threat Intelligence Indicator IPv6"
+    | project RegEx
+);
+let _ExpectedIPAddressDNSQueries = toscalar(
+    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    | where Activity == "IPAddressDNSQuery"
+    | summarize make_list(Auxiliar)
+);
+let _WindowsDNSEvents =
+    DnsEvents
+    | extend QueriedIPAddress = extract(strcat(@"(", _IPv4Regex, @"|", _IPv6Regex, @")$"), 1, Name)
+    | where not(isempty(QueriedIPAddress) or ipv4_is_private(QueriedIPAddress) or QueriedIPAddress == "127.0.0.1")
+    | lookup _ResultCodeTable on ResultCode
+    | project
+        TimeGenerated,
+        SrcIpAddr = ClientIP,
+        DnsQueryTypeName = QueryType,
+        DnsQuery = Name,
+        EventResult = iff(EventResultDetails =~ 'NOERROR', 'Success', 'Failure'),
+        EventResultDetails,
+        DnsResponseName = IPAddresses,
+        Dvc = Computer,
+        Type
+;
+let _UmbrellaDNSEvents =
+    Cisco_Umbrella_dns_CL
+    | extend QueriedIPAddress = extract(strcat(@"(", _IPv4Regex, @"|", _IPv6Regex, @")\.$"), 1, Domain_s)
+    | where not(isempty(QueriedIPAddress) or ipv4_is_private(QueriedIPAddress) or QueriedIPAddress == "127.0.0.1")
+    | parse QueryType_s with DnsQueryType:int " (" DnsQueryTypeName:string ")"
+    | mv-apply Identities_s_aux = todynamic(Identities_s) to typeof(string), Identity_Types_s_aux = todynamic(Identity_Types_s) to typeof(string) on ( 
+        summarize Identities = make_bag(bag_pack(Identity_Types_s_aux, Identities_s_aux))
+        )
+    | project
+        TimeGenerated = todatetime(column_ifexists('Timestamp_t', column_ifexists('Timestamp_s',''))),
+        Identities,
+        SrcIpAddr = column_ifexists('InternalIp_s', ''),
+        SrcNatIpAddr = column_ifexists('ExternalIp_s', ''),
+        DnsQueryType,
+        DnsQueryTypeName,
+        DnsQuery = trim_end(@'\.', column_ifexists('Domain_s', '')),
+        EventResult = iff(ResponseCode_s =~ 'NOERROR', 'Success', 'Failure'),
+        EventResultDetails = ResponseCode_s,  // => ResponseCodeNames
+        DvcAction = column_ifexists('Action_s', ''),
+        UrlCategory = column_ifexists('Categories_s', ''),
+        ThreatCategory = column_ifexists('Blocked_Categories_s', ''),
+        PolicyIdentityType = column_ifexists('Policy_Identity_Type_s', ''),
+        PolicyIdentity = column_ifexists('Policy_Identity_s', ''),
+        Dvc = 'CiscoUmbrella',
+        Type
+;
+union _WindowsDNSEvents, _UmbrellaDNSEvents
+| where not(DnsQuery in (_ExpectedIPAddressDNSQueries))
+| project
+    TimeGenerated,
+    Identities,
+    SrcIpAddr,
+    SrcNatIpAddr,
+    DnsQueryType,
+    DnsQueryTypeName,
+    DnsQuery,
+    EventResult,
+    EventResultDetails,
+    DnsResponseName,
+    DvcAction,
+    UrlCategory,
+    ThreatCategory,
+    PolicyIdentityType,
+    PolicyIdentity,
+    Dvc,
+    Type
