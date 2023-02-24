@@ -13,6 +13,7 @@
 //let query_frequency = 1h;
 //let query_period = 14d; // A CorrelationId can extend over several weeks
 //let Function = (query_frequency:timespan = 1h, query_period:timespan = 14d){
+let mfa_denied_key_strings = dynamic(["MFA denied", "SuspiciousActivityReported"]);
 let unreported_denied_message_types = dynamic([
     "MFA denied; user did not respond to mobile app notification",
     "MFA denied; invalid authentication",
@@ -40,6 +41,7 @@ let _ExpectedIPRanges = toscalar(
     union
         (_GetWatchlist("IP-Vendors")
         | where Vendor == "Microsoft"
+            or (Vendor == "SymantecWSS")
         ),
         (_GetWatchlist("IP-CorporateCollaborators")
         )
@@ -52,7 +54,7 @@ let _ExpectedDomain = toscalar(
 );
 let _CorrelationIds = toscalar(
     SigninLogs
-    | where TimeGenerated > ago(query_frequency) and (AuthenticationDetails has "MFA denied;" or Status has "MFA denied;" or ResultType == "500121")
+    | where TimeGenerated > ago(query_frequency) and (AuthenticationDetails has_any (mfa_denied_key_strings) or Status has_any (mfa_denied_key_strings) or ResultType == "500121")
     | summarize make_set(CorrelationId)
 );
 SigninLogs
@@ -233,7 +235,7 @@ SigninLogs
                 UsedRequestSequences = iff(isnotempty(RequestSequence), array_concat(Step1.UsedRequestSequences, pack_array(RequestSequence)), Step1.UsedRequestSequences),
                 SuccessMethods = iff(succeeded and not(Step1.SuccessMethods has authenticationMethod), array_concat(Step1.SuccessMethods, pack_array(authenticationMethod)), Step1.SuccessMethods),
                 SuccessMethodDetails = iff(succeeded and isnotempty(authenticationMethodDetail) and not(Step1.SuccessMethodDetails has authenticationMethodDetail), array_concat(Step1.SuccessMethodDetails, pack_array(authenticationMethodDetail)), Step1.SuccessMethodDetails),
-                DeniedResults = iff(authenticationStepResultDetail has "MFA denied" and not(authenticationStepResultDetail has "duplicate authentication attempt"), array_concat(Step1.DeniedResults, pack_array(authenticationStepResultDetail)), Step1.DeniedResults),
+                DeniedResults = iff(authenticationStepResultDetail has_any (mfa_denied_key_strings) and not(authenticationStepResultDetail has "duplicate authentication attempt"), array_concat(Step1.DeniedResults, pack_array(authenticationStepResultDetail)), Step1.DeniedResults),
                 minauthenticationStepDateTime = iff(isempty(Step1.minauthenticationStepDateTime), authenticationStepDateTime, min_of(Step1.minauthenticationStepDateTime, authenticationStepDateTime)),
                 maxauthenticationStepDateTime = iff(isempty(Step1.maxauthenticationStepDateTime), authenticationStepDateTime, max_of(Step1.maxauthenticationStepDateTime, authenticationStepDateTime))
         ;
