@@ -21,9 +21,10 @@ let unreported_denied_message_types = dynamic([
     "MFA denied; Verification code already used"
 ]);
 // Other messages:
-//  MFA denied; user declined the authentication
-//  MFA denied; Phone App Reported Fraud
-//  MFA denied; Verification code already used
+//     MFA denied; duplicate authentication attempt
+//     MFA denied; user declined the authentication
+//     MFA denied; Phone App Reported Fraud
+//     MFA denied; user is blocked
 let _SuccessResultTypes = toscalar( // "0","50140", "50199"
     _GetWatchlist('ResultType-SignInLogsErrorCodes')
     | where Notes has_all ("[Success]", "[Complete]") and isnotempty(ResultDescription)
