@@ -1,0 +1,75 @@
+let query_frequency = 5m;
+let query_period = 2d;
+AADUserRiskEvents
+| where TimeGenerated > ago(query_period)
+| where OperationName == "User Risk Detection" and Source == "EndUserReported" and RiskEventType == "userReportedSuspiciousActivity"
+| summarize arg_max(TimeGenerated, *) by Id
+| project
+    //TimeGenerated,
+    OperationName,
+    Source,
+    Activity,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    RiskEventType,
+    RiskState,
+    RiskDetail,
+    RiskLevel
+| as _Events
+| lookup kind=leftouter (
+    (SigninLogs
+    | where TimeGenerated > ago(query_period)
+    | where AuthenticationDetails has "SuspiciousActivityReported" or Status has "SuspiciousActivityReported"
+    | where UserId in (toscalar(_Events | summarize make_list(UserId)))
+    | extend
+        DeviceDetail = tostring(DeviceDetail),
+        TimeReceived = _TimeReceived
+    )
+    | summarize
+        arg_max(TimeReceived, *)
+        by OriginalRequestId
+    | project
+        TimeGenerated,
+        Type,
+        // UserPrincipalName,
+        // UserDisplayName,
+        IPAddress,
+        Location,
+        ResultType,
+        ResultDescription,
+        ClientAppUsed,
+        AppDisplayName,
+        ResourceDisplayName,
+        DeviceDetail,
+        UserAgent,
+        AuthenticationDetails,
+        UserId,
+        OriginalRequestId,
+        CorrelationId
+    ) on UserId
+| project
+    TimeGenerated,
+    OperationName,
+    Source,
+    Activity,
+    UserDisplayName,
+    UserPrincipalName,
+    RiskEventType,
+    RiskState,
+    RiskDetail,
+    RiskLevel,
+    Type,
+    IPAddress,
+    Location,
+    ResultType,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    AuthenticationDetails,
+    UserId,
+    OriginalRequestId,
+    CorrelationId
