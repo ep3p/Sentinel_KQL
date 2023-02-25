@@ -30,8 +30,9 @@ let _ImpossibleTravelAlerts = materialize(
         AlertLink
     | lookup kind=leftouter
         (AADUserRiskEvents
-        | summarize arg_max(TimeGenerated, *) by Id
+        | where TimeGenerated > ago(query_period)
         | where OperationName == "User Risk Detection" and Source == "MicrosoftCloudAppSecurity" and RiskEventType == "mcasImpossibleTravel"
+        | summarize arg_max(TimeGenerated, *) by Id
         | mv-apply Auxiliar_AdditionalInfo = AdditionalInfo on (
             where Auxiliar_AdditionalInfo["Key"] == "alertUrl"
             | extend AlertLink = tostring(Auxiliar_AdditionalInfo["Value"])
