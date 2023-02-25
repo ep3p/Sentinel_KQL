@@ -95,8 +95,7 @@ let _UntrustedUserIds = toscalar(
 );
 _ImpossibleTravelAlerts
 | extend RecentlyConfiguredMFA = UserId in (_UntrustedUserIds)
-| extend
-    BenignAlert = case(
+| extend BenignAlert = case(
         // Remove cases where Defender for Cloud Apps considers the alert solved and the account had MFA configured long ago
         RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed" and not(RecentlyConfiguredMFA), true,
         false
