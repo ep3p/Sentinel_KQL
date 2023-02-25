@@ -1,0 +1,150 @@
+let query_frequency = 5m;
+let query_period = 2d;
+let _HomeTenantDomains = toscalar(
+    _GetWatchlist("UUID-AADTenantIds")
+    | where Notes has "[HomeTenant]"
+    | summarize make_list(Domain)
+);
+let _UntrustedResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has "[MFA]" and Notes has_any ("[Unconfigured]", "[NotCompliant]")
+    | summarize make_list(ResultType)
+);
+let _InfrequentCountryAlerts = materialize(
+    SecurityAlert
+    | where TimeGenerated > ago(query_frequency)
+    | where ProductName has "Microsoft Cloud App Security" and AlertName has "Activity from infrequent country"
+    //| where CompromisedEntity has_any (_HomeTenantDomains)
+    | extend ExtendedProperties = todynamic(ExtendedProperties)
+    | project
+        Alert_TimeGenerated = TimeGenerated,
+        ProductName,
+        AlertName,
+        Description,
+        AlertSeverity,
+        Status,
+        Tactics,
+        Techniques,
+        Entities,
+        ExtendedProperties,
+        AlertLink
+    | lookup kind=leftouter
+        (AADUserRiskEvents
+        | where TimeGenerated > ago(query_period)
+        | where OperationName == "User Risk Detection" and Source == "MicrosoftCloudAppSecurity" and RiskEventType == "newCountry"
+        | summarize arg_max(TimeGenerated, *) by Id
+        | mv-apply Auxiliar_AdditionalInfo = AdditionalInfo on (
+            where Auxiliar_AdditionalInfo["Key"] == "alertUrl"
+            | extend AlertLink = tostring(Auxiliar_AdditionalInfo["Value"])
+            )
+        | project
+            //TimeGenerated,
+            UserDisplayName,
+            UserPrincipalName,
+            UserId,
+            AdditionalInfo,
+            OriginalRequestId = RequestId,
+            CorrelationId,
+            RiskDetail,
+            RiskLevel,
+            RiskState,
+            AlertLink
+        ) on AlertLink
+    | as _Alerts
+    | lookup kind=leftouter (
+        union
+            (SigninLogs
+            | where TimeGenerated > ago(query_period)
+            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+            | extend
+                DeviceDetail = tostring(DeviceDetail),
+                TimeReceived = _TimeReceived
+            ),
+            (AADNonInteractiveUserSignInLogs
+            | where TimeGenerated > ago(query_period)
+            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+            | extend TimeReceived = _TimeReceived
+            )
+        | summarize
+            arg_max(TimeReceived, *),
+            MFASuccess_TimeGenerated = minif(TimeGenerated, ConditionalAccessStatus == "success" and AuthenticationRequirement == "multiFactorAuthentication")
+            by OriginalRequestId
+        | project
+            MFASuccess_TimeGenerated,
+            TimeGenerated,
+            Type,
+            //UserPrincipalName,
+            //UserDisplayName,
+            IPAddress,
+            Location,
+            ResultType,
+            ResultDescription,
+            ClientAppUsed,
+            AppDisplayName,
+            ResourceDisplayName,
+            DeviceDetail,
+            UserAgent,
+            AuthenticationDetails,
+            RiskEventTypes,
+            RiskLevelDuringSignIn,
+            RiskLevelAggregated,
+            //UserId,
+            OriginalRequestId//,
+            //CorrelationId
+        )
+        on OriginalRequestId
+);
+let _UntrustedUserIds = toscalar(
+    union
+        (_InfrequentCountryAlerts
+        | join kind=innerunique (
+            SigninLogs
+            | where TimeGenerated > ago(query_period)
+            | where ResultType in (_UntrustedResultTypes)
+            | project UserId
+            )
+            on UserId
+        ),
+        (AuthenticationMethodChanges(query_period, toscalar(_InfrequentCountryAlerts | summarize make_set(UserId)), false)
+        )
+    | summarize make_set(UserId)
+);
+_InfrequentCountryAlerts
+| extend RecentlyConfiguredMFA = UserId in (_UntrustedUserIds)
+| extend BenignAlert = case(
+        // Remove cases where Defender for Cloud Apps considers the alert solved and the account had MFA configured long ago
+        RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed" and not(RecentlyConfiguredMFA), true,
+        false
+    )
+| where not(BenignAlert and AlertSeverity != "High")
+| project
+    TimeGenerated,
+    ProductName,
+    AlertName,
+    Description,
+    AlertLink,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    OriginalRequestId,
+    CorrelationId,
+    AdditionalInfo,
+    ExtendedProperties,
+    Entities,
+    AlertSeverity,
+    Tactics,
+    Techniques,
+    Type,
+    IPAddress,
+    Location,
+    ResultType,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    AuthenticationDetails,
+    RiskEventTypes,
+    RiskLevelDuringSignIn,
+    RiskLevelAggregated
