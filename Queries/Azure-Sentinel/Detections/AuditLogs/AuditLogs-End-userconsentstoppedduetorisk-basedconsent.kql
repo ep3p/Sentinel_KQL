@@ -1,0 +1,42 @@
+AuditLogs
+| where OperationName has "Consent to application" and Result == "failure" and ResultReason has "UserConsentBlockedForRiskyAppsException"
+| extend
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| mv-expand TargetResource = TargetResources
+//| where TargetResource["type"] == "Application"
+| extend
+    AppDisplayName = tostring(TargetResource["displayName"])
+| mv-apply modifiedProperty = TargetResource["modifiedProperties"] on (
+    summarize BagToUnpack = make_bag(pack(tostring(modifiedProperty["displayName"]), pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])), "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
+    )
+| evaluate bag_unpack(BagToUnpack, columnsConflict='replace_source')
+| extend
+    AdminConsent = tostring(column_ifexists("ConsentContext.IsAdminConsent", dynamic(null))["newValue"]),
+    OnBehalfOfAllUsers = tostring(column_ifexists("ConsentContext.OnBehalfOfAll", dynamic(null))["newValue"]),
+    ActionReason = tostring(column_ifexists("ConsentAction.Reason", dynamic(null))["newValue"]),
+    Permissions = extract_all(@"PrincipalId: ([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?, ResourceId: ([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}), ConsentType:\s+(\w+), Scope:\s+([^,]+)", extract(@"\=\>\s+(.*)", 1, tostring(column_ifexists("ConsentAction.Permissions", dynamic(null))["newValue"])))
+| mv-apply Permissions on (
+    extend PermissionsDict = bag_pack("ConsentType", tostring(Permissions[2]), "TargetId", tostring(Permissions[0]), "PermissionsResourceId", tostring(Permissions[1]), "Scope", array_sort_asc(split(Permissions[3], ' ')))
+    | summarize Permissions = make_list(PermissionsDict)
+    )
+| extend Target = iff(InitiatorId == Permissions[0]["TargetId"], Initiator, "")
+| project
+    TimeGenerated,
+    Initiator,
+    IPAddress,
+    OperationName,
+    Target,
+    Result,
+    ResultReason,
+    ActionReason,
+    AppDisplayName,
+    Permissions,
+    AdminConsent,
+    OnBehalfOfAllUsers,
+    InitiatorId,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    CorrelationId
