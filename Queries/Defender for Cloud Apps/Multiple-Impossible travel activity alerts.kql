@@ -102,6 +102,7 @@ _ImpossibleTravelAlerts
     )
 | where not(BenignAlert and AlertSeverity != "High")
 | project
+    Alert_TimeGenerated,
     TimeGenerated,
     ProductName,
     AlertName,
