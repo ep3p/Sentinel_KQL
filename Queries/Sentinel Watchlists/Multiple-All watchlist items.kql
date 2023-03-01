@@ -1,0 +1,9 @@
+union isfuzzy=true Watchlist, ConfidentialWatchlist
+| where TimeGenerated < now()
+| where _DTItemType == 'watchlist-item'
+| summarize hint.shufflekey=_DTItemId arg_max(_DTTimestamp, _DTItemStatus, LastUpdatedTimeUTC, SearchKey, WatchlistItem, WatchlistAlias) by _DTItemId
+| where _DTItemStatus != 'Delete'
+| sort by WatchlistAlias asc, LastUpdatedTimeUTC asc
+| project-away _DTTimestamp, _DTItemStatus, _DTItemId, LastUpdatedTimeUTC
+| evaluate bag_unpack(WatchlistItem)
+| project-reorder WatchlistAlias, SearchKey
