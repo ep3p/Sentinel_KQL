@@ -1,0 +1,112 @@
+let query_frequency = 1d;
+let query_period = 2d;
+let distinct_domain_threshold = 10;
+let _ExcludedIPAddresses = toscalar(
+    _GetWatchlist('Service-PrivateCorporateServices')
+    | where Notes has "[NXDOMAINDnsQuery]"
+    | summarize make_list(IPAddress)
+);
+let _DomainRegex = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "Threat Intelligence Indicator Domain"
+    | project RegEx
+);
+let _StringToRegEx = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "StringToRegEx"
+    | project RegEx
+);
+let _BenignDomainRegex = toscalar(
+    (union isfuzzy=true
+        _GetWatchlist("Domain-RareBenignDomains"),
+        _GetWatchlist("Domain-PrivDomains")
+    )
+    | project RegEx = replace_regex(Domain, _StringToRegEx, @"\\\1")
+    | summarize RegEx = make_set(RegEx)
+);
+let _PastWindowsDNSEvents =
+    DnsEvents
+    | where TimeGenerated between (ago(query_period)..ago(query_frequency))
+    | where ResultCode == 3 and not(QueryType in ("DNAME", "33", "64", "65", "249")) and not(ClientIP in (_ExcludedIPAddresses))
+    | where not(Name matches regex strcat(@'(?i)(', strcat_array(_BenignDomainRegex, '|'), @')(?-i)$'))
+    | where Name matches regex strcat(_DomainRegex, @"$")
+    | distinct
+        SrcIpAddr = ClientIP,
+        DnsQueryTypeName = QueryType,
+        SLD = tolower(strcat_array(array_slice(split(Name, "."), -2, -1), "."))
+;
+let _PastUmbrellaDNSEvents =
+    Cisco_Umbrella_dns_CL
+    | where TimeGenerated between (ago(query_period)..ago(query_frequency))
+    | where ResponseCode_s == "NXDOMAIN" and not(QueryType_s has_any ("PTR", "SRV", "SOA")) and not(InternalIp_s == ExternalIp_s)
+    | where not(Domain_s matches regex strcat(@'(?i)(', strcat_array(_BenignDomainRegex, '|'), @')(?-i)\.$'))
+    | where Domain_s matches regex strcat(_DomainRegex, @"\.$")
+    | distinct
+        SrcIpAddr = InternalIp_s,
+        QueryType_s,
+        SLD = strcat_array(array_slice(split(Domain_s, "."), -3, -2), ".")
+    | parse QueryType_s with DnsQueryType:int " (" DnsQueryTypeName:string ")"
+    | project
+        SrcIpAddr,
+        DnsQueryTypeName,
+        SLD
+;
+let _CurrentWindowsDNSEvents =
+    DnsEvents
+    | where TimeGenerated between (ago(query_frequency)..now())
+    | where ResultCode == 3 and not(QueryType in ("DNAME", "33", "64", "65", "249")) and not(ClientIP in (_ExcludedIPAddresses))
+    | where not(Name matches regex strcat(@'(?i)(', strcat_array(_BenignDomainRegex, '|'), @')(?-i)$'))
+    | where Name matches regex strcat(_DomainRegex, @"$")
+    | project
+        TimeGenerated,
+        SrcIpAddr = ClientIP,
+        DnsQueryTypeName = QueryType,
+        DnsQuery = Name,
+        SLD = tolower(strcat_array(array_slice(split(Name, "."), -2, -1), "."))
+;
+let _CurrentUmbrellaDNSEvents =
+    Cisco_Umbrella_dns_CL
+    | where TimeGenerated between (ago(query_frequency)..now())
+    | where ResponseCode_s == "NXDOMAIN" and not(QueryType_s has_any ("PTR", "SRV", "SOA")) and not(InternalIp_s == ExternalIp_s)
+    | where not(Domain_s matches regex strcat(@'(?i)(', strcat_array(_BenignDomainRegex, '|'), @')(?-i)\.$'))
+    | where Domain_s matches regex strcat(_DomainRegex, @"\.$")
+    | parse QueryType_s with DnsQueryType:int " (" DnsQueryTypeName:string ")"
+    | mv-apply Identities_s_aux = todynamic(Identities_s) to typeof(string), Identity_Types_s_aux = todynamic(Identity_Types_s) to typeof(string) on ( 
+        summarize Identities = make_bag(bag_pack(Identity_Types_s_aux, Identities_s_aux))
+        )
+    | project
+        TimeGenerated = todatetime(column_ifexists('Timestamp_t', column_ifexists('Timestamp_s',''))),
+        Identities,
+        SrcIpAddr = column_ifexists('InternalIp_s', ''),
+        SrcNatIpAddr = column_ifexists('ExternalIp_s', ''),
+        DnsQueryTypeName,
+        DnsQuery = trim_end(@'\.', column_ifexists('Domain_s', '')),
+        SLD = strcat_array(array_slice(split(Domain_s, "."), -3, -2), ".")
+;
+union _CurrentWindowsDNSEvents, _CurrentUmbrellaDNSEvents
+| join kind=leftanti
+    (union _PastWindowsDNSEvents, _PastUmbrellaDNSEvents)
+    on SrcIpAddr, DnsQueryTypeName, SLD
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Identities = make_set(Identities, 5),
+    take_any(SrcNatIpAddr),
+    DnsQueryTypeNames = array_sort_asc(make_set(DnsQueryTypeName)),
+    SLDSample = make_set(SLD, 100),
+    SLDDistinctCount = dcount(SLD),
+    DnsQuerySample = make_set(DnsQuery, 150),
+    DnsQueryDistinctCount = dcount(DnsQuery)
+    by SrcIpAddr
+| where DnsQueryDistinctCount > distinct_domain_threshold or SLDDistinctCount > distinct_domain_threshold
+| project
+    StartTime,
+    EndTime,
+    Identities,
+    SrcIpAddr,
+    SrcNatIpAddr,
+    DnsQueryTypeNames,
+    SLDDistinctCount,
+    SLDSample,
+    DnsQueryDistinctCount,
+    DnsQuerySample
