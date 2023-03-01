@@ -3,7 +3,7 @@ OfficeActivity
 | mv-apply Parameter = todynamic(Parameters) on (
     summarize ParsedParameters = make_bag(bag_pack(tostring(Parameter["Name"]), tostring(Parameter["Value"])))
     )
-| where bag_has_key(ParsedParameters, "AdminAuditLogEnabled") and ParsedParameters["AdminAuditLogEnabled"] != "True"
+| where bag_has_key(ParsedParameters, "AdminAuditLogEnabled") and not(ParsedParameters["AdminAuditLogEnabled"] == "True")
 | project
     TimeGenerated,
     OfficeWorkload,
