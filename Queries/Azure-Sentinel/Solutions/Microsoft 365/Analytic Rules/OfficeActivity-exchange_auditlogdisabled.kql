@@ -1,0 +1,16 @@
+OfficeActivity
+| where Operation has "AdminAuditLogConfig"
+| mv-apply Parameter = todynamic(Parameters) on (
+    summarize ParsedParameters = make_bag(bag_pack(tostring(Parameter["Name"]), tostring(Parameter["Value"])))
+    )
+| where bag_has_key(ParsedParameters, "AdminAuditLogEnabled") and ParsedParameters["AdminAuditLogEnabled"] != "True"
+| project
+    TimeGenerated,
+    OfficeWorkload,
+    RecordType,
+    UserType,
+    UserId,
+    Operation,
+    ResultStatus,
+    OfficeObjectId,
+    Parameters
