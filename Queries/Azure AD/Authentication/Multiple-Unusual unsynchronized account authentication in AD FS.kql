@@ -1,6 +1,6 @@
-let query_frequency = 1d;
+let query_frequency = 2d;
 let query_period = 14d;
-let synchronization_wait = 10m;
+let synchronization_wait = 1h;
 ADFSSignInLogs
 | where ingestion_time() > ago(query_frequency)
 | where UserId == "00000000-0000-0000-0000-000000000000"
@@ -13,11 +13,10 @@ ADFSSignInLogs
 | summarize arg_min(TimeGenerated, *) by UserPrincipalName
 | lookup kind=leftouter (
     AuditLogs
-    | where Category == "UserManagement" and OperationName == "Restore user" and Result == "success"
+    | where TimeGenerated > ago(query_frequency)
+    | where Category == "UserManagement" and OperationName in ("Add user", "Restore user") and Result == "success"
     | mv-expand TargetResource = TargetResources
     | where TargetResource["type"] == "User"
-    | project
-        AddedUser_TimeGenerated = TimeGenerated,
-        UserPrincipalName = tostring(TargetResource["userPrincipalName"])
+    | summarize AddedUser_TimeGenerated = min(TimeGenerated) by UserPrincipalName = tostring(TargetResource["userPrincipalName"])
 ) on UserPrincipalName
-| where not(abs(TimeGenerated - AddedUser_TimeGenerated) between (0m .. synchronization_wait))
+| where not(isnotempty(AddedUser_TimeGenerated) and abs(TimeGenerated - AddedUser_TimeGenerated) between (0m .. synchronization_wait))
