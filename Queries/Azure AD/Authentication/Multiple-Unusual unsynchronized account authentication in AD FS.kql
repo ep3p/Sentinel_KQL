@@ -1,0 +1,23 @@
+let query_frequency = 1d;
+let query_period = 14d;
+let synchronization_wait = 10m;
+ADFSSignInLogs
+| where ingestion_time() > ago(query_frequency)
+| where UserId == "00000000-0000-0000-0000-000000000000"
+| join kind=leftanti (
+    ADFSSignInLogs
+    | where ingestion_time() between (ago(query_period) .. ago(query_frequency))
+    | where UserId == "00000000-0000-0000-0000-000000000000"
+    | distinct UserPrincipalName
+) on UserPrincipalName
+| summarize arg_min(TimeGenerated, *) by UserPrincipalName
+| lookup kind=leftouter (
+    AuditLogs
+    | where Category == "UserManagement" and OperationName == "Restore user" and Result == "success"
+    | mv-expand TargetResource = TargetResources
+    | where TargetResource["type"] == "User"
+    | project
+        AddedUser_TimeGenerated = TimeGenerated,
+        UserPrincipalName = tostring(TargetResource["userPrincipalName"])
+) on UserPrincipalName
+| where not(abs(TimeGenerated - AddedUser_TimeGenerated) between (0m .. synchronization_wait))
