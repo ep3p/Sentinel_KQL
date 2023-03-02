@@ -1,0 +1,36 @@
+SecurityAlert
+| where AlertName has "Possible attack tool detected" and ProviderName != "ASI Scheduled Alerts"
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend
+    Computer = tostring(ExtendedProperties["Compromised Host"]),
+    Account = tostring(ExtendedProperties["User Name"]),
+    Process = tostring(ExtendedProperties["Suspicious Process"]),
+    CommandLine = tostring(ExtendedProperties["Suspicious Command Line"])
+// Clean Entities
+| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\,{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    Processes = make_set(Process, 250),
+    CommandLines = make_set(CommandLine, 250),
+    AlertLinks = make_set(AlertLink, 250),
+    Entities = make_set(todynamic(Entities)),
+    take_any(RemediationSteps)
+    by AlertName, AlertSeverity, Description, ResourceId = tolower(ResourceId), Computer, Account, Tactics
+| project
+    TimeGenerated,
+    AlertName,
+    AlertSeverity,
+    Description,
+    RemediationSteps,
+    ResourceId,
+    StartTime,
+    EndTime,
+    Computer,
+    Account,
+    Processes,
+    CommandLines,
+    AlertLinks,
+    Tactics,
+    Entities
