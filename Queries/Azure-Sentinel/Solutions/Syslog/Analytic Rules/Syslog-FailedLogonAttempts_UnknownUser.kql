@@ -1,0 +1,34 @@
+let failures_threshold = 5;
+let _InfoInvalidUser =
+    Syslog
+    | where SyslogMessage has_any ("invalid user") and not(SyslogMessage has "[preauth]") and Facility in ("auth", "authpriv")
+    | parse SyslogMessage with * "user " User:string " from " RemoteIPAddress:string " port " RemotePort:int *
+    | summarize hint.strategy=shuffle arg_min(TimeGenerated, *) by Computer, HostIP, ProcessID, RemoteIPAddress, RemotePort
+;
+let _UserUnknown =
+    Syslog
+    | where SyslogMessage has_any ("user unknown") and Facility in ("auth", "authpriv")
+    | join kind=leftanti _InfoInvalidUser on Computer, ProcessID
+;
+union _InfoInvalidUser, _UserUnknown
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Count = count(),
+    Facilities = array_sort_asc(make_set(Facility)),
+    SeverityLevels = array_sort_asc(make_set(SeverityLevel)),
+    SyslogMessages = make_list(SyslogMessage, 100),
+    take_any(_ResourceId)
+    by Computer, HostIP, ProcessName
+| where Count > failures_threshold
+| project
+    StartTime,
+    EndTime,
+    Computer,
+    HostIP,
+    Facilities,
+    SeverityLevels,
+    ProcessName,
+    Count,
+    SyslogMessages,
+    _ResourceId
