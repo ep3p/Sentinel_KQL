@@ -55,7 +55,6 @@ OfficeActivity
 // One example could be a welcome SharePoint site that is visited automatically by all users when opening a browser
 | mv-expand QueryRange = range(now() - query_frequency + query_frequency/query_window_checks, now(), query_frequency/query_window_checks) to typeof(datetime)
 | where TimeGenerated between ((QueryRange - query_frequency) .. QueryRange)
-| where TimeGenerated between ((QueryRange - query_frequency) .. QueryRange)
 | summarize
     StartTime = min(TimeGenerated),
     EndTime = max(TimeGenerated),
