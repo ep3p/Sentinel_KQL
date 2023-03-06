@@ -1,0 +1,4 @@
+Type,Critical,Frequency,DelayType,IngestionDelay,Auxiliar,Notes
+AADNonInteractiveUserSignInLogs,"true","00:30:00",offline,"00:10:00",,
+Heartbeat,"true","00:30:00",,"00:05:00",,
+SecurityIncident,"true","00:30:00",,"00:05:00",,
