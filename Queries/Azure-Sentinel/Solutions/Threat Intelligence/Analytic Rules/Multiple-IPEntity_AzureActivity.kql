@@ -67,7 +67,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
     | project
         AzureActivity_TimeGenerated,
         Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, TI_IPAddress, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress,
-        Category, Level, ResourceProvider, ResourceId, Caller, CallerIpAddress, OperationNameValue, OperationName, ActivityStatus, HTTPRequest, Properties, CorrelationId
+        CategoryValue, Level, ResourceProviderValue, _ResourceId, Caller, CallerIpAddress, OperationNameValue, ActivityStatusValue, HTTPRequest, Properties, CorrelationId
 };
 union// isfuzzy=true
     // Match      current table events                                all indicators available
