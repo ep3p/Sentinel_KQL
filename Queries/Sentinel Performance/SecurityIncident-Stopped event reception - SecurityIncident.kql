@@ -1,4 +1,4 @@
-let query_frequency = 2h;
+let query_frequency = 1h;
 let query_period = 3d;
 let _ExpectedFrequencies =
     _GetWatchlist('DataType-IngestedTables')
