@@ -1,0 +1,19 @@
+let query_frequency = 2h;
+let query_period = 3d;
+let _ExpectedFrequencies =
+    _GetWatchlist('DataType-IngestedTables')
+    | where Type == "SecurityIncident"
+    | project Type, Critical, ExpectedIngestionFrequency = totimespan(Frequency)
+;
+SecurityIncident
+| where TimeGenerated > ago(query_period)
+| summarize IngestionTime = max(ingestion_time()) by Type
+| lookup kind=inner _ExpectedFrequencies on Type
+| where IngestionTime between (ago(ExpectedIngestionFrequency + query_frequency) .. ago(ExpectedIngestionFrequency))
+| extend
+    TimespanWithoutIngestion = now() - IngestionTime,
+    AlertSeverity = case(
+        Critical == "true", "High",
+        "Informational"
+        )
+| project Type, Critical, ExpectedIngestionFrequency, TimespanWithoutIngestion, AlertSeverity
