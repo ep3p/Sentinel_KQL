@@ -1,5 +1,5 @@
-let query_frequency = 1h;
-let query_period = 3d;
+let query_frequency = 15m;
+let query_period = 2h;
 let _ExpectedFrequencies =
     _GetWatchlist('DataType-IngestedTables')
     | where Type == "SecurityIncident"
