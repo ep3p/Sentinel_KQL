@@ -11,16 +11,10 @@ let malicious_categories = dynamic([
     "Phishing",
     "Potentially Harmful"
 ]);
-let _StringToRegEx = toscalar(
-    _GetWatchlist('RegEx-SingleRegularExpressions')
-    | where UseCase == "StringToRegEx"
-    | project RegEx
-);
 let _ExpectedBlockedDomainsPartial = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "ExpectedBlockedDomain" and Notes has "[PartialDomain]"
-    | project RegEx = replace_regex(DestinationAddress, _StringToRegEx, @"\\\1")
-    | summarize RegEx = make_list(RegEx)
+    | summarize RegEx = make_list(regex_quote(DestinationAddress))
     | extend RegEx = strcat(@'\.(', strcat_array(RegEx, '|'), @')$')
 );
 let _ExpectedBlockedDomainsComplete = toscalar(
