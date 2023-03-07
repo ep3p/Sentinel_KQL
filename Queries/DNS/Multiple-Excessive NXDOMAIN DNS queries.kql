@@ -11,18 +11,12 @@ let _DomainRegex = toscalar(
     | where UseCase == "Threat Intelligence Indicator Domain"
     | project RegEx
 );
-let _StringToRegEx = toscalar(
-    _GetWatchlist('RegEx-SingleRegularExpressions')
-    | where UseCase == "StringToRegEx"
-    | project RegEx
-);
 let _BenignDomainRegex = toscalar(
     (union isfuzzy=true
         _GetWatchlist("Domain-RareBenignDomains"),
         _GetWatchlist("Domain-PrivDomains")
     )
-    | project RegEx = replace_regex(Domain, _StringToRegEx, @"\\\1")
-    | summarize RegEx = make_set(RegEx)
+    | summarize RegEx = make_set(regex_quote(Domain))
 );
 let _PastWindowsDNSEvents =
     DnsEvents
