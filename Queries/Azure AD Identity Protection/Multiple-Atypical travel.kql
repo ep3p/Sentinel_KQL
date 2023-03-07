@@ -56,14 +56,14 @@ let _AtypicaltravelAlerts = materialize(
         union
             (SigninLogs
             | where TimeGenerated > ago(query_period)
-            | where CorrelationId in (toscalar(_Alerts | summarize make_list(CorrelationId))) and RiskState == "atRisk" and RiskEventTypes has "unlikelyTravel"
+            | where CorrelationId in (toscalar(_Alerts | summarize make_list(CorrelationId))) and RiskState != "none" and RiskEventTypes has "unlikelyTravel"
             | extend
                 DeviceDetail = tostring(DeviceDetail),
                 TimeReceived = _TimeReceived
             ),
             (AADNonInteractiveUserSignInLogs
             | where TimeGenerated > ago(query_period)
-            | where CorrelationId in (toscalar(_Alerts | summarize make_list(CorrelationId))) and RiskState == "atRisk" and RiskEventTypes has "unlikelyTravel"
+            | where CorrelationId in (toscalar(_Alerts | summarize make_list(CorrelationId))) and RiskState != "none" and RiskEventTypes has "unlikelyTravel"
             | extend TimeReceived = _TimeReceived
             )
         | summarize
