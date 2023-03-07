@@ -72,6 +72,7 @@ SecurityAlert
         Status == "Resolved" or Alert_State == "Closed", true,
         false
     ),
+    // If a user is put at high risk, the alert severity should be High and the incident name should have the string "User at risk"
     AlertSeverity = case(
         RiskLevelAggregated in (disallowed_risks) or RiskLevelDuringSignIn in (disallowed_risks), "High",
         AlertSeverity
@@ -80,6 +81,8 @@ SecurityAlert
         RiskLevelAggregated in (disallowed_risks), strcat(AlertName, " - User at risk"),
         AlertName
     )
+// Remove benign cases where alert severity is not High
+// | where not(BenignAlert and not(AlertSeverity in ("High")))
 | project-reorder
     TimeGenerated,
     ProductName,
