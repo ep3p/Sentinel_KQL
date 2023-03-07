@@ -26,14 +26,14 @@ SecurityAlert
     union
         (SigninLogs
         | where TimeGenerated > ago(query_period)
-        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState != "none"
         | extend
             DeviceDetail = tostring(DeviceDetail),
             TimeReceived = _TimeReceived
         ),
         (AADNonInteractiveUserSignInLogs
         | where TimeGenerated > ago(query_period)
-        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState != "none"
         | extend TimeReceived = _TimeReceived
         )
     | summarize arg_max(TimeReceived, *) by OriginalRequestId
