@@ -1,0 +1,8 @@
+// this code can be substituted by regex_quote()
+let _StringToRegEx = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "StringToRegEx"
+    | project RegEx
+);
+// ...
+| project RegEx = replace_regex(ToReplace, _StringToRegEx, @"\\\1")
