@@ -1,16 +1,32 @@
+let query_frequency = 1h;
+let query_period = 2h;
 let failures_threshold = 5;
 let _InfoInvalidUser =
     Syslog
+    | where TimeGenerated > ago(query_period)
     | where SyslogMessage has_any ("invalid user") and not(SyslogMessage has "[preauth]") and Facility in ("auth", "authpriv")
     | parse SyslogMessage with * "user " User:string " from " RemoteIPAddress:string " port " RemotePort:int *
     | summarize hint.strategy=shuffle arg_min(TimeGenerated, *) by HostName, HostIP, ProcessID, RemoteIPAddress, RemotePort
 ;
 let _UserUnknown =
     Syslog
+    | where TimeGenerated > ago(query_period)
     | where SyslogMessage has_any ("user unknown") and Facility in ("auth", "authpriv")
     | join kind=leftanti _InfoInvalidUser on HostName, ProcessID
 ;
 union _InfoInvalidUser, _UserUnknown
+| as _Events
+| lookup kind=inner (
+    _Events
+    | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, HostName, HostIP, ProcessName)
+    | summarize
+        arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
+        arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
+        by HostName, HostIP, ProcessName
+    | where (not(PreviousCount > failures_threshold) and CurrentCount > failures_threshold)
+        or ((CurrentCount - PreviousCount) > failures_threshold)
+    | project-away PreviousTimeGenerated, PreviousCount, CurrentTimeGenerated, CurrentCount
+    ) on HostName, HostIP, ProcessName
 | summarize
     StartTime = min(TimeGenerated),
     EndTime = max(TimeGenerated),
@@ -20,7 +36,6 @@ union _InfoInvalidUser, _UserUnknown
     SyslogMessages = make_list(SyslogMessage, 100),
     take_any(_ResourceId)
     by HostName, HostIP, ProcessName
-| where Count > failures_threshold
 | project
     StartTime,
     EndTime,
