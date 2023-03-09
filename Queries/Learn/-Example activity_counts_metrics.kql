@@ -1,13 +1,16 @@
 let threshold = 5;
 ...
 | as _Events
-// query_period should be 2 * query_frequency
-| evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, ColumnToSummarizeBy1, ColumnToSummarizeBy2, ColumnToSummarizeBy3)
-| summarize
-    arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
-    arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
-    by ColumnToSummarizeBy1, ColumnToSummarizeBy2, ColumnToSummarizeBy3
-| where (not(PreviousCount > threshold) and CurrentCount > threshold)
-    or ((CurrentCount - PreviousCount) > threshold)
-| project-away PreviousTimeGenerated, PreviousCount, CurrentTimeGenerated, CurrentCount
-| lookup _Events on ColumnToSummarizeBy1, ColumnToSummarizeBy2, ColumnToSummarizeBy3
+| lookup kind=inner (
+    _Events
+    // query_period should be 2 * query_frequency
+    | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, ColumnToSummarizeBy1, ColumnToSummarizeBy2, ColumnToSummarizeBy3)
+    | summarize
+        arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
+        arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
+        by ColumnToSummarizeBy1, ColumnToSummarizeBy2, ColumnToSummarizeBy3
+    | where (not(PreviousCount > threshold) and CurrentCount > threshold)
+        or ((CurrentCount - PreviousCount) > threshold)
+    | project-away PreviousTimeGenerated, PreviousCount, CurrentTimeGenerated, CurrentCount
+    ) on ColumnToSummarizeBy1, ColumnToSummarizeBy2, ColumnToSummarizeBy3
+...
