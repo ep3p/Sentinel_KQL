@@ -1,0 +1,74 @@
+union isfuzzy=true
+    (AuditLogs
+    | mv-expand AdditionalDetail = AdditionalDetails
+    | where AdditionalDetail["key"] == "User-Agent"
+    | extend UserAgent = tostring(AdditionalDetail["value"])
+    ),
+    (AWSCloudTrail
+    | where isnotempty(UserAgent)
+    ),
+    (AzureDiagnostics
+    | where Category == "ApplicationGatewayAccessLog" and OperationName == "ApplicationGatewayAccess"
+    | extend UserAgent = columnifexists("userAgent_s", "")
+    | where isnotempty(UserAgent)
+    ),
+    (ContainerLog
+    | parse-where LogEntry with IPAddress ' - - [' Date '] "' Request '" ' ResponseCode ' ' Bytes ' "' URL '" "' UserAgent '" "' IPAddress2 '"'  *
+    | where not(isempty(UserAgent) or UserAgent == "-")
+    | extend IPAddress = tostring(split(IPAddress, " ")[-1])
+    ),
+    (ContainerRegistryLoginEvents
+    | where isnotempty(UserAgent)
+    ),
+    (ContainerRegistryRepositoryEvents
+    | where isnotempty(UserAgent)
+    ),
+    (MicrosoftGraphActivityLogs
+    | where isnotempty(UserAgent)
+    ),
+    (OfficeActivity
+    | where isnotempty(UserAgent)
+    ),
+    (OfficeActivity
+    | where RecordType in ("AzureActiveDirectory", "AzureActiveDirectoryStsLogon")
+    | parse ExtendedProperties with * 'User-Agent\\":\\"' UserAgent2 '\\' *
+    | parse ExtendedProperties with * 'UserAgent",      "Value": "' UserAgent1 '"' *
+    | where isnotempty(UserAgent1) or isnotempty(UserAgent2)
+    | extend UserAgent = iff(RecordType == "AzureActiveDirectoryStsLogon", UserAgent1, UserAgent2)
+    ),
+    (SigninLogs
+    | where isnotempty(UserAgent)
+    ),
+    (AADNonInteractiveUserSignInLogs
+    | where isnotempty(UserAgent)
+    ),
+    (ADFSSignInLogs
+    | where not(isempty(UserAgent) or UserAgent == "-")
+    ),
+    (StorageBlobLogs
+    | where isnotempty(UserAgentHeader)
+    | extend UserAgent = UserAgentHeader
+    ),
+    (StorageFileLogs
+    | where isnotempty(UserAgentHeader)
+    | extend UserAgent = UserAgentHeader
+    ),
+    (StorageQueueLogs
+    | where isnotempty(UserAgentHeader)
+    | extend UserAgent = UserAgentHeader
+    ),
+    (StorageTableLogs
+    | where isnotempty(UserAgentHeader)
+    | extend UserAgent = UserAgentHeader
+    ),
+    (W3CIISLog
+    | where isnotempty(csUserAgent)
+    | extend UserAgent = csUserAgent
+    )
+| summarize take_any(*) by Type, UserAgent
+| where UserAgent startswith "User"
+    or  UserAgent startswith @'\"'
+    or  UserAgent startswith '"'
+    or  UserAgent contains "Mozilla" and not(UserAgent contains_cs "Mozilla")
+    or  UserAgent contains_cs "Compatible"
+    or  UserAgent matches regex @"MSIE(\S|.{1,5}?\d\s;)"
