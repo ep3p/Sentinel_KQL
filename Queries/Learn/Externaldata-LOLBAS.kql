@@ -1,0 +1,18 @@
+externaldata(
+    Filename:string,
+    Description:string,
+    Author:string,
+    Date:datetime,
+    Command:string,
+    CommandDescription:string,
+    CommandUsecase:string,
+    CommandCategory:string,
+    CommandPrivileges:string,
+    Technique:string,
+    OperatingSystem:string,
+    Paths:string,
+    Detections:string,
+    Resources:string,
+    Acknowledgements:string,
+    URL:string
+)[@"https://lolbas-project.github.io/api/lolbas.csv"] with (format="csv", ignoreFirstRecord=True);
