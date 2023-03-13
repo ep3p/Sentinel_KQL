@@ -1,0 +1,2 @@
+AWSCloudTrail
+| where EventName has_any ("DeactivateMFADevice", "DeleteVirtualMFADevice", "DeleteLoginProfile", "DeleteServiceSpecificCredential", "DeleteSSHPublicKey", "DeleteSigningCertificate", "DeleteAccessKey")
