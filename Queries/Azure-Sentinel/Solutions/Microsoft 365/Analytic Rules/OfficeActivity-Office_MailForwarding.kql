@@ -16,20 +16,20 @@ OfficeActivity
     ForwardTo = iff(isnotempty(ParametersDict["ForwardTo"]), split(ParametersDict["ForwardTo"], ";"), dynamic([])),
     RedirectTo = iff(isnotempty(ParametersDict["RedirectTo"]), split(ParametersDict["RedirectTo"], ";"), dynamic([])),
     ForwardingSmtpAddress = iff(isnotempty(ParametersDict["ForwardingSmtpAddress"]), pack_array(trim_start(@"smtp:", tostring(ParametersDict["ForwardingSmtpAddress"]))), dynamic([]))
-| mv-expand DestinationMailAddress = array_concat(ForwardTo, RedirectTo, ForwardingSmtpAddress) to typeof(string)
+| mv-expand DestinationEmailAddress = array_concat(ForwardTo, RedirectTo, ForwardingSmtpAddress) to typeof(string)
 | project-away ForwardTo, RedirectTo, ForwardingSmtpAddress
 | as _Events
 | lookup kind=inner (
     _Events
-    | summarize TargetCount = dcount(Target), MaxTimeGenerated = max(TimeGenerated) by DestinationMailAddress
+    | summarize TargetCount = dcount(Target), MaxTimeGenerated = max(TimeGenerated) by DestinationEmailAddress
     | where TargetCount > 1 and MaxTimeGenerated > ago(query_frequency)
     | project-away TargetCount, MaxTimeGenerated
-    ) on DestinationMailAddress
+    ) on DestinationEmailAddress
 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]]+)\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), ClientIP)[0]
 | extend
     IPAddress = tostring(ClientIPValues[0])//,
     //Port = tostring(ClientIPValues[1])
-| sort by DestinationMailAddress asc, TimeGenerated asc
+| sort by DestinationEmailAddress asc, TimeGenerated asc
 | project
     TimeGenerated,
     OfficeWorkload,
@@ -39,6 +39,6 @@ OfficeActivity
     Operation,
     ResultStatus,
     Target,
-    DestinationMailAddress,
+    DestinationEmailAddress,
     OfficeObjectId,
     Parameters
