@@ -1,0 +1,19 @@
+AWSCloudTrail
+| where EventName contains "EmergencyAccessToken" //EventName == "AdminGetEmergencyAccessToken"
+| project
+    TimeGenerated,
+    UserIdentityAccountId,
+    UserIdentityUserName,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    SessionCreationDate,
+    SessionMfaAuthenticated,
+    UserAgent,
+    RequestParameters,
+    AwsEventId,
+    AwsRequestId_
