@@ -1,5 +1,7 @@
-// 1 hour
+// 1 hour example
 set query_datetimescope_column = "TimeGenerated";
+// In case of using a Watchlist below these statements, comment the next line, "query_datetimescope_from"
 set query_datetimescope_from = datetime(2022-10-24T10:54:50.128Z);
 set query_datetimescope_to = datetime(2022-10-24T11:54:50.128Z);
 set query_now=datetime(2022-10-24T11:54:50.128Z);
+...
