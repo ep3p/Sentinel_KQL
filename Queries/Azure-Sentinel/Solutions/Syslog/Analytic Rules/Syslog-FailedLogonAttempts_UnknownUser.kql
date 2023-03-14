@@ -16,7 +16,7 @@ let _UserUnknown =
 ;
 union _InfoInvalidUser, _UserUnknown
 | as _Events
-| lookup kind=inner (
+| join kind=leftsemi (
     _Events
     | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, HostName, HostIP, ProcessName)
     | summarize
@@ -25,7 +25,6 @@ union _InfoInvalidUser, _UserUnknown
         by HostName, HostIP, ProcessName
     | where (not(PreviousCount > failures_threshold) and CurrentCount > failures_threshold)
         or ((CurrentCount - PreviousCount) > failures_threshold)
-    | project-away PreviousTimeGenerated, PreviousCount, CurrentTimeGenerated, CurrentCount
     ) on HostName, HostIP, ProcessName
 | summarize
     StartTime = min(TimeGenerated),
