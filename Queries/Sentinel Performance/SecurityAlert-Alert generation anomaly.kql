@@ -1,0 +1,39 @@
+let query_frequency = 1h;
+let query_period = 7d;
+let scan_step = 5m;
+let consecutive_failures_threshold = 2;
+let _SecurityAlertTimeSeries = (start_time: datetime, end_time: datetime) {
+    let _Auxiliar = toscalar(
+        SecurityAlert
+        | where TimeGenerated between (start_time .. end_time)
+        | make-series Count = count() default=0 on TimeGenerated step scan_step
+        | extend
+            TimeGenerated = array_slice(TimeGenerated, 0, toint(-(consecutive_failures_threshold * query_frequency / scan_step))),
+            Count = array_slice(Count, 0, toint(-(consecutive_failures_threshold * query_frequency / scan_step)))
+        | extend series_periods_detect(
+            Count,
+            0.0,
+            toint(24h / scan_step),
+            1)
+        | summarize Period = take_any(toint(series_periods_detect_Count_periods[0]))
+        );
+    let _PeriodStep = scan_step * coalesce(_Auxiliar, 1);
+    SecurityAlert
+    | where TimeGenerated between (start_time .. end_time)
+    // _PeriodStep cannot be used with make-series, so summarize has to be used instead
+    // | make-series Count = count() default=0 on TimeGenerated step _PeriodStep
+    // summarize does not generate zero values for count(), baseline noise has to be added, it will be "deleted" afterwards
+    | union (range TimeGenerated from start_time to end_time step _PeriodStep)
+    | summarize Count = count() by bin_at(TimeGenerated, _PeriodStep, end_time)
+    | extend Count = Count - 1
+    | summarize TimeGenerated = make_list(TimeGenerated), Count = make_list(Count)
+    | extend
+        TimeGenerated = array_slice(TimeGenerated, 0, -2),
+        Count = array_slice(Count, 0, -2)
+    | extend series_decompose_anomalies(Count)
+    | where array_sum(array_slice(series_decompose_anomalies_Count_ad_flag, -(consecutive_failures_threshold), -1)) == (-1 * consecutive_failures_threshold)
+};
+_SecurityAlertTimeSeries(ago(query_period), now())
+// Uncomment the following line if you want only one alert (during the first query_frequency of the anomaly)
+| where not(toscalar(_SecurityAlertTimeSeries(ago(query_period), ago(query_frequency)) | count) > 0)
+| render timechart
