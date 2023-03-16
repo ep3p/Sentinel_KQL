@@ -1,0 +1,27 @@
+
+// Default dashboard snippet
+let NumberOfTypesToPresent = 2;
+let NumberOfViolatingPointsPerTypeToConsider = 2;
+let StdBounderies = 2;
+search * 
+| where not(Type == 'SecurityAlert' and (ProviderName == 'ASI Scheduled Alerts' or ProviderName == 'CustomAlertRule'))
+| summarize Value=count() by Type, bin_at(TimeGenerated, 1h , datetime(2023-03-16T10:17:40.767Z))
+| order by Type, TimeGenerated asc
+| extend Index = tostring(row_number(1, prev(Type) != Type))
+| extend DataItem = todynamic(pack("Index", Index, "TimeGenerated", TimeGenerated, "Value", Value))
+| summarize Avg = avg(Value), Std = stdev(Value), DataItem = makelist(DataItem) by Type
+| mvexpand DataItem
+| extend Std_violation = iif(Std == 0, real(0), (DataItem.Value - Avg) / Std)
+| order by Type, Std_violation desc
+| extend Violation_rank = tostring(row_number(1, prev(Type) != Type))
+| extend DataItem = pack("Index", DataItem.Index, "TimeGenerated", DataItem.TimeGenerated, "Value", DataItem.Value, "ViolationStdValue", Std_violation, "ViolationRank", Violation_rank, "Avg", Avg, "Std", Std)
+| summarize DataItems = makelist(DataItem), LargestViolationDataItems = makelist(DataItem) by Type
+| mvexpand LargestViolationDataItems
+| where LargestViolationDataItems.ViolationRank <= NumberOfViolatingPointsPerTypeToConsider
+| extend ViolationStdValue = toreal(LargestViolationDataItems.ViolationStdValue)
+| summarize TotalStdLargestViolations = sum(ViolationStdValue) by Type, tostring(DataItems)
+| order by TotalStdLargestViolations desc
+| extend DataItems = todynamic(DataItems), StdViolationRank = row_number(1)
+| where StdViolationRank <= NumberOfTypesToPresent
+| mvexpand DataItems
+| project Type, TimeGenerated=DataItems.TimeGenerated, Value=todouble(DataItems.Value), LowerBound = DataItems.Avg - StdBounderies * DataItems.Std, UpperBound = DataItems.Avg + StdBounderies * DataItems.Std
