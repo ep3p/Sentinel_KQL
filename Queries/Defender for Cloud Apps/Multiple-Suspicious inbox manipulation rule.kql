@@ -5,13 +5,13 @@ let _HomeTenantDomains = toscalar(
     _GetWatchlist("UUID-AADTenantIds")
     | where Notes has "[HomeTenant]"
     | summarize make_list(Domain)
-    );
+);
 let _UntrustedResultTypes = toscalar(
     _GetWatchlist("ResultType-SignInLogsErrorCodes")
     | where Notes has "[MFA]" and Notes has_any ("[Unconfigured]", "[NotCompliant]")
     | summarize make_list(ResultType)
-    );
-let _SuspiciousInboxForwardingRuleAlerts = materialize(
+);
+let _SuspiciousInboxManipulationRuleAlerts = materialize(
     SecurityAlert
     | where TimeGenerated between (ago(query_wait + query_frequency) .. ago(query_wait))
     | where ProductName has "Microsoft Cloud App Security" and AlertName has "Suspicious inbox manipulation rule"
@@ -32,9 +32,7 @@ let _SuspiciousInboxForwardingRuleAlerts = materialize(
     | lookup kind=leftouter
         (AADUserRiskEvents
         | where TimeGenerated > ago(query_period)
-        | where OperationName == "User Risk Detection"
-            and Source == "MicrosoftCloudAppSecurity"
-            and RiskEventType == "mcasSuspiciousInboxManipulationRules"
+        | where OperationName == "User Risk Detection" and Source == "MicrosoftCloudAppSecurity" and RiskEventType == "mcasSuspiciousInboxManipulationRules"
         | summarize arg_max(TimeGenerated, *) by Id
         | mv-apply Auxiliar_AdditionalInfo = AdditionalInfo on (
             where Auxiliar_AdditionalInfo["Key"] == "alertUrl"
@@ -52,23 +50,20 @@ let _SuspiciousInboxForwardingRuleAlerts = materialize(
             RiskLevel,
             RiskState,
             AlertLink
-        )
-        on AlertLink
+        ) on AlertLink
     | as _Alerts
     | lookup kind=leftouter (
         union
             (SigninLogs
             | where TimeGenerated > ago(query_period)
-            | where OriginalRequestId in (toscalar(_Alerts
-                | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
             | extend
                 DeviceDetail = tostring(DeviceDetail),
                 TimeReceived = _TimeReceived
             ),
             (AADNonInteractiveUserSignInLogs
             | where TimeGenerated > ago(query_period)
-            | where OriginalRequestId in (toscalar(_Alerts
-                | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
             | extend TimeReceived = _TimeReceived
             )
         | summarize
@@ -96,13 +91,13 @@ let _SuspiciousInboxForwardingRuleAlerts = materialize(
             RiskLevelAggregated,
             //UserId,
             OriginalRequestId//,
-        //CorrelationId
+            //CorrelationId
         )
         on OriginalRequestId
-    );
+);
 let _UntrustedUserIds = toscalar(
     union
-        (_SuspiciousInboxForwardingRuleAlerts
+        (_SuspiciousInboxManipulationRuleAlerts
         | join kind=innerunique (
             SigninLogs
             | where TimeGenerated > ago(query_period)
@@ -111,17 +106,16 @@ let _UntrustedUserIds = toscalar(
             )
             on UserId
         ),
-        (AuthenticationMethodChanges(query_period, toscalar(_SuspiciousInboxForwardingRuleAlerts
-        | summarize make_set(UserId)), false)
+        (AuthenticationMethodChanges(query_period, toscalar(_SuspiciousInboxManipulationRuleAlerts | summarize make_set(UserId)), false)
         )
     | summarize make_set(UserId)
-    );
-_SuspiciousInboxForwardingRuleAlerts
+);
+_SuspiciousInboxManipulationRuleAlerts
 | extend RecentlyConfiguredMFA = UserId in (_UntrustedUserIds)
 | extend BenignAlert = case(
-    // Remove cases where Defender for Cloud Apps considers the alert solved and the account had MFA configured long ago
-    RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed" and not(RecentlyConfiguredMFA), true,
-    false
+        // Remove cases where Defender for Cloud Apps considers the alert solved and the account had MFA configured long ago
+        RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed" and not(RecentlyConfiguredMFA), true,
+        false
     )
 | where not(BenignAlert and AlertSeverity != "High")
 | project
