@@ -1,5 +1,6 @@
 let query_frequency = 5m;
 let query_period = 2d;
+let query_wait = 30m;
 let _HomeTenantDomains = toscalar(
     _GetWatchlist("UUID-AADTenantIds")
     | where Notes has "[HomeTenant]"
@@ -12,7 +13,7 @@ let _UntrustedResultTypes = toscalar(
 );
 let _SuspiciousInboxForwardingRuleAlerts = materialize(
     SecurityAlert
-    | where TimeGenerated > ago(query_frequency)
+    | where TimeGenerated between (ago(query_wait + query_frequency) .. ago(query_wait))
     | where ProductName has "Microsoft Cloud App Security" and AlertName has "Suspicious inbox forwarding rule"
     //| where CompromisedEntity has_any (_HomeTenantDomains)
     | extend ExtendedProperties = todynamic(ExtendedProperties)
