@@ -9,6 +9,7 @@ let threshold = 5;
         arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
         arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
         by ColumnToSummarizeBy1, ColumnToSummarizeBy2, ColumnToSummarizeBy3
+    | extend PreviousCount = iff(PreviousTimeGenerated == CurrentTimeGenerated, 0, PreviousCount)
     | where (not(PreviousCount > threshold) and CurrentCount > threshold)
         or ((CurrentCount - PreviousCount) > threshold)
     ) on ColumnToSummarizeBy1, ColumnToSummarizeBy2, ColumnToSummarizeBy3
