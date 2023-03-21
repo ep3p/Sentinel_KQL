@@ -23,6 +23,8 @@ union _InfoInvalidUser, _UserUnknown
         arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
         arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
         by HostName, HostIP, ProcessName
+    | where CurrentTimeGenerated > ago(query_period)
+    | extend PreviousCount = iff(PreviousTimeGenerated == CurrentTimeGenerated, 0, PreviousCount)
     | where (not(PreviousCount > failures_threshold) and CurrentCount > failures_threshold)
         or ((CurrentCount - PreviousCount) > failures_threshold)
     ) on HostName, HostIP, ProcessName
