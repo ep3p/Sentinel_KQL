@@ -1,3 +1,5 @@
+let query_frequency = 15m;
+let query_period = 30m;
 let threshold = 5;
 ...
 | as _Events
