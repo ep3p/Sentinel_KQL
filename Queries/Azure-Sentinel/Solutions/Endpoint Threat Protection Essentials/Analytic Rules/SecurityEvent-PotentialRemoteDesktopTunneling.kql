@@ -1,0 +1,16 @@
+SecurityEvent
+| where EventID in (4624, 4625) and LogonType in (7, 10) and IpAddress has_any ("::1","127.0.0.1")
+| project
+    TimeGenerated,
+    Computer,
+    Activity,
+    Account,
+    AccountType,
+    IpAddress,
+    Process,
+    LogonTypeName,
+    ElevatedToken,
+    VirtualAccount,
+    RestrictedAdminMode,
+    TargetLogonId,
+    TargetLinkedLogonId
