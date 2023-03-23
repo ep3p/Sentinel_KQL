@@ -1,0 +1,21 @@
+Anomalies
+| where RuleName endswith "UEBA Anomalous Process Creation" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"]
+| project
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserPrincipalName,
+    ActivityInsights,
+    DeviceInsights,
+    UserInsights,
+    StartTime,
+    EndTime,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics,
+    Techniques,
+    ExtendedLinks
