@@ -32,7 +32,7 @@ let _PastWindowsDNSEvents =
 let _PastUmbrellaDNSEvents =
     Cisco_Umbrella_dns_CL
     | where TimeGenerated between (ago(query_period)..ago(query_frequency))
-    | where ResponseCode_s == "NXDOMAIN" and not(QueryType_s has_any ("PTR", "SRV", "SOA")) and not(InternalIp_s == ExternalIp_s)
+    | where ResponseCode_s == "NXDOMAIN" and not(QueryType_s has_any ("PTR", "SRV", "SOA")) //and not(InternalIp_s == ExternalIp_s)
     | where not(Domain_s matches regex strcat(@'(?i)(', strcat_array(_BenignDomainRegex, '|'), @')(?-i)\.$'))
     | where Domain_s matches regex strcat(_DomainRegex, @"\.$")
     | distinct
