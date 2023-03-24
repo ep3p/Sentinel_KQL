@@ -1,0 +1,40 @@
+// This query can help you to obtain which accounts in IdentityInfo table have privileged groups or roles, according to values specified in certain Watchlists.
+// IdentityInfo table renews itself completely every ~14 days.
+//
+// Click "Save as function", in Parameters write in the fields:
+// "datetime"  "starttime"  "14d"
+// "datetime"  "endtime"    "time(null)"
+//
+// If you name the function "PrivilegedIdentityInfo", you can check the function with queries like the following:
+//
+// PrivilegedIdentityInfo
+//
+// PrivilegedIdentityInfo(26d, 12d)
+//
+//let Function = (starttime:timespan = 14d, endtime:timespan = time(null)){
+let _PrivilegedGroupRegex = toscalar(
+    union
+        (_GetWatchlist("SID-AuditADObjects")
+        | where Notes has_any ("[Privileged]", "[Unpopulated]")
+        | project RegEx = regex_quote(SAMAccountName)
+        ),
+        (_GetWatchlist("RegEx-PrivDomainGroups")
+        | project RegEx
+        )
+    | summarize RegEx = make_set(RegEx)
+    | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
+);
+let _PrivilegedRoleRegex = toscalar(
+    _GetWatchlist("RegEx-PrivAADRoles")
+    | summarize RegEx = make_list(RegEx)
+    | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
+);
+IdentityInfo
+| where TimeGenerated between (ago(starttime) .. ago(endtime))
+| summarize arg_max(TimeGenerated, *) by AccountObjectId
+| mv-expand GroupMember = GroupMembership to typeof(string), AssignedRole = AssignedRoles to typeof(string)
+| where GroupMember matches regex _PrivilegedGroupRegex or AssignedRole matches regex _PrivilegedRoleRegex
+| project-away GroupMember, AssignedRole
+| summarize take_any(*) by AccountObjectId
+//};
+//Function(14d, time(null))
