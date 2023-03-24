@@ -49,16 +49,18 @@ let _AddDeleteDeviceEvents =
     | evaluate bag_unpack(BagToUnpack, columnsConflict = 'replace_source')
     | where not(OperationName == "Add device" and column_ifexists("DeviceTrustType", "") in (_ExpectedTrustTypes))
     | extend
-        AutoPilotZTDID = extract(@"ZTDID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AutopilotZTDID = extract(@"ZTDID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         AccountObjectId = extract(@"USER\-GID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         ["USER-HWID"] = extract(@"USER\-HWID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         IntuneOrderId = extract(@"OrderId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         AzureResourceId = extract(@"AzureResourceId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
     | lookup kind=leftouter _UserInfo on AccountObjectId
 ;
-let _AddObjectIds = toscalar(_AddDeleteDeviceEvents
+let _AddObjectIds = toscalar(
+    _AddDeleteDeviceEvents
     | where OperationName == "Add device"
-    | summarize make_set(ObjectId));
+    | summarize make_set(ObjectId)
+);
 let _UpdateDeviceEvents =
     AuditLogs
     | where TimeGenerated > ago(query_frequency + query_wait)
@@ -84,7 +86,7 @@ let _UpdateDeviceEvents =
     )
     | evaluate bag_unpack(BagToUnpack, columnsConflict = 'replace_source')
     | extend
-        AutoPilotZTDID = extract(@"ZTDID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AutopilotZTDID = extract(@"ZTDID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         AccountObjectId = extract(@"USER\-GID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         ["USER-HWID"] = extract(@"USER\-HWID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         IntuneOrderId = extract(@"OrderId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
@@ -127,11 +129,13 @@ let _DeviceEvents = materialize(
             AddIntuneOrderId = take_anyif(IntuneOrderId, OperationName == "Add device"),
             take_anyif(AccountObjectId, OperationName == "Add device"),
             take_anyif(AzureResourceId, OperationName == "Add device"),
+            take_anyif(AutopilotZTDID, OperationName == "Add device"),
             UpdateIntuneOrderId = take_anyif(IntuneOrderId, OperationName == "Update device")
             by ObjectId
         | where OperationNames has "Add device"
         | where not(AddIntuneOrderId in (_ExpectedIntuneOrderIds) or UpdateIntuneOrderId in (_ExpectedIntuneOrderIds))
         | where not(isnotempty(AccountObjectId) and isnotempty(AzureResourceId))
+        | where not(isnotempty(AutopilotZTDID))
         | project ObjectId, DeviceId
     ) on ObjectId
     | extend
@@ -175,7 +179,7 @@ union _DeviceEvents, _SignInEvents
     UserPrincipalName,
     ObjectId,
     DeviceId,
-    AutoPilotZTDID,
+    AutopilotZTDID,
     AccountObjectId,
     IntuneOrderId,
     AzureResourceId,
