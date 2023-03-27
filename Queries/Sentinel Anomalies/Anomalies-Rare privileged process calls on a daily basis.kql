@@ -5,7 +5,7 @@ Anomalies
 | summarize
     TimeGenerated = min(TimeGenerated),
     Description = make_set(Description),
-    take_any(Entities, Tactics)
+    take_any(Entities, Tactics, Techniques)
     by RuleName, UserName, Query
 | project
     TimeGenerated,
@@ -15,5 +15,4 @@ Anomalies
     UserName,
     Entities,
     Tactics,
-    Techniques,
-    ExtendedLinks
+    Techniques
