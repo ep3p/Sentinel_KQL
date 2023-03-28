@@ -40,4 +40,5 @@ SecurityAlert
     CommandLines,
     AlertLinks,
     Tactics,
+    Techniques,
     Entities
