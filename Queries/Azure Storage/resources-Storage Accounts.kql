@@ -10,6 +10,9 @@ resources
     minimumTlsVersion = tostring(DynamicProperties.minimumTlsVersion),
     primaryEndpoints = DynamicProperties.primaryEndpoints,
     privateEndpointConnections = DynamicProperties.privateEndpointConnections,
+    publicNetworkAccess = tostring(DynamicProperties.publicNetworkAccess),
+    services = DynamicProperties.encryption.services,
+    defaultToOAuthAuthentication = tostring(DynamicProperties.defaultToOAuthAuthentication),
     networkAcls = DynamicProperties.networkAcls
 | extend
     networkAcls_defaultAction = tostring(networkAcls.defaultAction),
@@ -17,20 +20,23 @@ resources
     networkAcls_ipRules = networkAcls.ipRules,
     networkAcls_virtualNetworkRules = networkAcls.virtualNetworkRules
 // | where allowBlobPublicAccess == "true"
+// | where publicNetworkAccess == "Enabled"
+// | where defaultToOAuthAuthentication == "false"
 // | where networkAcls_defaultAction == "Allow"
-// | where networkAcls_ipRules == "[]"
-// | where networkAcls_virtualNetworkRules == "[]"
 | project
     subscriptionId,
     resourceGroup,
     id,
     tags,
     creationTime,
-    allowBlobPublicAccess,
     supportsHttpsTrafficOnly,
     minimumTlsVersion,
+    allowBlobPublicAccess,
+    publicNetworkAccess,
+    defaultToOAuthAuthentication,
     primaryEndpoints,
     privateEndpointConnections,
+    services,
     networkAcls_bypass,
     networkAcls_defaultAction,
     networkAcls_ipRules,
