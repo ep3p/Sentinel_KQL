@@ -16,8 +16,8 @@ SecurityAlert
     CommandLines = make_set(CommandLine, 250),
     AlertLinks = make_set(AlertLink, 250),
     Entities = make_set(todynamic(Entities)),
-    take_any(RemediationSteps)
-    by AlertName, AlertSeverity, Description, ResourceId = tolower(ResourceId), Computer, Account, Tactics
+    take_any(RemediationSteps, Tactics, Techniques)
+    by AlertName, AlertSeverity, Description, ResourceId = tolower(ResourceId), Computer, Account
 | project
     TimeGenerated,
     AlertName,
@@ -33,4 +33,5 @@ SecurityAlert
     CommandLines,
     AlertLinks,
     Tactics,
+    Techniques,
     Entities
