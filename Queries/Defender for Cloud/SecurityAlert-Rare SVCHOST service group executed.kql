@@ -26,8 +26,8 @@ SecurityAlert
     ParentProcessIds = make_set(ParentProcessId, 250),
     AlertLinks = make_set(AlertLink, 250),
     Entities = make_set(todynamic(Entities)),
-    take_any(RemediationSteps)
-    by AlertName, AlertSeverity, Description, ResourceId = tolower(ResourceId), Computer, Account, AccountSID, ResourceType, Tactics
+    take_any(RemediationSteps, Tactics, Techniques)
+    by AlertName, AlertSeverity, Description, ResourceId = tolower(ResourceId), Computer, Account, AccountSID, ResourceType
 | project
     TimeGenerated,
     AlertName,
@@ -49,4 +49,5 @@ SecurityAlert
     ParentProcessIds,
     AlertLinks,
     Tactics,
+    Techniques,
     Entities
