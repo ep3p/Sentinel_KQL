@@ -15,8 +15,8 @@ SecurityAlert
     ExtendedLinks = make_set(ExtendedLinks, 250),
     AlertLinks = make_set(AlertLink, 250),
     Entities = make_set(todynamic(Entities)),
-    take_any(RemediationSteps)
-    by AlertName, AlertSeverity, Description, ResourceId = tolower(ResourceId), MachineName, ResourceType, Tactics
+    take_any(RemediationSteps, Tactics, Techniques)
+    by AlertName, AlertSeverity, Description, ResourceId = tolower(ResourceId), MachineName, ResourceType
 | project
     TimeGenerated,
     AlertName,
@@ -32,4 +32,5 @@ SecurityAlert
     ExtendedLinks,
     AlertLinks,
     Tactics,
+    Techniques,
     Entities
