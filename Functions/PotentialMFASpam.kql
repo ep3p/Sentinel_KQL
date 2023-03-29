@@ -41,7 +41,7 @@ let _ExpectedIPRanges = toscalar(
     union
         (_GetWatchlist("IP-Vendors")
         | where Vendor == "Microsoft"
-            or (Vendor == "SymantecWSS")
+            or (Vendor == "Proxy")
         ),
         (_GetWatchlist("IP-CorporateCollaborators")
         )
