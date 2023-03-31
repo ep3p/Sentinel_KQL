@@ -1,0 +1,42 @@
+let _URLRegex = toscalar(
+    _GetWatchlist('RegEx-SingleRegularExpressions')
+    | where UseCase == "Threat Intelligence Indicator URL"
+    | project RegEx
+);
+SecurityAlert
+| where AlertName has "A potentially malicious URL click was detected" and ProviderName == "OATP"
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend
+    InvestigationAction = tostring(ExtendedProperties["InvestigationName"]),
+    URL = tostring(split(tostring(ExtendedProperties["InvestigationName"]), " - ")[1])
+| extend Domain = tostring(extract(_URLRegex, 3, URL))
+| extend SLD = strcat_array(array_slice(split(Domain, "."), -2, -1), ".")
+// Clean Entities
+| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\,{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    InvestigationActions = make_set(InvestigationAction, 250),
+    URLs = make_set(URL, 250),
+    Domains = make_set(Domain, 250),
+    AlertLinks = make_set(AlertLink, 250),
+    Entities = make_set(todynamic(Entities)),
+    take_any(RemediationSteps, Tactics, Techniques)
+    by AlertName, AlertSeverity, Description, SLD
+| project
+    TimeGenerated,
+    AlertName,
+    AlertSeverity,
+    Description,
+    RemediationSteps,
+    StartTime,
+    EndTime,
+    SLD,
+    Domains,
+    URLs,
+    InvestigationActions,
+    AlertLinks,
+    Tactics,
+    Techniques,
+    Entities
