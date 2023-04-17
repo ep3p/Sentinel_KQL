@@ -1,25 +1,29 @@
-//This rule detects IP addresses that downloaded several files in SharePoint, and in the previous days they did not make these operations.
-let query_period = 14d;
 let query_frequency = 1d;
+let query_period = 14d;
 let monitored_operations = dynamic(["FileDownloaded", "FileSyncDownloadedFull"]);
 let operation_threshold = 10;
 let file_threshold = 1;
-let expected_locations = dynamic([]);
+let ipv4_prefix_mask = 23;
+let _ExpectedLocations = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "CorporateGeolocation" 
+    | summarize make_list(Auxiliar)
+);
 let _DefaultSharePointAdministrators = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "SharePointAdministrator" and Notes has "[Default]"
     | summarize make_list(ActorPrincipalName)
-    );
+);
 let _ExpectedMachineDomainInfo = toscalar(
     _GetWatchlist("UUID-AADTenantIds")
     | where Notes has "[MachineDomainInfoHomeTenant]"
     | summarize make_list(tostring(TenantId))
-    );
+);
 let _ExpectedDomain = toscalar(
     _GetWatchlist("UUID-AADTenantIds")
     | where Notes has "[HomeTenant]"
     | summarize make_list(strcat("@", Domain))
-    );
+);
 let _ExpectedIPRanges = dynamic([]);
 OfficeActivity
 | where TimeGenerated > ago(query_frequency)
@@ -29,8 +33,7 @@ OfficeActivity
     | where TimeGenerated between(ago(query_period) .. ago(query_frequency))
     | where Operation in (monitored_operations) and not(UserId in (_DefaultSharePointAdministrators))
     | distinct ClientIP
-    )
-    on ClientIP
+    ) on ClientIP
 | as _FileOperations
 | summarize
     StartTime = min(TimeGenerated),
@@ -43,27 +46,27 @@ OfficeActivity
 | lookup kind=leftouter (
     _FileOperations
     | summarize OperationCount = count() by ClientIP
-    )
-    on ClientIP
+    ) on ClientIP
 | where OperationCount > operation_threshold or FileCount > file_threshold
+// Remove operations from expected devices
+| where not(MachineDomainInfo in (_ExpectedMachineDomainInfo) or ipv4_is_in_any_range(ClientIP, _ExpectedIPRanges))
 // Add geolocation from IP address
+| extend IPRange = parse_ipv6_mask(ClientIP, 128 - (32 - ipv4_prefix_mask))
 | lookup kind=leftouter (
     union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs
     | where TimeGenerated > ago(query_period)
     | summarize hint.strategy=shuffle take_anyif(Location, isnotempty(Location)) by IPAddress
-    )
-    on $left.ClientIP == $right.IPAddress
-// Remove operations from expected devices
-//| where not(MachineDomainInfo in (_ExpectedMachineDomainInfo) or ipv4_is_in_any_range(ClientIP, _ExpectedIPRanges))
+    | summarize Locations = make_set_if(Location, isnotempty(Location)) by IPRange = parse_ipv6_mask(IPAddress, 128 - (32 - ipv4_prefix_mask))
+    ) on IPRange
 // Remove home tenant users from expected locations
-//| where not(Location in (expected_locations) and UserId has_any (_ExpectedDomain))
+| where not(array_length(Locations) == 1 and tostring(Locations[0]) in (_ExpectedLocations) and UserId has_any (_ExpectedDomain))
 | project
     StartTime,
     EndTime,
     OfficeWorkload,
     UserId,
     ClientIP,
-    Location,
+    Locations,
     MachineDomainInfo,
     OperationCount,
     Operations,
