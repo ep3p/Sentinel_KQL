@@ -7,7 +7,6 @@ let _ExpectedLocations = toscalar(
     | summarize make_list(Auxiliar)
 );
 let _ExpectedIPRanges = dynamic([]);
-);
 let _RiskEvents = materialize(
     AADUserRiskEvents
     | where TimeGenerated > ago(query_frequency + auth_method_change_period_diff)
@@ -31,7 +30,27 @@ let _RiskEvents = materialize(
         RelatedLocation_IpAddress = tostring(column_ifexists("AdditionalInfo_relatedLocation", dynamic(null))["clientIP"]),
         RelatedLocation_Location = tostring(column_ifexists("AdditionalInfo_relatedLocation", dynamic(null))["countryCode"]),
         RelatedLocation_SignIn_TimeGenerated = column_ifexists("AdditionalInfo_relatedEventTimeInUtc", datetime(null))
-    | project TimeGenerated, RelatedLocation_SignIn_TimeGenerated, RelatedLocation_IpAddress, RelatedLocation_Location, SignIn_TimeGenerated, IpAddress, Location, UserPrincipalName, UserDisplayName, Source, RiskEventType, DetectionTimingType, RiskLevel, RiskState, RiskDetail, CorrelationId, RequestId, UserId, AdditionalInfo, RiskEventId = Id
+    | project
+        TimeGenerated,
+        RelatedLocation_SignIn_TimeGenerated,
+        RelatedLocation_IpAddress,
+        RelatedLocation_Location,
+        SignIn_TimeGenerated,
+        IpAddress,
+        Location,
+        UserPrincipalName,
+        UserDisplayName,
+        Source,
+        RiskEventType,
+        DetectionTimingType,
+        RiskLevel,
+        RiskState,
+        RiskDetail,
+        CorrelationId,
+        RequestId,
+        UserId,
+        AdditionalInfo,
+        RiskEventId = Id
 );
 let _AuthenticationMethodChanges =
     AuthenticationMethodChanges(query_period, toscalar(_RiskEvents | summarize make_set(UserId)))
@@ -52,14 +71,40 @@ _RiskEvents
     BenignAlert = case(
         // Remove Unfamiliar sign-in properties cases where MFA was not set previously and the location or IP address is expected, depending on severity
         RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationMethod", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)), true,
+        // Remove Unfamiliar sign-in properties cases where MFA was not set previously and the location or IP address is expected, depending on severity
+        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationPhoneAppDetail", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)) and column_ifexists("AuthMethodChange_OperationName", "") has "started security info registration", true,
+        // Remove Unfamiliar sign-in properties cases where MFA was not set previously and the location or IP address is expected, depending on severity
+        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationUserDetails", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)), true,
         // Remove Atypical travel cases from expected locations, depending on severity
-        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and RelatedLocation_Location == Location and RelatedLocation_Location in (_ExpectedLocations) and Location in (_ExpectedLocations) , true,
+        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and RelatedLocation_Location == Location and RelatedLocation_Location in (_ExpectedLocations) and Location in (_ExpectedLocations), true,
         // Remove Atypical travel cases from expected IP addresses, depending on severity
-        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and ipv4_is_in_any_range(RelatedLocation_IpAddress, _ExpectedIPRanges)    and Location in (_ExpectedLocations), true,
-        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)                    and RelatedLocation_Location in (_ExpectedLocations), true,
+        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and ipv4_is_in_any_range(RelatedLocation_IpAddress, _ExpectedIPRanges) and Location in (_ExpectedLocations), true,
+        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges) and RelatedLocation_Location in (_ExpectedLocations), true,
         false
     )
 // Remove benign cases where risk level is not High
 | where not(BenignAlert and not(RiskLevel in ("high")))
 | summarize arg_min(TimeGenerated, *) by UserId, RiskEventType, RiskLevel, AuthMethodChange_TimeGenerated, IpAddress
-| project-reorder TimeGenerated, RelatedLocation_SignIn_TimeGenerated, RelatedLocation_IpAddress, RelatedLocation_Location, SignIn_TimeGenerated, IpAddress, Location, AuthMethodChange_TimeGenerated, UserPrincipalName, UserDisplayName, Source, RiskEventType, DetectionTimingType, RiskLevel, RiskState, RiskDetail, CorrelationId, RequestId, UserId, AdditionalInfo, RiskEventId, AuthMethodChange_*
+| project-reorder
+    TimeGenerated,
+    RelatedLocation_SignIn_TimeGenerated,
+    RelatedLocation_IpAddress,
+    RelatedLocation_Location,
+    SignIn_TimeGenerated,
+    IpAddress,
+    Location,
+    AuthMethodChange_TimeGenerated,
+    UserPrincipalName,
+    UserDisplayName,
+    Source,
+    RiskEventType,
+    DetectionTimingType,
+    RiskLevel,
+    RiskState,
+    RiskDetail,
+    CorrelationId,
+    RequestId,
+    UserId,
+    AdditionalInfo,
+    RiskEventId,
+    AuthMethodChange_*
