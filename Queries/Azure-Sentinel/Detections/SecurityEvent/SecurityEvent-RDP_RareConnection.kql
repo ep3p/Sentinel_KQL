@@ -1,0 +1,153 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let query_lookback = 6h;
+let join_timespan_step = 5m;
+let _ExpectedSourceIPAddresses = dynamic([]);
+let _SharedAddressRanges =
+    _GetWatchlist("IP-PrivateAddressing")
+    | where Notes has_all ("[VPN]", "[RDPRange]")
+    | project IPAddressRange = IPAddress
+;
+let _DomainControllers = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Service == "DomainController"
+    | summarize make_list(HostName)
+);
+let _RDPEvents = materialize(
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID == 4624
+        and (LogonType == 10 or (LogonType == 7 and not(IpAddress in ("-", "127.0.0.1"))))
+    | where not(IpAddress in (_ExpectedSourceIPAddresses))
+    | summarize
+        ElevatedToken = make_set_if(ElevatedToken, isnotempty(ElevatedToken)),
+        take_any(LogonTypeName, TargetUserSid)
+        by
+        TimeGenerated = bin(TimeGenerated, 1s),
+        Computer,
+        Account,
+        AccountType,
+        Activity,
+        IpAddress,
+        LogonType,
+        RestrictedAdminMode,
+        VirtualAccount
+    | evaluate ipv4_lookup(_SharedAddressRanges, IpAddress, IPAddressRange, return_unmatched = true)
+    | extend IPAddressRange = case(
+        isempty(IPAddressRange), IpAddress,
+        //ipv4_netmask_suffix(IpAddressRange) < 23, format_ipv4_mask(IpAddress, 24),
+        IPAddressRange
+        )
+);
+_RDPEvents
+| where TimeGenerated > ago(query_frequency)
+| join kind=leftanti (
+    _RDPEvents
+    | where TimeGenerated between (ago(query_period) .. ago(query_frequency))
+    ) on Computer, Account, IPAddressRange
+| extend bin_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+// Gather name of source computer, this information might not be correct
+| join hint.strategy=shuffle kind=leftouter (
+    SecurityEvent
+    | where TimeGenerated > ago(query_frequency + query_lookback)
+    | where EventID == 4624
+        and not(LogonType in (7, 10))
+        and not(IpAddress in ("", "::1", "-", "127.0.0.1"))
+    | project
+        SourceComputer_TimeGenerated = TimeGenerated,
+        IpAddress,
+        SourceComputer = case(
+            AccountType == "Machine", toupper(extract(@"([^\\]+\\)?(.*)\$", 2, Account)),
+            LogonProcessName has "NtLmSsp" and WorkstationName != "-", toupper(WorkstationName),
+            ""
+        ),
+        binSourceComputer_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+    | where isnotempty(SourceComputer)
+    | mv-expand binSourceComputer_TimeGenerated = range(binSourceComputer_TimeGenerated, binSourceComputer_TimeGenerated + query_lookback, join_timespan_step) to typeof(datetime)
+    ) on IpAddress, $left.bin_TimeGenerated == $right.binSourceComputer_TimeGenerated
+| project-away binSourceComputer_TimeGenerated, IpAddress1
+| extend
+    SourceComputer_TimeGenerated = case(
+        isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated - 1s > TimeGenerated, datetime(null),
+        isnotempty(SourceComputer) and SourceComputer == Computer, datetime(null),
+        isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated < TimeGenerated - query_lookback, datetime(null),
+        SourceComputer_TimeGenerated
+    ),
+    SourceComputer = case(
+        isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated - 1s > TimeGenerated, "",
+        isnotempty(SourceComputer) and SourceComputer == Computer, "",
+        isnotempty(SourceComputer_TimeGenerated) and SourceComputer_TimeGenerated < TimeGenerated - query_lookback, "",
+        SourceComputer
+    )
+// Take the lastest computer info
+| summarize
+    SourceComputers = make_set_if(SourceComputer, isnotempty(SourceComputer)),
+    arg_max(SourceComputer_TimeGenerated, *)
+    by TimeGenerated, Computer, Account, IpAddress
+// Gather accounts used by the source IpAddress, in domain controllers
+| join hint.strategy=shuffle kind=leftouter (
+    SecurityEvent
+    | where TimeGenerated > ago(query_frequency + query_lookback)
+    | where EventID == 4624
+        and AccountType == "User"
+        and Computer has_any (_DomainControllers)
+        //and not(Account == @"NT AUTHORITY\ANONYMOUS LOGON")
+        //and not(LogonType == 10 or (LogonType == 7 and not(IpAddress in ("-", "127.0.0.1"))))
+        //and not(IpAddress in ("", "::1", "-", "127.0.0.1"))
+    | project
+        SourceAccount_TimeGenerated = TimeGenerated,
+        IpAddress,
+        SourceAccount = tolower(Account),
+        binSourceAccount_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+    | mv-expand binSourceAccount_TimeGenerated = range(binSourceAccount_TimeGenerated, binSourceAccount_TimeGenerated + query_lookback, join_timespan_step) to typeof(datetime)
+    ) on IpAddress, $left.bin_TimeGenerated == $right.binSourceAccount_TimeGenerated
+| project-away binSourceAccount_TimeGenerated, IpAddress1, bin_TimeGenerated
+| extend
+    SourceAccount_TimeGenerated = case(
+        isnotempty(SourceAccount_TimeGenerated) and SourceAccount_TimeGenerated - 1s > TimeGenerated, datetime(null),
+        isnotempty(SourceAccount) and SourceAccount == tolower(Account), datetime(null),
+        isnotempty(SourceAccount_TimeGenerated) and SourceAccount_TimeGenerated < TimeGenerated - query_lookback, datetime(null),
+        SourceAccount_TimeGenerated
+    ),
+    SourceAccount = case(
+        isnotempty(SourceAccount_TimeGenerated) and SourceAccount_TimeGenerated - 1s > TimeGenerated, "",
+        isnotempty(SourceAccount) and SourceAccount == tolower(Account), "",
+        isnotempty(SourceAccount_TimeGenerated) and SourceAccount_TimeGenerated < TimeGenerated - query_lookback, "",
+        SourceAccount
+    )
+// Take the lastest account info
+| summarize
+    arg_max(SourceAccount_TimeGenerated, *)
+    by TimeGenerated, Computer, Account, IpAddress
+// Summarize in one line per relevant info
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Count = count(),
+    ElevatedToken = make_set(ElevatedToken),
+    SourceComputers = make_set(SourceComputers),
+    SourceComputer_TimeGenerated = min(SourceComputer_TimeGenerated),
+    SourceAccount_TimeGenerated = min(SourceAccount_TimeGenerated),
+    arg_min(TimeGenerated, IPAddressRange, AccountType, Activity, RestrictedAdminMode, VirtualAccount, TargetUserSid)
+    by Computer, Account, IpAddress, LogonTypeName, SourceComputer, SourceAccount
+| project
+    TimeGenerated,
+    StartTime,
+    EndTime,
+    Count,
+    Computer,
+    Account,
+    IpAddress,
+    IPAddressRange,
+    AccountType,
+    Activity,
+    LogonTypeName,
+    RestrictedAdminMode,
+    VirtualAccount,
+    ElevatedToken,
+    TargetUserSid,
+    SourceComputers,
+    SourceComputer_TimeGenerated,
+    SourceComputer,
+    SourceAccount_TimeGenerated,
+    SourceAccount
