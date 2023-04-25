@@ -1,0 +1,34 @@
+let query_frequency = 1h;
+let query_lookback = 1h;
+let query_period = query_frequency + query_lookback;
+let join_timespan_step = 5m;
+SecurityEvent
+| where TimeGenerated > ago(query_frequency)
+| where EventID == 4688
+| where CommandLine has "sdelete" or Process =~ "sdelete.exe"
+//| where CommandLine has_all ("-s", "-r") // Recursively
+| extend bin_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+| join hint.strategy=shuffle kind=inner (
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID == 4688 //and Process has "svchost.exe"
+    | where CommandLine has_any ("-k GPSvcGroup", "-s gpsvc")
+    | extend bin_TimeGenerated = bin(TimeGenerated, join_timespan_step)
+    | project bin_TimeGenerated, Computer, NewProcessName, NewProcessId, ParentCommandLine = CommandLine, ParentParentProcessName = ParentProcessName
+    | mv-expand bin_TimeGenerated = range(bin_TimeGenerated, bin_TimeGenerated + query_lookback, join_timespan_step) to typeof(datetime)
+    ) on Computer, bin_TimeGenerated, $left.ParentProcessName == $right.NewProcessName, $left.ProcessId == $right.NewProcessId
+| project
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    Activity,
+    CommandLine,
+    NewProcessName,
+    NewProcessId,
+    ParentCommandLine,
+    ParentProcessName,
+    ParentProcessId = ProcessId,
+    ParentParentProcessName,
+    TokenElevationType,
+    SubjectLogonId
