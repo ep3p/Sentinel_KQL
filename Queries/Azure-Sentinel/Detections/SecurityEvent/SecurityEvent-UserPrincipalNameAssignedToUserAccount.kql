@@ -1,0 +1,50 @@
+SecurityEvent
+| where EventID == 5136 and EventData has_all ("servicePrincipalName", "user")
+| project TimeGenerated, Computer, Account, Activity, SubjectLogonId, OperationType, EventData
+| mv-apply Auxiliar = parse_xml(EventData)["EventData"]["Data"] on (
+    summarize BagToUnpack = make_bag(pack(tostring(Auxiliar["@Name"]), tostring(Auxiliar["#text"])))
+    )
+| evaluate bag_unpack(BagToUnpack, columnsConflict="keep_source"): (TimeGenerated: datetime, Computer: string, Account: string, Activity: string, SubjectLogonId: string, OperationType: string, EventData: string, OpCorrelationID: string, DSName:string, ObjectDN: string, ObjectGUID: string, ObjectClass: string, AttributeLDAPDisplayName: string, AttributeValue: string)
+| where AttributeLDAPDisplayName =~ "servicePrincipalName" and ObjectClass =~ "user"
+| extend
+    TargetUserName = extract(@"(?i:CN\=)([^,]+)", 1, ObjectDN),
+    ObjectGUID = toupper(ObjectGUID),
+    TargetDomain = DSName
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    ValueAdded_TimeGenerated = maxif(TimeGenerated, OperationType == "%%14674"),
+    ValueDeleted_TimeGenerated = maxif(TimeGenerated, OperationType == "%%14675"),
+    SubjectLogonIds = make_set(SubjectLogonId),
+    Computers = make_set(Computer),
+    take_any(Activity, TargetUserName, AttributeLDAPDisplayName)
+    by Account, TargetDomain, ObjectGUID, AttributeValue
+| extend AddedOrDeleted = case(
+        isnotempty(ValueAdded_TimeGenerated) and isempty(ValueDeleted_TimeGenerated), "Added",
+        isnotempty(ValueAdded_TimeGenerated) and isnotempty(ValueDeleted_TimeGenerated) and ValueAdded_TimeGenerated > ValueDeleted_TimeGenerated, "Added",
+        isempty(ValueAdded_TimeGenerated) and isnotempty(ValueDeleted_TimeGenerated), "Deleted",
+        isnotempty(ValueAdded_TimeGenerated) and isnotempty(ValueDeleted_TimeGenerated) and ValueAdded_TimeGenerated < ValueDeleted_TimeGenerated,  "Deleted",
+        ""
+    )
+| summarize
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    ValueAdded = array_sort_asc(make_set_if(AttributeValue, AddedOrDeleted == "Added")),
+    ValueDeleted = array_sort_asc(make_set_if(AttributeValue, AddedOrDeleted == "Deleted")),
+    SubjectLogonIds = make_set(SubjectLogonIds),
+    Computers = array_sort_asc(make_set(Computers)),
+    take_any(Activity, TargetUserName, AttributeLDAPDisplayName)
+    by Account, TargetDomain, ObjectGUID
+| project
+    StartTime,
+    EndTime,
+    Computers,
+    Account,
+    Activity,
+    TargetDomain,
+    TargetUserName,
+    AttributeLDAPDisplayName,
+    ValueAdded,
+    ValueDeleted,
+    ObjectGUID,
+    SubjectLogonIds
