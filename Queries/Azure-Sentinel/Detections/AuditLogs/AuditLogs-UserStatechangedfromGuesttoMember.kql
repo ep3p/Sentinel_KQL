@@ -1,8 +1,20 @@
 AuditLogs
 | where Category == "UserManagement"// and OperationName has_any ("Update user")
+| where TargetResources has_any ("Guest", "#EXT#")
 | mv-expand TargetResource = TargetResources
-| mv-expand modifiedProperty = TargetResource["modifiedProperties"]
-| where modifiedProperty["displayName"] has "UserType" and modifiedProperty["newValue"] has "Member" and modifiedProperty["oldValue"] has "Guest"
+// | where TargetResource["type"] == "User"
+| mv-apply modifiedProperty = TargetResource["modifiedProperties"] on (
+    summarize modifiedProperties = make_bag(
+        bag_pack(tostring(modifiedProperty["displayName"]),
+            bag_pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])),
+                "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
+    )
+| where case(
+    isnotempty(modifiedProperties["TargetId.UserType"]["oldValue"]) and tostring(modifiedProperties["TargetId.UserType"]["oldValue"]) != tostring(modifiedProperties["TargetId.UserType"]["newValue"]), true,
+    tostring(modifiedProperties["UserType"]["oldValue"]) != "[]" and tostring(modifiedProperties["UserType"]["oldValue"]) != tostring(modifiedProperties["UserType"]["newValue"]), true,
+    tostring(modifiedProperties["UserPrincipalName"]["oldValue"]) != "[]" and tostring(modifiedProperties["UserPrincipalName"]["oldValue"]) != tostring(modifiedProperties["UserPrincipalName"]["newValue"]), true,
+    false
+)
 | extend
     Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
     InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
@@ -12,6 +24,7 @@ AuditLogs
 | project
     TimeGenerated,
     Category,
+    Identity,
     Initiator,
     IPAddress,
     OperationName,
