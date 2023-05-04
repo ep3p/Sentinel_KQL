@@ -1,0 +1,7 @@
+SigninLogs
+| where (RiskEventTypes != "[]" or RiskEventTypes_V2 != "[]") and AuthenticationDetails has "Password"
+| extend AuthenticationDetails = todynamic(AuthenticationDetails), TimeIngested = ingestion_time()
+| mv-expand AuthenticationDetails
+| where AuthenticationDetails["authenticationMethod"] == "Password" and AuthenticationDetails["succeeded"] == "false"
+| sort by TimeIngested
+| project-reorder TimeIngested, TimeGenerated, RiskEventTypes, RiskState, AuthenticationDetails
