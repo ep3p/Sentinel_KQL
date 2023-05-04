@@ -10,7 +10,7 @@ let _UntrustedResultTypes = toscalar(
 let _AnonymousIPAddressAlerts = materialize(
     SecurityAlert
     | where TimeGenerated > ago(query_period)
-    | where ProductName has "Azure Active Directory Identity Protection" and AlertName has "Anonymous IP address"
+    | where ProductName has "Azure Active Directory Identity Protection" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Anonymous IP address"
     | extend ExtendedProperties = todynamic(ExtendedProperties)
     | extend OriginalRequestId = tostring(ExtendedProperties["Request Id"])
     | summarize minTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by OriginalRequestId, AlertName, AlertSeverity
