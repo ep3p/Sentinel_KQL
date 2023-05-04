@@ -14,7 +14,7 @@ let _UntrustedResultTypes = toscalar(
 let _SuspiciousInboxManipulationRuleAlerts = materialize(
     SecurityAlert
     | where TimeGenerated between (ago(query_wait + query_frequency) .. ago(query_wait))
-    | where ProductName has "Microsoft Cloud App Security" and AlertName has "Suspicious inbox manipulation rule"
+    | where ProductName has "Microsoft Cloud App Security" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Suspicious inbox manipulation rule"
     //| where CompromisedEntity has_any (_HomeTenantDomains)
     | extend ExtendedProperties = todynamic(ExtendedProperties)
     | project
