@@ -13,7 +13,7 @@ let _UntrustedResultTypes = toscalar(
 let _InfrequentCountryAlerts = materialize(
     SecurityAlert
     | where TimeGenerated > ago(query_frequency)
-    | where ProductName has "Microsoft Cloud App Security" and AlertName has "Activity from infrequent country"
+    | where ProductName has "Microsoft Cloud App Security" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Activity from infrequent country"
     //| where CompromisedEntity has_any (_HomeTenantDomains)
     | extend ExtendedProperties = todynamic(ExtendedProperties)
     | project
