@@ -17,7 +17,7 @@ let _ExpectedIPRanges = dynamic([]);
 let _AtypicaltravelAlerts = materialize(
     SecurityAlert
     | where TimeGenerated > ago(query_period)
-    | where ProductName has "Azure Active Directory Identity Protection" and AlertName has "Atypical travel"
+    | where ProductName has "Azure Active Directory Identity Protection" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Atypical travel"
     | extend ExtendedProperties = todynamic(ExtendedProperties)
     | extend OriginalRequestId = tostring(ExtendedProperties["Request Id"])
     | project
