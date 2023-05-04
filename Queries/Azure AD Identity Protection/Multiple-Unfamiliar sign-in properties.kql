@@ -17,7 +17,7 @@ let _ExpectedIPRanges = dynamic([]);
 let _UnfamiliarAlerts = materialize(
     SecurityAlert
     | where TimeGenerated > ago(query_period)
-    | where ProductName has "Azure Active Directory Identity Protection" and AlertName has "Unfamiliar sign-in properties"
+    | where ProductName has "Azure Active Directory Identity Protection" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Unfamiliar sign-in properties"
     | extend ExtendedProperties = todynamic(ExtendedProperties)
     | extend OriginalRequestId = tostring(ExtendedProperties["Request Id"])
     | summarize minTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by OriginalRequestId, AlertName, AlertSeverity
