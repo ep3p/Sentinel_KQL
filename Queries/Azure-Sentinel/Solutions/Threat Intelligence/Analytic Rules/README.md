@@ -94,7 +94,7 @@ You can notice this query scheme has some placeholders indicated by the strings 
 ```kql
 _IndicatorTypesDatatable = datatable(EntityType:string, IndicatorDictionary:dynamic)
 _TablesDatatable = datatable(EntityType:string, TableDictionary:dynamic)
-_IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableConditions:dynamic)
+_IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableDictionary:dynamic)
 ```
 Each datable *element* has a dictionary that will contain the placeholders.
 
@@ -119,7 +119,7 @@ dynamic({
 })
 ,
 ```
-```TITableLookback```, ```TITableAdditionalLets``` and ```TITableConditions``` are placeholders in the query scheme. Each element in the datatable should have a dictionary (in this case in the column **) with the *same placeholders keys*, even if the placeholders values are empty.
+```TITableLookback```, ```TITableAdditionalLets``` and ```TITableConditions``` are placeholders in the query scheme. Each element in the datatable should have a dictionary (in this case in the column *TITableDictionary*) with the *same placeholders keys*, even if the placeholders values are empty.
 
 At the end, this function tries to substitute, in the query scheme, any placeholder found in the dictionaries of each datatable. **If you need to change the threat intelligence indicator detections**, you just need to change the query scheme or some datatable elements, and make sure the placeholder keys are named the same everywhere. **You can add or remove as many placeholders as you want**, the ```scan``` KQL operator will try to replace *all* the placeholder keys found in the dictionaries.
 
