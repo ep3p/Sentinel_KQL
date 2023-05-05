@@ -100,7 +100,8 @@ Each datable *element* has a dictionary that will contain the placeholders.
 
 An example element for the ```_IndicatorXTableDatatable``` datatable, that represents the combination of *URL indicators* with the *Syslog table*, would be:
 ```kql
-'URL', 'Syslog',
+'URL',
+'Syslog',
 dynamic({
     "TITableLookback":
         '2d'
