@@ -1239,7 +1239,7 @@
                 ``````
         })
     ];
-    let _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableConditions:dynamic) [
+    let _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableDictionary:dynamic) [
         'URL', 'Syslog',
         dynamic({
             "TITableLookback":
@@ -2283,7 +2283,7 @@
             bag_merge(
                 IndicatorDictionary,
                 TableDictionary,
-                TITableConditions
+                TITableDictionary
             )
     | mv-expand bagexpansion=array Dictionary
     | sort by IndicatorType, TableType
