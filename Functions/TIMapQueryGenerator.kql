@@ -2313,7 +2313,7 @@
                     // Take the earliest TimeGenerated and the latest column info
                     | summarize hint.strategy=shuffle
                         minTimeGenerated = min(TimeGenerated),
-                        arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId<<<TIProjectColumns>>>)
+                        arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation, ExternalIndicatorId<<<TIProjectColumns>>>)
                         by IndicatorId
                     // Remove inactive or expired indicators
                     | where not(not(Active) or ExpirationDateTime < now())
@@ -2343,7 +2343,7 @@
                 //| summarize hint.strategy=shuffle take_any(*) by <<<TIGroupByColumn>>><<<TableGroupByColumn>>>
                 | project
                     <<<TableName>>>_TimeGenerated,
-                    Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation<<<TIExtendColumns>>><<<TIProjectColumns>>>,
+                    Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation<<<TIExtendColumns>>><<<TIProjectColumns>>>,
                     <<<TableColumns&LookUp>>>
             };
             union// isfuzzy=true
