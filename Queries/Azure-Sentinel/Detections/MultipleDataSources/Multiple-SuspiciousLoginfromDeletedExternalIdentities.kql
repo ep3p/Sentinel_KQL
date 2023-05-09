@@ -1,0 +1,52 @@
+let query_frequency = 1h;
+let query_period = 1d;
+AuditLogs
+| where TimeGenerated > ago(query_frequency)
+| where Category =~ "UserManagement" and OperationName =~ "Delete user"
+| mv-expand TargetResource = TargetResources
+| where TargetResource["type"] == "User" and TargetResource["userPrincipalName"] has "#EXT#"
+| extend ParsedDeletedUserPrincipalName = extract(@"^[0-9a-f]{32}([^\#]+)\#EXT\#", 1, tostring(TargetResource["userPrincipalName"]))
+| extend
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    Delete_IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| project
+    Delete_TimeGenerated = TimeGenerated,
+    Category,
+    Identity,
+    Initiator,
+    Delete_IPAddress,
+    OperationName,
+    Result,
+    ParsedDeletedUserPrincipalName,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    InitiatorId,
+    CorrelationId
+| join kind=inner (
+    SigninLogs
+    | where TimeGenerated > ago(query_period)
+    | summarize take_any(*) by UserPrincipalName
+    | extend ParsedUserPrincipalName = translate("@", "_", UserPrincipalName)
+    | project
+        SigninLogs_TimeGenerated = TimeGenerated,
+        UserPrincipalName,
+        UserDisplayName,
+        ResultType,
+        ResultDescription,
+        IPAddress,
+        LocationDetails,
+        AppDisplayName,
+        ResourceDisplayName,
+        ClientAppUsed,
+        UserAgent,
+        DeviceDetail,
+        UserId,
+        UserType,
+        OriginalRequestId,
+        ParsedUserPrincipalName
+    )
+    on $left.ParsedDeletedUserPrincipalName == $right.ParsedUserPrincipalName
+| where Delete_TimeGenerated > SigninLogs_TimeGenerated
+| project-away ParsedDeletedUserPrincipalName, ParsedUserPrincipalName
