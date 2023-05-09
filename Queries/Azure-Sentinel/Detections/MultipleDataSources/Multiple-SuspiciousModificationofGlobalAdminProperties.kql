@@ -1,0 +1,29 @@
+let query_frequency = 1h;
+let query_period = 14d;
+IdentityInfo
+| where TimeGenerated > ago(query_period)
+| where set_has_element(AssignedRoles, "Global Administrator")
+| distinct AccountUPN, AccountObjectId
+| join kind=inner (
+    AuditLogs
+    | where TimeGenerated > ago(query_frequency)
+    | where OperationName=~ "Update user" and Result =~ "success"
+    // | where isnotempty(InitiatedBy["user"])
+    | mv-expand TargetResource = TargetResources
+    | where TargetResource["type"] == "User"
+    | extend AccountObjectId = tostring(TargetResource["id"])
+    | where not(tostring(TargetResource["modifiedProperties"]) == "[]")
+    | mv-apply modifiedProperty = TargetResource["modifiedProperties"] on (
+        summarize modifiedProperties = make_bag(
+            bag_pack(tostring(modifiedProperty["displayName"]),
+                bag_pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])),
+                    "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
+    )
+    | where not(tostring(modifiedProperties["Included Updated Properties"]["newValue"]) in ("LastDirSyncTime", ""))
+    | where not(isnotempty(modifiedProperties["StrongAuthenticationPhoneAppDetail"]) and tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(modifiedProperties["StrongAuthenticationPhoneAppDetail"]["newValue"])))) == tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(modifiedProperties["StrongAuthenticationPhoneAppDetail"]["oldValue"])))))
+    | extend
+        Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+        InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+        IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+    ) on AccountObjectId
+| project TimeGenerated, Category, Identity, Initiator, IPAddress, OperationName, Result, AccountUPN, InitiatedBy, AdditionalDetails, TargetResources, AccountObjectId, InitiatorId, CorrelationId
