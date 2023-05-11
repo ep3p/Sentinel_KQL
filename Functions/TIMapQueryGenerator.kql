@@ -1946,7 +1946,7 @@
             "TITableConditions":
                 ```
                 | where not(EmailDirection in ("Intra-org"))
-                | mv-expand EmailAddress = pack_array(SenderFromAddress, iff(SenderFromAddress != SenderMailFromAddress, SenderFromAddress, ""), RecipientEmailAddress) to typeof(string)
+                | mv-expand EmailAddress = pack_array(SenderMailFromAddress, iff(SenderFromAddress != SenderMailFromAddress, SenderFromAddress, ""), RecipientEmailAddress) to typeof(string)
                 | where isnotempty(EmailAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(EmailAddress has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | extend EmailAddress = tolower(EmailAddress)
@@ -2160,7 +2160,7 @@
             "TITableConditions":
                 ```
                 | where not(EmailDirection in ("Intra-org"))
-                | mv-expand Domain = pack_array(SenderFromDomain, iff(SenderFromDomain != SenderMailFromDomain, SenderFromDomain, ""), split(RecipientEmailAddress, "@")[-1]) to typeof(string)
+                | mv-expand Domain = pack_array(SenderMailFromDomain, iff(SenderFromDomain != SenderMailFromDomain, SenderFromDomain, ""), split(RecipientEmailAddress, "@")[-1]) to typeof(string)
                 | where isnotempty(Domain)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(Domain has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = tolower(Domain)
