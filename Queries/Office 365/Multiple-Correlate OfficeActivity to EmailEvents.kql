@@ -1,0 +1,39 @@
+let _RelevantEmailEvents =
+    EmailEvents
+    // Filter wanted EmailEvents
+    //| where Subject has "" and SenderFromAddress has ""
+    | extend EmailEvents_TimeGenerated = TimeGenerated
+    | project EmailEvents_TimeGenerated, InternetMessageId, DeliveryAction, SenderFromAddress, RecipientEmailAddress, Subject
+;
+union
+    (
+    _RelevantEmailEvents
+    | join kind=leftouter (
+        OfficeActivity
+        | where OfficeWorkload == "Exchange"
+        | mv-expand ExpandedFolder = iff(isempty(Folders), dynamic([""]), todynamic(Folders)), ExpandedAffectedItem = iff(isempty(AffectedItems), dynamic([""]), todynamic(AffectedItems))
+        | extend AffectedItemsInternetMessageId = tostring(ExpandedAffectedItem["InternetMessageId"])
+        | mv-expand FolderItem = iff(isempty(ExpandedFolder), dynamic([""]), ExpandedFolder["FolderItems"])
+        | extend FolderItemInternetMessageId = tostring(FolderItem["InternetMessageId"])
+        | extend ItemInternetMessageId = tostring(todynamic(Item)["InternetMessageId"])
+        | mv-expand InternetMessageId = pack_array(AffectedItemsInternetMessageId, FolderItemInternetMessageId, ItemInternetMessageId) to typeof(string)
+        | where isnotempty(InternetMessageId)
+        // Remove certain automatic operations (not MailboxOwnerUPN generated)
+        | where not(AppId == "" and ClientAppId == "" and Operation == "MailItemsAccessed")
+        | extend Exchange_TimeGenerated = TimeGenerated
+        ) on InternetMessageId
+    ),
+    (
+    _RelevantEmailEvents
+    | join kind=inner (
+        OfficeActivity
+        | where OfficeWorkload == "Exchange"
+        | extend Subject = replace_string(tostring(todynamic(Item)["Subject"]), "[PrefixToRemove] ", "")
+        | extend Exchange_TimeGenerated = TimeGenerated
+        ) on Subject, $left.RecipientEmailAddress == $right.MailboxOwnerUPN
+    )
+| project EmailEvents_TimeGenerated, DeliveryAction, SenderFromAddress, RecipientEmailAddress, Subject, Exchange_TimeGenerated, OfficeWorkload, RecordType, UserId, MailboxOwnerUPN, Client_IPAddress, Operation, OperationProperties, ResultStatus, Folder, DestFolder, Folders, AffectedItems, Item, AppId, ClientAppId, ClientProcessName, InternetMessageId
+| sort by RecipientEmailAddress asc, Exchange_TimeGenerated asc
+// | where Operation has_any ("MoveToDeletedItems", "Send")
+// | where Operation has "MailItemsAccessed"
+// | where not(Operation has "SoftDelete")
