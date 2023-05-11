@@ -22,7 +22,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         // Take the earliest TimeGenerated and the latest column info
         | summarize hint.strategy=shuffle
             minTimeGenerated = min(TimeGenerated),
-            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId, EmailSenderAddress)
+            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation, ExternalIndicatorId, EmailSenderAddress)
             by IndicatorId
         // Remove inactive or expired indicators
         | where not(not(Active) or ExpirationDateTime < now())
@@ -54,7 +54,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where ingestion_time() between (table_start .. table_end)
         // Filter events that may contain indicators
         | where not(EmailDirection in ("Intra-org"))
-        | mv-expand EmailAddress = pack_array(SenderFromAddress, iff(SenderFromAddress != SenderMailFromAddress, SenderFromAddress, ""), RecipientEmailAddress) to typeof(string)
+        | mv-expand EmailAddress = pack_array(SenderMailFromAddress, iff(SenderFromAddress != SenderMailFromAddress, SenderFromAddress, ""), RecipientEmailAddress) to typeof(string)
         | where isnotempty(EmailAddress)
         //| where not(_IndicatorsPrefilterLength < 10000 and not(EmailAddress has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
         | extend EmailAddress = tolower(EmailAddress)
@@ -67,7 +67,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
     //| summarize hint.strategy=shuffle take_any(*) by EmailAddress, NetworkMessageId
     | project
         EmailEvents_TimeGenerated,
-        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, EmailSenderAddress,
+        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation, EmailSenderAddress,
         SenderFromAddress, SenderFromDomain, SenderMailFromAddress, SenderMailFromDomain, SenderDisplayName, SenderIPv4, SenderIPv6, AuthenticationDetails, RecipientEmailAddress, EmailDirection, Subject, EmailLanguage, UrlCount, AttachmentCount, AdditionalFields, OrgLevelPolicy, OrgLevelAction, UserLevelPolicy, UserLevelAction, EmailActionPolicy, EmailAction, DeliveryAction, DeliveryLocation, ThreatTypes, ConfidenceLevel, DetectionMethods, Connectors, NetworkMessageId, ReportId
 };
 union// isfuzzy=true
