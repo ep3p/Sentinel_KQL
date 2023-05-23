@@ -26,4 +26,18 @@ IdentityInfo
         InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
         IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
     ) on AccountObjectId
-| project TimeGenerated, Category, Identity, Initiator, IPAddress, OperationName, Result, AccountUPN, InitiatedBy, AdditionalDetails, TargetResources, AccountObjectId, InitiatorId, CorrelationId
+| project
+    TimeGenerated,
+    Category,
+    Identity,
+    Initiator,
+    IPAddress,
+    OperationName,
+    Result,
+    AccountUPN,
+    InitiatedBy,
+    AdditionalDetails,
+    TargetResources,
+    AccountObjectId,
+    InitiatorId,
+    CorrelationId
