@@ -1,0 +1,68 @@
+let _ExpectedFilePaths =
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "LOLBASPath"
+    | project
+        ParsedProcess = tolower(Auxiliar),
+        PartialPath = extract(@"([c-z]\:\\[^\\]+\\[^\\]+)", 1, tolower(SourceAddress))
+;
+let _LOLBAS = externaldata(
+    Filename: string,
+    Description: string,
+    Author: string,
+    Date: datetime,
+    Command: string,
+    CommandDescription: string,
+    CommandUsecase: string,
+    CommandCategory: string,
+    CommandPrivileges: string,
+    Technique: string,
+    OperatingSystem: string,
+    Paths: string,
+    Detections: string,
+    Resources: string,
+    Acknowledgements: string,
+    URL: string
+    )[@"https://lolbas-project.github.io/api/lolbas.csv"] with (format="csv", ignoreFirstRecord=True)
+    | project Filename, Paths
+    | where Paths has @"C:\"
+    | mv-expand Path = split(Paths, ", ") to typeof(string)
+    | distinct
+        ParsedProcess = tolower(Filename),
+        PartialPath = extract(@"(c\:\\[^\\]+\\[^\\]+)", 1, tolower(Path))
+;
+let _LOLBASFiles = toscalar(
+    _LOLBAS
+    | summarize make_set(ParsedProcess)
+);
+SecurityEvent
+| where EventID == 4688 and Process has_any (_LOLBASFiles)
+| extend
+    ParsedProcess = tolower(Process),
+    PartialPath = extract(@"([c-z]\:\\[^\\]+\\[^\\]+)", 1, tolower(NewProcessName))
+| join kind=leftanti (
+    union
+        (_LOLBAS
+        | where isnotempty(PartialPath)
+        ),
+        _ExpectedFilePaths
+    ) on ParsedProcess, PartialPath
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Count = count(),
+    take_any(AccountType, Activity, CommandLine, Process, ParentProcessName, SubjectLogonId, TokenElevationType)
+    by Computer, Account, NewProcessName
+| project
+    StartTime,
+    EndTime,
+    Computer,
+    Account,
+    AccountType,
+    Activity,
+    Count,
+    CommandLine,
+    Process,
+    NewProcessName,
+    ParentProcessName,
+    SubjectLogonId,
+    TokenElevationType
