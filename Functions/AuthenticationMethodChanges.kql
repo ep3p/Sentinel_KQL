@@ -32,7 +32,7 @@ let _SecurityInfoChanges =
     | where (OperationName has "security info"
         and OperationName has_any ("User", "Admin")
         and OperationName has_any ("started", "changed", "registered", "updated", "reviewed", "deleted"))
-        or OperationName has_any ("Disable Strong Authentication", "passwordless phone sign-in credential")
+        or OperationName has_any ("Disable Strong Authentication", "passwordless phone sign-in credential", "Windows Hello for Business credential")
         //and Result == "success"
     | extend UserId = tolower(TargetResources[0].id)
     | where array_length(query_userids) == 0 or UserId in (query_userids)
