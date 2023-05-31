@@ -1,3 +1,4 @@
+// The query_now parameter represents the time (in UTC) at which the scheduled analytics rule ran to produce this alert.
 let event_list = dynamic([
     // https://docs.aws.amazon.com/IAM/latest/APIReference/API_Operations.html
     "AttachGroupPolicy",
@@ -85,6 +86,13 @@ let version_event_list = dynamic([
     "SetDefaultPolicy",
     "DeletePolicy"
     ]);
+let _ExcludedRoles =
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "AWSAssumedRole"
+    | project RoleName = Auxiliar, UserIdentity = ActorPrincipalName
+;
 AWSCloudTrail
 | where EventName has_any (event_list)
     or EventName matches regex strcat("$(", strcat_array(version_event_list, "|"), ")")
+| extend UserIdentity = tostring(split(UserIdentityPrincipalid, ":")[1])
+| join kind=leftanti _ExcludedRoles on $left.SessionIssuerUserName == $right.RoleName, UserIdentity
