@@ -76,6 +76,8 @@ let event_list = dynamic([
     "DeleteNetworkAclEntry",
     "RunInstances",
     "TerminateInstances",
+    "CreateFlowLogs",
+    "DeleteFlowLogs",
     // https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Operations.html
     "CreateTrail",
     "UpdateTrail",
@@ -85,7 +87,10 @@ let event_list = dynamic([
     // https://docs.aws.amazon.com/workspaces/latest/api/API_Operations.html
     "ModifyAccount",
     "ModifyBilling",
-    "ModifyPaymentMethods"
+    "ModifyPaymentMethods",
+    // https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Operations.html
+    "CreateEventBus",
+    "DeleteEventBus"
     ]);
 let version_event_list = dynamic([
     "CreatePolicy",
