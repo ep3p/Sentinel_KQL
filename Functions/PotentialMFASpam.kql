@@ -317,6 +317,8 @@ SigninLogs
     array_length(SuccessMethods) == 1 and SuccessMethods[0] == "Text message", true,
     // Assume successful OATH verification code is benign
     array_length(SuccessMethods) == 1 and SuccessMethods[0] == "OATH verification code", true,
+    // Assume successful Microsoft Authenticator notification is benign (because of number matching)
+    array_length(SuccessMethods) == 1 and SuccessMethods[0] == "Mobile app notification", true,
     // Guest account
     not(UserPrincipalName has_any (_ExpectedDomain)), true,
     // Expected source - 1 attempt - unsuccessful
