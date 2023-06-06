@@ -1,0 +1,86 @@
+// This query can help you to parse Azure Firewall events received in AZFW tables.
+//
+// Click "Save as function", in Parameters write in the fields:
+//  string   source                ""
+//  string   destination           ""
+//  int      source_port           int(null)
+//  int      destination_port      int(null)
+//  string   action                ""
+//  string   protocol              ""
+//  bool     network_log           true
+//  bool     application_log       true
+//  bool     nat_log               true
+//  bool     ids_log               true
+//  bool     threatintel_log       true
+//  string   firewall              ""
+//
+// If you name the function "AzureFirewallLogs", you can check the function with queries like the following:
+//
+// AzureFirewallLogs()
+//
+// AzureFirewallLogs("10.10.10.237/31", "172.29.55.47/24")
+//
+//let Function = (
+//     source:string = "",
+//     destination:string = "",
+//     source_port:int = int(null),
+//     destination_port:int = int(null),
+//     action:string = "",
+//     protocol:string = "",
+//     network_log:bool = true,
+//     application_log:bool = true,
+//     nat_log:bool = true,
+//     ids_log:bool = true,
+//     threatintel_log:bool = true,
+//     firewall:string = ""
+// ){
+// Check inputs
+let is_source_ipv4 = isnotempty(parse_ipv4(source));
+let is_source_ipv6 = isempty(parse_ipv4(source)) and isnotempty(parse_ipv6(source));
+let is_destination_ipv4 = isnotempty(parse_ipv4(destination));
+let is_destination_ipv6 = isempty(parse_ipv4(destination)) and isnotempty(parse_ipv6(destination));
+let is_input_valid =
+    (isempty(source) or is_source_ipv4 or is_source_ipv6)
+    and (isempty(destination) or is_destination_ipv4 or is_destination_ipv6)
+;
+// Prepare Type checks
+let removed_logs = set_difference(
+    array_iff(
+        pack_array(network_log, application_log, nat_log, ids_log, threatintel_log),
+        "",
+        dynamic(["AZFWNetworkRule", "AZFWApplicationRule", "AZFWNatRule", "AZFWIdpsSignature", "AZFWThreatIntel"])
+    ),
+    dynamic([""])
+);
+let all_logs = array_length(removed_logs) == 0;
+// Query
+union AZFWNetworkRule, AZFWApplicationRule, AZFWNatRule, AZFWIdpsSignature, AZFWThreatIntel
+// Check input is valid
+| where is_input_valid
+// Filter by Type
+| where all_logs or not(Type in (removed_logs))
+// Filter by Resource
+| where isempty(firewall) or _ResourceId has firewall
+// Filter by Action
+| where isempty(action) or Action has action// or (Type == "AZFWNatRule" and action =~ "Allow")
+// Filter by Protocol
+| where isempty(protocol) or Protocol has protocol
+// Filter by addresses
+| where case(
+    isempty(source), true,
+    is_source_ipv4, ipv4_is_in_range(SourceIp, source),
+    is_source_ipv6, ipv6_is_in_range(SourceIp, source),
+    false
+    )
+| where case(
+    isempty(destination), true,
+    is_destination_ipv4, ipv4_is_in_range(DestinationIp, destination) or ipv4_is_in_range(TranslatedIp, destination),
+    is_destination_ipv6, ipv6_is_in_range(DestinationIp, destination) or ipv6_is_in_range(TranslatedIp, destination),
+    TargetUrl has destination
+    )
+// Filter by ports
+| where isempty(source_port) or SourcePort == source_port
+| where isempty(destination_port) or DestinationPort == destination_port or TranslatedPort == destination_port
+| project-reorder TimeGenerated, Type, Action, ActionReason, Protocol, SourceIp, DestinationIp, TranslatedIp, SourcePort, DestinationPort, TranslatedPort, TargetUrl, Fqdn, WebCategory, IsTlsInspected, Rule, RuleCollection, RuleCollectionGroup, Policy, ThreatDescription, Severity, Category, Description, SignatureId, SourceSystem, _ResourceId
+//};
+//Function(source, destination)
