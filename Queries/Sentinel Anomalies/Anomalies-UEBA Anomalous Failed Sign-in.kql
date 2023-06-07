@@ -1,0 +1,19 @@
+Anomalies
+| where RuleName endswith "UEBA Anomalous Failed Sign-in" and RuleStatus != "Flighting"
+| extend
+    Query = ExtendedLinks[0]["DetailBladeInputs"]
+| project-reorder
+    TimeGenerated,
+    RuleName,
+    Description,
+    Query,
+    UserPrincipalName,
+    ActivityInsights,
+    DeviceInsights,
+    UserInsights,
+    Score,
+    AnomalyDetails,
+    Entities,
+    Tactics,
+    Techniques,
+    ExtendedLinks
