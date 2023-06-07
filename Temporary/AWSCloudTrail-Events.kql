@@ -88,6 +88,17 @@ let event_list = dynamic([
     "DeleteTrail",
     "StartLogging",
     "StopLogging",
+    // https://docs.aws.amazon.com/guardduty/latest/APIReference/API_Operations.html
+    "CreateIPSet",
+    "UpdateIPSet",
+    "UpdatePublishingDestination",
+    "DeletePublishingDestination",
+    "UpdateThreatIntelSet",
+    "DeleteThreatIntelSet",
+    "UpdateDetector",
+    "DeleteDetector",
+    "UpdateMalwareScanSettings",
+    "StopMonitoringMembers",
     // https://docs.aws.amazon.com/workspaces/latest/api/API_Operations.html
     "ModifyAccount",
     "ModifyBilling",
