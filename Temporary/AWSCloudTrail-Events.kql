@@ -78,6 +78,10 @@ let event_list = dynamic([
     "TerminateInstances",
     "CreateFlowLogs",
     "DeleteFlowLogs",
+    // https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_Operations.html
+    "ModifyRule",
+    "SetRulePriorities",
+    "SetRulePriorities",
     // https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Operations.html
     "CreateTrail",
     "UpdateTrail",
@@ -104,6 +108,6 @@ let _ExcludedRoles =
 ;
 AWSCloudTrail
 | where EventName has_any (event_list)
-    or EventName matches regex strcat("$(", strcat_array(version_event_list, "|"), ")")
+    or EventName matches regex strcat("^(", strcat_array(version_event_list, "|"), ")")
 | extend UserIdentity = tostring(split(UserIdentityPrincipalid, ":")[1])
 | join kind=leftanti _ExcludedRoles on $left.SessionIssuerUserName == $right.RoleName, UserIdentity
