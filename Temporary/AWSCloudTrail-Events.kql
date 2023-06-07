@@ -1,4 +1,3 @@
-// The query_now parameter represents the time (in UTC) at which the scheduled analytics rule ran to produce this alert.
 let event_list = dynamic([
     // https://docs.aws.amazon.com/IAM/latest/APIReference/API_Operations.html
     "AttachGroupPolicy",
