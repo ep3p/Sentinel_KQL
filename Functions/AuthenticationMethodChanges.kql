@@ -182,7 +182,7 @@ union
     Result,
     ResultDescription,
     Strong*,
-    SearchableDeviceKey,
+    SearchableDevice*,
     LoggedByService,
     InitiatedBy,
     UpdateUser_TargetResources,
