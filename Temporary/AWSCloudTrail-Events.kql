@@ -88,6 +88,12 @@ let event_list = dynamic([
     "DeleteTrail",
     "StartLogging",
     "StopLogging",
+    // https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Operations.html
+    "CreateEventBus",
+    "DeleteEventBus",
+    // https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_Operations.html
+    "DeleteLogStream",
+    "DeleteLogGroup",
     // https://docs.aws.amazon.com/guardduty/latest/APIReference/API_Operations.html
     "CreateIPSet",
     "UpdateIPSet",
@@ -102,10 +108,7 @@ let event_list = dynamic([
     // https://docs.aws.amazon.com/workspaces/latest/api/API_Operations.html
     "ModifyAccount",
     "ModifyBilling",
-    "ModifyPaymentMethods",
-    // https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Operations.html
-    "CreateEventBus",
-    "DeleteEventBus"
+    "ModifyPaymentMethods"
     ]);
 let version_event_list = dynamic([
     "CreatePolicy",
