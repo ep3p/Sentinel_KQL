@@ -1,0 +1,34 @@
+// Possible results: reportOnlyNotApplied, reportOnlyFailure, reportOnlySuccess
+union
+    (
+    SigninLogs
+    )
+    // ,
+    // (
+    // AADNonInteractiveUserSignInLogs
+    // | extend ConditionalAccessPolicies = todynamic(ConditionalAccessPolicies)
+    // )
+| mv-expand ConditionalAccessPolicy = ConditionalAccessPolicies
+| extend
+    DisplayName = tostring(ConditionalAccessPolicy["displayName"]),
+    ConditionsNotSatisfied = toint(ConditionalAccessPolicy["conditionsNotSatisfied"]),
+    ConditionsSatisfied = toint(ConditionalAccessPolicy["conditionsSatisfied"]),
+    EnforcedGrantControls = tostring(ConditionalAccessPolicy["enforcedGrantControls"]),
+    EnforcedSessionControls = tostring(ConditionalAccessPolicy["enforcedSessionControls"]),
+    PolicyId = tostring(ConditionalAccessPolicy["id"]),
+    PolicyResult = tostring(ConditionalAccessPolicy["result"])
+| summarize
+    Count_NotApplied = countif(PolicyResult == "reportOnlyNotApplied"),
+    Count_Failure = countif(PolicyResult == "reportOnlyFailure"),
+    Count_Success = countif(PolicyResult == "reportOnlySuccess"),
+    DistinctUsers_NotApplied = dcountif(UserId, PolicyResult == "reportOnlyNotApplied"),
+    DistinctUsers_Failure = dcountif(UserId, PolicyResult == "reportOnlyFailure"),
+    DistinctUsers_Success = dcountif(UserId, PolicyResult == "reportOnlySuccess"),
+    Example = take_any(ConditionalAccessPolicy),
+    StartTime = min(TimeGenerated),
+    EndTime = arg_max(TimeGenerated, DisplayName)
+    by Type, PolicyId, EnforcedGrantControls, EnforcedSessionControls
+| extend Count_Success = iff(EnforcedGrantControls == '["Block"]', int(null), Count_Success)
+| extend DistinctUsers_Success = iff(EnforcedGrantControls == '["Block"]', int(null), DistinctUsers_Success)
+| sort by DisplayName
+| project-reorder DisplayName, Enforced*, Count_NotApplied, Count_Failure, Count_Success, DistinctUsers_NotApplied, DistinctUsers_Failure, DistinctUsers_Success, Example, PolicyId, StartTime, EndTime
