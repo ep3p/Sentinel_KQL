@@ -37,6 +37,8 @@ let event_list = dynamic([
     "CreateAccessKey",
     "UpdateAccessKey",
     "DeleteAccessKey",
+    "CreateSAMLProvider",
+    "UpdateSAMLProvider",
     // https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Operations.html
     "CreateRoute",
     "ReplaceRoute",
@@ -80,7 +82,8 @@ let event_list = dynamic([
     // https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_Operations.html
     "ModifyRule",
     "SetRulePriorities",
-    "SetRulePriorities",
+    "SetSecurityGroups",
+    "SetSubnets",
     // https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Operations.html
     "CreateTrail",
     "UpdateTrail",
@@ -93,6 +96,23 @@ let event_list = dynamic([
     // https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_Operations.html
     "DeleteLogStream",
     "DeleteLogGroup",
+    // https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Operations.html
+    "SetRepositoryPolicy",
+    "PutRegistryScanningConfiguration",
+    // https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_Operations.html
+    "CreateDBInstance",
+    "ModifyDBInstance",
+    "CreateDBProxy",
+    "ModifyDBProxy",
+    "CreateDBProxyEndpoint",
+    "ModifyDBProxyEndpoint",
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations.html
+    "PutAccessPointPolicy",
+    "PutAccessPointPolicyForObjectLambda",
+    "PutMultiRegionAccessPointPolicy",
+    "PutBucketPolicy",
+    "PutBucketAcl",
+    "PutObjectAcl",
     // https://docs.aws.amazon.com/guardduty/latest/APIReference/API_Operations.html
     "CreateIPSet",
     "UpdateIPSet",
@@ -104,6 +124,11 @@ let event_list = dynamic([
     "DeleteDetector",
     "UpdateMalwareScanSettings",
     "StopMonitoringMembers",
+    // https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_Operations.html
+    "ModifyDocumentPermission",
+    "SendCommand",
+    "CreateAssociation",
+    "UpdateAssociation",
     // https://docs.aws.amazon.com/workspaces/latest/api/API_Operations.html
     "ModifyAccount",
     "ModifyBilling",
