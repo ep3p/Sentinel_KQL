@@ -1,7 +1,7 @@
 let query_frequency = 15m;
 let query_wait = 1h;
 let _DomainControllers = toscalar(
-    _GetWatchlist('IP-CorporationPrivateServices')
+    _GetWatchlist('Service-PrivateCorporateServices')
     | where Service == "DomainController"
     | summarize make_list(HostName)
 );
