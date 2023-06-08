@@ -40,6 +40,7 @@ let event_list = dynamic([
     "CreateSAMLProvider",
     "UpdateSAMLProvider",
     // https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Operations.html
+    "AllocateAddress",
     "CreateRoute",
     "ReplaceRoute",
     "DeleteRoute",
