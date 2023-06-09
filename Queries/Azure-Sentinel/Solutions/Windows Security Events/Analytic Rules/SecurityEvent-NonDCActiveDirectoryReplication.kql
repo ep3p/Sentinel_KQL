@@ -39,7 +39,7 @@ SecurityEvent
     arg_min(TimeGenerated, AccountType, Activity, AccessList, AccessMask, ObjectServer, ObjectType, OperationType, Logon_Account),
     OperationCount = count(),
     PropertiesList = array_sort_asc(make_set(split(replace_string(Properties, "\t", ""), " "))),
-    SubjectLogonIdList = make_list(SubjectLogonId, 250)
+    SubjectLogonIdList = make_set(SubjectLogonId, 250)
     by Computer, Account, IpAddress, ObjectName
 // Events where logon was not registered, thus IpAddress is not available, are assumed to be benign and happen infrequently
 | where not(isempty(IpAddress) and OperationCount < replication_threshold and Account in (toscalar(_BenignDSReplication | summarize make_set(Account))))
