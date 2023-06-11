@@ -1,3 +1,5 @@
+**\*\*Classic alert automation will be deprecated, so maybe you can't implement this use case anymore\*\***
+
 ### Automation Rules or Log Analytics stopped working
 
 These queries can help you to detect when the Automation Rules or the Log Analytics workspace from a Microsoft Sentinel resource are not working as expected. Microsoft Sentinel may have brief moments where it does not work correctly, and then resumes its activity. Microsoft might acknowledge later the malfunction through a Service Health Alert (setting up notifications of these health alerts is recommended).
