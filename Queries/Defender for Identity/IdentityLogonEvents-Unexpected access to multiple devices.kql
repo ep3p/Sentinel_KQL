@@ -1,0 +1,64 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _ExpectedAccounts = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "DeviceNTLMScan"
+    | summarize make_list(ActorPrincipalName)
+);
+let _ExpectedTargetDevices = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Notes has "[NTLMAccess]"
+    | summarize make_list(HostName)
+);
+IdentityLogonEvents
+| where TimeGenerated > ago(query_frequency)
+| where LogonType == "Resource access" and not(Protocol == "Kerberos")// and Application == "Active Directory" and ActionType == "LogonSuccess"
+| where not(tostring(AdditionalFields["ACTOR.DEVICE"]) == tostring(AdditionalFields["TARGET_OBJECT.DEVICE"]))
+| where not(AccountUpn in (_ExpectedAccounts))
+| where not(TargetDeviceName has_any (_ExpectedTargetDevices))
+| extend SourceEntity = coalesce(AccountUpn, IPAddress, DeviceName)
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    SourceDevices = make_set_if(DeviceName, isnotempty(DeviceName)),
+    SourceIPAddresses = make_set_if(IPAddress, isnotempty(IPAddress)),
+    take_any(AccountUpn, AccountName, AccountDomain, AccountSid, AccountObjectId, AccountDisplayName, ActionType)
+    by SourceEntity, TargetDeviceName, Application, Protocol
+| join kind=leftanti (
+    IdentityLogonEvents
+    | where TimeGenerated between (ago(query_period) .. ago(query_frequency))
+    | where LogonType == "Resource access" and not(Protocol == "Kerberos")// and Application == "Active Directory" and ActionType == "LogonSuccess"
+    | where not(tostring(AdditionalFields["ACTOR.DEVICE"]) == tostring(AdditionalFields["TARGET_OBJECT.DEVICE"]))
+    | where not(AccountUpn in (_ExpectedAccounts))
+    | where not(TargetDeviceName has_any (_ExpectedTargetDevices))
+    | extend SourceEntity = coalesce(AccountUpn, IPAddress, DeviceName)
+    | where not(isempty(SourceEntity) or isempty(TargetDeviceName))
+    ) on SourceEntity, TargetDeviceName
+| summarize
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    SourceDevices = make_set(SourceDevices),
+    SourceIPAddresses = make_set(SourceIPAddresses),
+    TargetDevices = make_set_if(TargetDeviceName, isnotempty(TargetDeviceName), 250),
+    take_any(AccountUpn, AccountName, AccountDomain, AccountSid, AccountObjectId, AccountDisplayName, ActionType)
+    by SourceEntity, Application, Protocol
+| extend TargetDevicesCount = array_length(TargetDevices)
+| where TargetDevicesCount > 10
+| extend SourceDevice = iff(array_length(SourceDevices) == 1, tostring(SourceDevices[0]), "")
+| sort by TargetDevicesCount desc
+| project
+    StartTime,
+    EndTime,
+    Application,
+    ActionType,
+    Protocol,
+    SourceEntity,
+    SourceDevice,
+    SourceDevices,
+    SourceIPAddresses,
+    TargetDevicesCount,
+    TargetDevices,
+    AccountDisplayName,
+    AccountUpn,
+    AccountSid,
+    AccountObjectId
