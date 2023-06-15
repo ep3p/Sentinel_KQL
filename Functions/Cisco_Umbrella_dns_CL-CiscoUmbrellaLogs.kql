@@ -19,4 +19,5 @@ Cisco_Umbrella_dns_CL
     ThreatCategory = column_ifexists('Blocked_Categories_s', ''),
     PolicyIdentityType = column_ifexists('Policy_Identity_Type_s', ''),
     PolicyIdentity = column_ifexists('Policy_Identity_s', ''),
-    Dvc = 'CiscoUmbrella'
+    Dvc = 'CiscoUmbrella',
+    TimeGenerated
