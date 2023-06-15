@@ -37,12 +37,14 @@ CiscoUmbrellaLogs
     DnsQueryTypeNames = make_set(DnsQueryTypeName, 100),
     take_any(EventResult, UrlCategory, ThreatCategory)
     by EventResultDetails, DvcAction, DnsQuery, PolicyIdentityType, PolicyIdentity
-| extend Domain_s = strcat(DnsQuery, ".")
+| extend SLD = strcat_array(array_slice(split(DnsQuery, "."), -2, -1), ".")
 | join kind=leftanti (
     Cisco_Umbrella_dns_CL
     | where TimeGenerated  between (ago(query_period) .. ago(query_frequency))
     | where Categories_s has_any (avoidance_categories)
-    ) on Domain_s
+    | distinct Domain_s
+    | extend SLD = strcat_array(array_slice(split(Domain_s, "."), -3, -2), ".")
+    ) on SLD
 | project
     StartTime,
     EndTime,
@@ -53,7 +55,7 @@ CiscoUmbrellaLogs
     SrcNatIpAddrs,
     DnsQueryTypeNames,
     DnsQuery,
-    SLD = strcat_array(array_slice(split(DnsQuery, "."), -2, -1), "."),
+    SLD,
     EventResult,
     EventResultDetails,
     DvcAction,
