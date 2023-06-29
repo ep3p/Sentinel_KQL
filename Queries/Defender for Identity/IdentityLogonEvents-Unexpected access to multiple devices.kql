@@ -1,5 +1,6 @@
 let query_frequency = 1h;
 let query_period = 14d;
+let device_threshold = 15;
 let _ExpectedAccounts = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "DeviceNTLMScan"
@@ -43,7 +44,7 @@ IdentityLogonEvents
     take_any(AccountUpn, AccountName, AccountDomain, AccountSid, AccountObjectId, AccountDisplayName, ActionType)
     by SourceEntity, Application, Protocol
 | extend TargetDevicesCount = array_length(TargetDevices)
-| where TargetDevicesCount > 10
+| where TargetDevicesCount > device_threshold
 | extend SourceDevice = iff(array_length(SourceDevices) == 1, tostring(SourceDevices[0]), "")
 | sort by TargetDevicesCount desc
 | project
