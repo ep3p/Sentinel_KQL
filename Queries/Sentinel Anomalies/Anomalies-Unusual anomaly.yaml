@@ -1,48 +1,15 @@
-id: d0255b5f-2a3c-4112-8744-e6757af3283a
-name: Unusual Anomaly
-description: |
-  'Anomalies Analytics rules generate events in the "Anomalies" table. This Scheduled Analytics rule tries to detect Anomalies events that are not usual, they could come from an Anomalies rule that has recently been activated, or be an infrequent type. The detected anomaly should be reviewed, if it is relevant enough, eventually a separate Scheduled Analytics rule should be created specifically for those Anomalies rule events, so an alert and/or incident is generated everytime that type of anomaly happens.'
-severity: Medium
-requiredDataConnectors: []
-queryFrequency: 1h
-queryPeriod: 4d
-triggerOperator: gt
-triggerThreshold: 0
-tactics: []
-techniques: []
-query: |
-  let query_frequency = 1h;
-  let query_lookback = 3d;
-  let _MonitoredRules = toscalar(
-      _GetWatchlist('AlertName-SubstitutedDetections')
-      | where ProductName == "Anomalies"
-      | summarize make_list(AlertName)
-  );  
-  Anomalies
-  | where TimeGenerated > ago(query_frequency)
-  | where not(replace_string(RuleName, "(Preview) ", "") in (_MonitoredRules))
-  | join kind = leftanti (
-      Anomalies
-      | where TimeGenerated between (ago(query_frequency + query_lookback) .. ago(query_frequency))
-      | distinct RuleName
-  ) on RuleName
-incidentConfiguration:
-  createIncident: true
-  groupingConfiguration:
-    enabled: true
-    reopenClosedIncident: false
-    lookbackDuration: 1h
-    matchingMethod: Selected
-    groupByEntities: []
-    groupByAlertDetails:
-      - DisplayName
-    groupByCustomDetails: []
-eventGroupingSettings:
-  aggregationKind: AlertPerResult
-alertDetailsOverride:
-  alertDisplayNameFormat: Unusual Anomaly - {{RuleName}}
-  alertTacticsColumnName: Tactics
-sentinelEntitiesMappings:
-  - columnName: Entities
-version: 1.0.0
-kind: Scheduled
+let query_frequency = 1h;
+let query_lookback = 3d;
+let _MonitoredRules = toscalar(
+    _GetWatchlist('AlertName-SubstitutedDetections')
+    | where ProductName == "Anomalies"
+    | summarize make_list(AlertName)
+);
+Anomalies
+| where TimeGenerated > ago(query_frequency)
+| where not(replace_string(replace_string(RuleName, "(Preview) ", ""), " - Customized", "") in (_MonitoredRules))
+| join kind = leftanti (
+    Anomalies
+    | where TimeGenerated between (ago(query_frequency + query_lookback) .. ago(query_frequency))
+    | distinct RuleName
+) on RuleName
