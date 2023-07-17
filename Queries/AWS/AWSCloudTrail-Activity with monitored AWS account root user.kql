@@ -1,0 +1,56 @@
+let _AWSAccounts =
+    _GetWatchlist("AccountId-AuditAWSAccounts")
+    | project
+        AccountId,
+        AccountName,
+        Auditors = Auditor,
+        AlertSeverity = Severity,
+        Notes
+;
+AWSCloudTrail
+| where UserIdentityType == "Root"
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+	SourceIpAddresses = array_sort_asc(make_set_if(SourceIpAddress, isnotempty(SourceIpAddress))),
+    SessionMfaAuthenticated = make_set_if(SessionMfaAuthenticated, isnotempty(SessionMfaAuthenticated)),
+    EventNames = array_sort_asc(make_set(EventName)),
+    ReadOnly = make_set_if(ReadOnly, isnotempty(ReadOnly)),
+    ManagementEvent = make_set_if(ManagementEvent, isnotempty(ManagementEvent)),
+    ErrorCodes = make_set_if(ErrorCode, isnotempty(ErrorCode)),
+    ErrorMessages = make_set_if(ErrorMessage, isnotempty(ErrorMessage)),
+    UserAgents = make_set_if(UserAgent, isnotempty(UserAgent)),
+    take_any(UserIdentityType)
+    by UserIdentityPrincipalid, UserIdentityArn, UserIdentityAccountId, RecipientAccountId
+| lookup kind=leftouter _AWSAccounts on $left.UserIdentityAccountId == $right.AccountId
+| where not(isnotempty(AccountName) and not(Notes has "[RootActivity]"))
+| mv-apply SourceIpAddress = SourceIpAddresses to typeof(string) on (
+        summarize AddressesList = strcat_array(array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has ".amazonaws.com"))), '\n\n- ')
+    )
+| extend AlertDescription = strcat(
+    'This rule detects operations of the root user in AWS accounts, which should be avoided.\n\nThe root user was used in the AWS account "',
+    iff(isnotempty(AccountName), AccountName, RecipientAccountId),
+    '".\n\nThe operations were made from the addresses:\n\n- ',
+    AddressesList,
+    '\n'
+    )
+| project
+    StartTime,
+    EndTime,
+    UserIdentityAccountName = AccountName,
+    UserIdentityAccountId,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    UserIdentityType,
+    RecipientAccountId,
+    SourceIpAddresses,
+    SessionMfaAuthenticated,
+    EventNames,
+    ReadOnly,
+    ManagementEvent,
+    ErrorCodes,
+    ErrorMessages,
+    UserAgents,
+    AlertSeverity,
+    AlertDescription,
+    Auditors
