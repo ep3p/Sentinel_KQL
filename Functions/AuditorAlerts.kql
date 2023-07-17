@@ -45,6 +45,7 @@
         AttributeLDAPDisplayName = column_ifexists("AttributeLDAPDisplayName", ""),
         OperationTypeTranslated = column_ifexists("OperationTypeTranslated", ""),
         ModifiedAttributeValue = column_ifexists("ModifiedAttributeValue", ""),
+        UserIdentityAccountName = column_ifexists("UserIdentityAccountName", ""),
         UserIdentityAccountId = column_ifexists("UserIdentityAccountId", "")
     | project-reorder
         TimeGenerated
