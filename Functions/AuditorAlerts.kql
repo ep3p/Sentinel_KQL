@@ -44,7 +44,8 @@
         AttributeValue_EventData = column_ifexists("AttributeValue_EventData", ""),
         AttributeLDAPDisplayName = column_ifexists("AttributeLDAPDisplayName", ""),
         OperationTypeTranslated = column_ifexists("OperationTypeTranslated", ""),
-        ModifiedAttributeValue = column_ifexists("ModifiedAttributeValue", "")
+        ModifiedAttributeValue = column_ifexists("ModifiedAttributeValue", ""),
+        UserIdentityAccountId = column_ifexists("UserIdentityAccountId", "")
     | project-reorder
         TimeGenerated
 //};
