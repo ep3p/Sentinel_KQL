@@ -2,7 +2,7 @@ Anomalies
 | where RuleName endswith "UEBA Anomalous Failed Sign-in" and RuleStatus != "Flighting"
 | extend
     Query = ExtendedLinks[0]["DetailBladeInputs"]
-| project-reorder
+| project
     TimeGenerated,
     RuleName,
     Description,
