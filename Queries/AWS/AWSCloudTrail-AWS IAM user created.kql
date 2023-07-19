@@ -1,0 +1,71 @@
+let _AWSAccounts =
+    _GetWatchlist("AccountId-AuditAWSAccounts")
+    | project
+        AccountId,
+        AccountName,
+        Auditors = Auditor,
+        AlertSeverity = Severity,
+        Notes
+;
+AWSCloudTrail
+| where EventName has "CreateUser" and not(EventSource == "sso-directory.amazonaws.com")// and EventSource == "iam.amazonaws.com"
+| extend CreatedUserName = tostring(todynamic(RequestParameters)["userName"])
+| lookup kind=leftouter (
+    _AWSAccounts
+    | project-rename RecipientAccountName = AccountName
+    ) on $left.RecipientAccountId == $right.AccountId
+//| where Notes has "[CreateUser]" or isempty(RecipientAccountName)
+| lookup kind=leftouter (
+    _AWSAccounts
+    | project UserIdentityAccountName = AccountName, AccountId
+    ) on $left.UserIdentityAccountId == $right.AccountId
+| extend AlertDescription = strcat(
+    'This rule detects the creation of a user in AWS accounts using means different than IAM Identity Center, which should be the one used for this task.\n\nIn the AWS account "',
+    iff(isnotempty(RecipientAccountName), RecipientAccountName, RecipientAccountId),
+    '" ',
+    case(
+        UserIdentityType == "Root", "the root user",
+        UserIdentityType == "AssumedRole", strcat('the user "', tostring(split(UserIdentityPrincipalid, ":")[1]), '", assuming the role "', tostring(split(UserIdentityArn, "/")[-2]), '",'),
+        UserIdentityType == "IAM", strcat('the IAM user "', UserIdentityUserName),
+        "an unknown user"
+    ),
+    iff(isnotempty(ErrorCode) or isnotempty(ErrorMessage), " failed to create", " created"),
+    ' a user called "',
+    CreatedUserName,
+    '"',
+    iff(not(SourceIpAddress has ".amazonaws.com"), strcat(", from the IP address ", SourceIpAddress), ""),
+    ".\n"
+    )
+| project
+    TimeGenerated,
+    UserIdentityType,
+    UserIdentityAccountName,
+    UserIdentityAccountId,
+    SessionCreationDate,
+    SessionIssuerUserName,
+    SessionIssuerPrincipalId,
+    SessionIssuerArn,
+    UserIdentityUserName,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    UserIdentityAccessKeyId,
+    RecipientAccountName,
+    RecipientAccountId,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    CreatedUserName,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId,
+    AlertSeverity,
+    AlertDescription,
+    Auditors
