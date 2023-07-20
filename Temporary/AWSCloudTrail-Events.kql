@@ -25,7 +25,7 @@ let event_list = dynamic([
     "CreateRole",
     "UpdateRole",
     "DeleteRole",
-    "CreateUser",
+    //"CreateUser",
     "UpdateUser",
     "DeleteUser",
     "EnableMFADevice",
@@ -137,9 +137,9 @@ let event_list = dynamic([
     "DeleteEventBus",
     "CreateConnection",
     // https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_Operations.html
-    "CreateLogStream",
+    //"CreateLogStream",
     "DeleteLogStream",
-    "CreateLogGroup",
+    //"CreateLogGroup",
     "DeleteLogGroup",
     // https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Operations.html
     "SetRepositoryPolicy",
