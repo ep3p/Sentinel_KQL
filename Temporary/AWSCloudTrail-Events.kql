@@ -1,4 +1,8 @@
 let event_list = dynamic([
+    // signin.amazonaws.com
+    "PasswordRecoveryRequested",
+    "PasswordRecoveryCompleted",
+    "AccountNameUpdated",
     // https://docs.aws.amazon.com/IAM/latest/APIReference/API_Operations.html
     "AttachGroupPolicy",
     "DetachGroupPolicy",
