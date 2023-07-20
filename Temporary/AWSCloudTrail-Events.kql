@@ -87,6 +87,10 @@ let event_list = dynamic([
     "TerminateInstances",
     "CreateFlowLogs",
     "DeleteFlowLogs",
+    "RunInstances",
+    "StartInstances",
+    "StopInstances",
+    "UnmonitorInstances",
     // https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_Operations.html
     "ModifyRule",
     "SetRulePriorities",
@@ -123,6 +127,8 @@ let event_list = dynamic([
     "PutBucketPolicy",
     "PutBucketAcl",
     "PutObjectAcl",
+    // https://docs.aws.amazon.com/lambda/latest/dg/API_Operations.html
+    "Invoke",
     // https://docs.aws.amazon.com/guardduty/latest/APIReference/API_Operations.html
     "CreateIPSet",
     "UpdateIPSet",
