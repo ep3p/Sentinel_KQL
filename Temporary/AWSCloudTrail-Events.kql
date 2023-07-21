@@ -247,7 +247,7 @@ let _ExcludedRoles =
 let _ExcludedAWSAccountEventNames =
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "AWSAccountIdEventName"
-    | project UserIdentityAccountId = ActorId, EventName = Auxiliar
+    | project UserIdentityAccountId = tostring(ActorId), EventName = Auxiliar
 ;
 AWSCloudTrail
 | where EventName has_any (event_list)
