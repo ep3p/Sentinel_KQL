@@ -244,8 +244,14 @@ let _ExcludedRoles =
     | where Activity == "AWSAssumedRole"
     | project RoleName = Auxiliar, UserIdentity = ActorPrincipalName
 ;
+let _ExcludedAWSAccountEventNames =
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "AWSAccountIdEventName"
+    | project UserIdentityAccountId = ActorId, EventName = Auxiliar
+;
 AWSCloudTrail
 | where EventName has_any (event_list)
     or EventName matches regex strcat("^(", strcat_array(version_event_list, "|"), ")")
 | extend UserIdentity = tostring(split(UserIdentityPrincipalid, ":")[1])
 | join kind=leftanti _ExcludedRoles on $left.SessionIssuerUserName == $right.RoleName, UserIdentity
+| join kind=leftanti _ExcludedAWSAccountEventNames on UserIdentityAccountId, EventName
