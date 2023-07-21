@@ -3,6 +3,15 @@ let event_list = dynamic([
     "PasswordRecoveryRequested",
     "PasswordRecoveryCompleted",
     "AccountNameUpdated",
+    // https://docs.aws.amazon.com/controltower/latest/userguide/lifecycle-events.html
+    "CreateManagedAccount",
+    "UpdateManagedAccount",
+    "EnableGuardrail",
+    "DisableGuardrail",
+    "RegisterOrganizationalUnit",
+    "DeregisterOrganizationalUnit",
+    "SetupLandingZone",
+    "UpdateLandingZone",
     // https://docs.aws.amazon.com/IAM/latest/APIReference/API_Operations.html
     "AddUserToGroup",
     "RemoveUserFromGroup",
