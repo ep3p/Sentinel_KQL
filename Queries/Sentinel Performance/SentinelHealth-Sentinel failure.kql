@@ -1,0 +1,38 @@
+let alert_name = "Sentinel health";
+let _ExpectedAlertNames = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "SentinelHealthAlert"
+    | summarize make_list(Auxiliar)
+);
+SentinelHealth
+| extend
+    Issues = ExtendedProperties["Issues"],
+    FailureSummary = ExtendedProperties["FailureSummary"],
+    IncidentNumber = ExtendedProperties["IncidentNumber"]
+| mv-expand Issue = iff(array_length(Issues) > 0, Issues, dynamic([""])), Failure = iff(array_length(FailureSummary) > 0, FailureSummary, dynamic([""]))
+| where not(Status == "Success" and isempty(Issue) and isempty(FailureSummary))
+| extend
+    IssueCode = tostring(Issue["Code"]),
+    StatusCode = tostring(Failure["StatusCode"])
+| extend AlertName = case(
+    SentinelResourceType == "Analytics Rule" and Status == "Warning" and Reason == "The analytics rule is disabled and was not executed.", "Analytics rule was auto disabled",
+    SentinelResourceType == "Analytics Rule" and isnotempty(IssueCode), strcat(alert_name, " - ", SentinelResourceType, " - ", Status, " - ", IssueCode),
+    SentinelResourceType == "Data connector", strcat(alert_name, " - ", SentinelResourceType, " - ", Status, " - ", SentinelResourceName),
+    SentinelResourceType == "Automation rule", strcat(alert_name, " - ", SentinelResourceType, " - ", Status, " - Incident Number ", IncidentNumber),
+    strcat(alert_name, " - ", SentinelResourceType, " - ", Status)
+    )
+| where not(AlertName in (_ExpectedAlertNames))
+| project
+    TimeGenerated,
+    AlertName,
+    SentinelResourceType,
+    SentinelResourceKind,
+    SentinelResourceName,
+    OperationName,
+    Status,
+    Reason,
+    Description,
+    Issues,
+    FailureSummary,
+    ExtendedProperties,
+    SentinelResourceId
