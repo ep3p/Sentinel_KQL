@@ -1,0 +1,28 @@
+let _BreakGlassUserId = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "EntraIDBreakGlass"
+    | summarize make_list(ActorId)
+);
+union SigninLogs, AADNonInteractiveUserSignInLogs
+| where UserId in (_BreakGlassUserId)
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    ResultTypes = array_sort_asc(make_set(ResultType, 100)),
+    AppDisplayNames = array_sort_asc(make_set(AppDisplayName, 100)),
+    ResourcesDisplayNames = array_sort_asc(make_set(ResourceDisplayName, 100)),
+    UserAgents = make_set(UserAgent, 100),
+    take_any(UserPrincipalName, UserDisplayName, AlternateSignInName)
+    by IPAddress, UserId
+| project-reorder
+    StartTime,
+    EndTime,
+    UserPrincipalName,
+    UserDisplayName,
+    AlternateSignInName,
+    IPAddress,
+    ResultTypes,
+    AppDisplayNames,
+    ResourcesDisplayNames,
+    UserAgents,
+    UserId
