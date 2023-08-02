@@ -1,0 +1,75 @@
+let _MonitoredRoles =
+    _GetWatchlist("AccountId-AuditAWSAccounts")
+    | where Notes has "[RoleActivity]"
+    | project RequestedRole = Auxiliar, Auditors = Auditor, AlertSeverity = Severity
+;
+let _AWSAccounts =
+    _GetWatchlist("AccountId-AuditAWSAccounts")
+    | project AccountId, AccountName
+;
+union
+    (
+    AWSCloudTrail
+    | where EventName in ("Federate", "GetRoleCredentials")
+    | extend DynamicServiceEventDetails = todynamic(ServiceEventDetails)
+    | extend
+        RequestedRole = tostring(DynamicServiceEventDetails["role_name"]),
+        RequestedRoleAccountId = tostring(DynamicServiceEventDetails["account_id"])
+    ),
+    (
+    AWSCloudTrail 
+    | where EventName in ("AssumeRole")
+    | extend RoleArn = tostring(todynamic(RequestParameters)["roleArn"])
+    | extend
+        RequestedRole = tostring(split(RoleArn, "/")[-1]),
+        RequestedRoleAccountId = tostring(split(RoleArn, ":")[4])
+    )
+| lookup kind=inner _MonitoredRoles on RequestedRole
+| lookup kind=leftouter (
+    _AWSAccounts
+    | project RequestedRoleAccountName = AccountName, AccountId
+    ) on $left.RequestedRoleAccountId == $right.AccountId
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    SourceIpAddresses = array_sort_asc(make_set_if(SourceIpAddress, isnotempty(SourceIpAddress), 100)),
+    EventNames = array_sort_asc(make_set(EventName)),
+    ReadOnly = make_set_if(ReadOnly, isnotempty(ReadOnly)),
+    RequestedRoleAccounts = array_sort_asc(make_set(coalesce(RequestedRoleAccountName, RequestedRoleAccountId))),
+    take_any(*)
+    by UserIdentityType, UserIdentityAccountId, SessionIssuerArn, UserIdentityPrincipalid, RecipientAccountId, EventSource, EventTypeName
+| extend Identity = coalesce(UserIdentityUserName, UserIdentityPrincipalid)
+| project
+    StartTime,
+    EndTime,
+    UserIdentityType,
+    UserIdentityAccountId,
+    SessionCreationDate,
+    SessionIssuerUserName,
+    SessionIssuerPrincipalId,
+    SessionIssuerArn,
+    UserIdentityUserName,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    UserIdentityAccessKeyId,
+    RecipientAccountId,
+    Identity,
+    SourceIpAddresses,
+    EventSource,
+    EventTypeName,
+    EventNames,
+    RequestedRole,
+    RequestedRoleAccounts,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    ServiceEventDetails,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId,
+    AlertSeverity,
+    Auditors
