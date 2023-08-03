@@ -37,8 +37,22 @@ union
     ReadOnly = make_set_if(ReadOnly, isnotempty(ReadOnly)),
     RequestedRoleAccounts = array_sort_asc(make_set(coalesce(RequestedRoleAccountName, RequestedRoleAccountId))),
     take_any(*)
-    by UserIdentityType, UserIdentityAccountId, SessionIssuerArn, UserIdentityPrincipalid, RecipientAccountId, EventSource, EventTypeName
+    by RequestedRole, UserIdentityType, UserIdentityAccountId, SessionIssuerArn, UserIdentityPrincipalid, RecipientAccountId, EventSource, EventTypeName
 | extend Identity = coalesce(UserIdentityUserName, UserIdentityPrincipalid)
+| mv-apply SourceIpAddress = SourceIpAddresses to typeof(string) on (
+    summarize AddressesList = strcat_array(array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has ".amazonaws.com"))), '\n\n- ')
+    )
+| extend AlertDescription = strcat(
+    'This rule detects operations of specified roles in AWS accounts.\n\nThe role "',
+    RequestedRole,
+    '" was used by "',
+    Identity,
+    '" in the AWS accounts:\n\n- ',
+    strcat_array(RequestedRoleAccounts, '\n\n- '),
+    '\n\nThe operations were made from the addresses:\n\n- ',
+    AddressesList,
+    '\n'
+    )
 | project
     StartTime,
     EndTime,
@@ -72,4 +86,5 @@ union
     UserAgent,
     AwsEventId,
     AlertSeverity,
+    AlertDescription,
     Auditors
