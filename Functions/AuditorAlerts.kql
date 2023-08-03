@@ -46,7 +46,9 @@
         OperationTypeTranslated = column_ifexists("OperationTypeTranslated", ""),
         ModifiedAttributeValue = column_ifexists("ModifiedAttributeValue", ""),
         UserIdentityAccountName = column_ifexists("UserIdentityAccountName", ""),
-        UserIdentityAccountId = column_ifexists("UserIdentityAccountId", "")
+        UserIdentityAccountId = column_ifexists("UserIdentityAccountId", ""),
+        Identity = column_ifexists("Identity", ""),
+        RoleRequested = column_ifexists("Identity", "")
     | project-reorder
         TimeGenerated
 //};
