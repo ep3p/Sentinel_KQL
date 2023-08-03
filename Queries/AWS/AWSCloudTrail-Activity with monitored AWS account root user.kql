@@ -1,11 +1,6 @@
 let _AWSAccounts =
     _GetWatchlist("AccountId-AuditAWSAccounts")
-    | project
-        AccountId,
-        AccountName,
-        Auditors = Auditor,
-        AlertSeverity = Severity,
-        Notes
+    | project AccountId, AccountName, Auditors = Auditor, AlertSeverity = Severity, Notes
 ;
 AWSCloudTrail
 | where UserIdentityType == "Root"
@@ -25,7 +20,7 @@ AWSCloudTrail
 | lookup kind=leftouter _AWSAccounts on $left.UserIdentityAccountId == $right.AccountId
 | where not(isnotempty(AccountName) and not(Notes has "[RootActivity]"))
 | mv-apply SourceIpAddress = SourceIpAddresses to typeof(string) on (
-        summarize AddressesList = strcat_array(array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has ".amazonaws.com"))), '\n\n- ')
+    summarize AddressesList = strcat_array(array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has ".amazonaws.com"))), '\n\n- ')
     )
 | extend AlertDescription = strcat(
     'This rule detects operations of the root user in AWS accounts, which should be avoided.\n\nThe root user was used in the AWS account "',
