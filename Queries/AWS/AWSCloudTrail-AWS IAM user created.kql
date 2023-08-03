@@ -1,11 +1,6 @@
 let _AWSAccounts =
     _GetWatchlist("AccountId-AuditAWSAccounts")
-    | project
-        AccountId,
-        AccountName,
-        Auditors = Auditor,
-        AlertSeverity = Severity,
-        Notes
+    | project AccountId, AccountName, Auditors = Auditor, AlertSeverity = Severity, Notes
 ;
 AWSCloudTrail
 | where EventName has "CreateUser" and not(EventSource == "sso-directory.amazonaws.com")// and EventSource == "iam.amazonaws.com"
