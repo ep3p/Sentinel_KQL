@@ -25,7 +25,7 @@ let _RiskEvents = materialize(
     | mv-apply ExpandedAdditionalInfo = AdditionalInfo on (
         summarize BagToUnpack = make_bag(pack(tostring(ExpandedAdditionalInfo["Key"]), ExpandedAdditionalInfo["Value"]))
     )
-    | evaluate bag_unpack(BagToUnpack, OutputColumnPrefix = "AdditionalInfo_", ignoredProperties = dynamic(["requestId", "correlationId", "userAgent", "alertUrl"]))
+    | evaluate bag_unpack(BagToUnpack, OutputColumnPrefix = "AdditionalInfo_")//, ignoredProperties = dynamic(["requestId", "correlationId", "userAgent", "alertUrl"]))
     | extend
         RelatedLocation_IpAddress = tostring(column_ifexists("AdditionalInfo_relatedLocation", dynamic(null))["clientIP"]),
         RelatedLocation_Location = tostring(column_ifexists("AdditionalInfo_relatedLocation", dynamic(null))["countryCode"]),
