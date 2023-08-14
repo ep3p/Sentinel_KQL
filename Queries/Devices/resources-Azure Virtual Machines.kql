@@ -1,0 +1,75 @@
+// Use here: https://portal.azure.com/#view/HubsExtension/ArgQueryBlade
+resources
+| where type in~ (
+    "microsoft.compute/virtualmachines",
+    "microsoft.scvmm/virtualmachines",
+    "microsoft.connectedvmwarevsphere/virtualmachines",
+    "microsoft.azurestackhci/virtualmachines"
+    )
+| extend
+    ProvisioningState = tostring(properties["provisioningState"]),
+    TimeCreated = todatetime(properties["timeCreated"]),
+    PowerState = tostring(properties["extended"]["instanceView"]["powerState"]["displayStatus"]),
+    ExtComputerName = tostring(properties["extended"]["instanceView"]["computerName"]),
+    ExtOsVersion = tostring(properties["extended"]["instanceView"]["osVersion"]),
+    ExtOsName = tostring(properties["extended"]["instanceView"]["osName"]),
+    DiskOsType = tostring(properties["storageProfile"]["osDisk"]["osType"]),
+    DiskName = tostring(properties["storageProfile"]["osDisk"]["name"]),
+    DiskOption = tostring(properties["storageProfile"]["osDisk"]["createOption"]),
+    DiskImagePublisher = tostring(properties["storageProfile"]["imageReference"]["publisher"]),
+    DiskImageVersion = tostring(properties["storageProfile"]["imageReference"]["exactVersion"]),
+    DiskImageVersionType = tostring(properties["storageProfile"]["imageReference"]["version"]),
+    DiskImageSku = tostring(properties["storageProfile"]["imageReference"]["sku"]),
+    DiskImageOffer = tostring(properties["storageProfile"]["imageReference"]["offer"]),
+    DiskImageName = tostring(split(tostring(split(tostring(properties["storageProfile"]["imageReference"]["id"]), "/images/")[1]), "/")[0]),
+    DiskImageId = tostring(properties["storageProfile"]["imageReference"]["id"]),
+    OsComputerName = tostring(properties["osProfile"]["computerName"]),
+    OsAdminUsername = tostring(properties["osProfile"]["adminUsername"]),
+    WindowsAutomaticUpdates = tostring(properties["osProfile"]["windowsConfiguration"]["enableAutomaticUpdates"]),
+    PatchMode = tostring(properties["osProfile"][
+        case(
+            bag_keys(properties["osProfile"]) has "windowsConfiguration", "windowsConfiguration",
+            bag_keys(properties["osProfile"]) has "linuxConfiguration", "linuxConfiguration",
+            ""
+        )
+        ]["patchSettings"]["patchMode"]),
+    LicenseType = tostring(properties["licenseType"]),
+    VmId = tostring(properties["vmId"])
+| join kind=leftouter (
+    resourcecontainers
+    | where type == "microsoft.resources/subscriptions"
+    | project subscriptionId, subscriptionName = name
+    ) on subscriptionId
+| sort by PowerState, LicenseType, DiskOption, DiskImageOffer
+| project 
+    id,
+    tenantId,
+    subscriptionId,
+    subscriptionName,
+    resourceGroup,
+    type,
+    name,
+    tags,
+    plan,
+    ProvisioningState, 
+    TimeCreated,
+    PowerState,
+    ExtComputerName,
+    ExtOsVersion,
+    ExtOsName,
+    DiskOsType,
+    DiskName,
+    DiskOption,
+    DiskImagePublisher,
+    DiskImageVersion,
+    DiskImageVersionType,
+    DiskImageSku,
+    DiskImageOffer,
+    DiskImageName,
+    DiskImageId,
+    OsComputerName,
+    OsAdminUsername,
+    PatchMode,
+    WindowsAutomaticUpdates,
+    LicenseType,
+    VmId
