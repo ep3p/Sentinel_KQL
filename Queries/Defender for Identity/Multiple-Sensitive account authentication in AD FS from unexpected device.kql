@@ -1,0 +1,39 @@
+let _ExpectedDomain = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "DomainJoinedLDAP"
+    | summarize make_list(Auxiliar)
+);
+let _Identities =
+    IdentityInfo
+    | where TimeGenerated > ago(14d)
+    | summarize arg_max(TimeGenerated, *) by AccountUPN
+;
+IdentityLogonEvents
+| where TimeGenerated > ago(1h)
+| where ActionType == "LogonSuccess" and Protocol in ("Adfs", "NTLM") and isnotempty(DeviceName) and not(DeviceName has_any (_ExpectedDomain))
+| summarize hint.shufflekey=TimeGenerated
+    Protocols = array_sort_asc(make_set(Protocol)),
+    DeviceNames = array_sort_asc(make_set(DeviceName)),
+    LogonTypes = array_sort_asc(make_list(LogonType))
+    by AccountUpn, TimeGenerated
+| where Protocols has_all ("Adfs", "NTLM") and LogonTypes has_all ("Logon with ADFS authentication", "Resource access")
+| lookup kind=leftouter _Identities on $left.AccountUpn == $right.AccountUPN
+| where SourceSystem has "ActiveDirectory" or UserAccountControl has "PasswordNeverExpires"
+| project
+    TimeGenerated,
+    AccountUpn,
+    DeviceNames,
+    LogonTypes,
+    Protocols,
+    UserAccountControl,
+    AccountDisplayName,
+    JobTitle,
+    Manager,
+    Department,
+    OnPremisesDistinguishedName,
+    Tags,
+    GroupMembership,
+    AssignedRoles,
+    SourceSystem,
+    AccountSID,
+    AccountObjectId
