@@ -14,7 +14,7 @@ union SigninLogs, AADNonInteractiveUserSignInLogs
     UserAgents = make_set(UserAgent, 100),
     take_any(UserPrincipalName, UserDisplayName, AlternateSignInName)
     by IPAddress, UserId
-| project-reorder
+| project
     StartTime,
     EndTime,
     UserPrincipalName,
