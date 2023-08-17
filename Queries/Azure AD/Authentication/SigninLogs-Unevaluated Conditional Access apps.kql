@@ -1,0 +1,9 @@
+SigninLogs
+| where ConditionalAccessPolicies == "[]" and HomeTenantId == ResourceTenantId and ResultType == 0 and ConditionalAccessStatus == "notApplied"
+| summarize
+    DistinctUsers = dcount(UserId),
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    take_any(*)
+    by AppDisplayName, ResourceDisplayName
+| sort by ResourceDisplayName asc, DistinctUsers desc
