@@ -1,0 +1,79 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _HomeTenantId = toscalar(
+    _GetWatchlist('UUID-AADTenantIds')
+    | where Notes has "[HomeTenant]"
+    | summarize make_list(TenantId)
+);
+let _ExcludedResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has_all ("[Success]", "[Interrupt]", "[Consent]")
+    | summarize make_list(ResultType)
+);
+let _ExcludedAppIds = toscalar(
+    _GetWatchlist("UUID-AADApps")
+    | where Notes has "[ExcludedConditionalAccess]"
+    | summarize make_list(AppId)
+);
+let _ExcludedADGroups = toscalar(
+    _GetWatchlist("SID-AuditADObjects")
+    | where Notes has "[ExcludedConditionalAccess]"
+    | summarize make_list(SAMAccountName)
+);
+let _ExcludedUserIds = toscalar(
+    IdentityInfo
+    | where TimeGenerated > ago(query_period)
+    | summarize arg_max(TimeGenerated, GroupMembership) by AccountObjectId
+    | mv-expand GroupMembership to typeof(string)
+    | where GroupMembership in (_ExcludedADGroups)
+    | summarize make_list(AccountObjectId)
+);
+let _TrustedNamedLocations = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "TrustedNamedLocation"
+    | summarize make_list(SourceResource)
+);
+SigninLogs
+| where TimeGenerated > ago(query_frequency)
+| where not(AuthenticationRequirement == "multiFactorAuthentication") and not(ConditionalAccessStatus in ("failure", "notApplied")) and ResourceTenantId in (_HomeTenantId)
+| where not(ResultType in (_ExcludedResultTypes))
+| where not(AppId in (_ExcludedAppIds))
+| where not(UserId in (_ExcludedUserIds))
+| mv-expand NetworkLocationDetail = iff(NetworkLocationDetails == "[]", dynamic([""]), todynamic(NetworkLocationDetails))
+| where not(NetworkLocationDetail["networkType"] == "trustedNamedLocation" or NetworkLocationDetail["networkNames"][0] in (_TrustedNamedLocations))
+| summarize
+    StartTime = min(CreatedDateTime),
+    EndTime = max(CreatedDateTime),
+    ResultTypes = array_sort_asc(make_set(ResultType)),
+    AppDisplayNames = array_sort_asc(make_set(AppDisplayName)),
+    ResourceDisplayNames = array_sort_asc(make_set(ResourceDisplayName)),
+    UserAgents = array_sort_asc(make_set(UserAgent)),
+    AppIds = array_sort_asc(make_set(AppId)),
+    CorrelationIds = array_sort_asc(make_set(CorrelationId)),
+    take_any(UserPrincipalName, UserDisplayName, Location, ConditionalAccessStatus, ConditionalAccessPolicies, DeviceDetail, AuthenticationRequirement, AuthenticationRequirementPolicies,NetworkLocationDetails, UserType, Category)
+    by UserId, IPAddress, ClientAppUsed, TokenIssuerType
+| project
+    StartTime,
+    EndTime,
+    Category,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    NetworkLocationDetails,
+    ResultTypes,
+    AppDisplayNames,
+    ResourceDisplayNames,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    DeviceDetail,
+    ClientAppUsed,
+    UserAgents,
+    TokenIssuerType,
+    UserType,
+    UserId,
+    AppIds,
+    CorrelationIds,
+    AppDisplayNameSample = tostring(AppDisplayNames[0])
