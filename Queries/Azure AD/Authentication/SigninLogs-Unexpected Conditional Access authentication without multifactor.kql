@@ -1,7 +1,7 @@
 let query_frequency = 1h;
 let query_period = 14d;
 let _HomeTenantId = toscalar(
-    _GetWatchlist('UUID-AADTenantIds')
+    _GetWatchlist("UUID-AADTenantIds")
     | where Notes has "[HomeTenant]"
     | summarize make_list(TenantId)
 );
