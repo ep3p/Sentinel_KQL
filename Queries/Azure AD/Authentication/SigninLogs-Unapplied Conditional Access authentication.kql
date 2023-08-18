@@ -1,0 +1,48 @@
+SigninLogs
+| where ConditionalAccessStatus == "notApplied" and ConditionalAccessPolicies != "[]"
+| mv-apply ConditionalAccessPolicy = ConditionalAccessPolicies on (
+    extend PolicyResult = tostring(ConditionalAccessPolicy["result"])
+    | summarize ConditionalAccessPoliciesResults = make_set(PolicyResult)
+    )
+| where not(
+    TokenIssuerType == "AzureADBackupAuth"
+    and ((array_length(ConditionalAccessPoliciesResults) == 1 and ConditionalAccessPoliciesResults[0] == "unknownFutureValue")
+        or (array_length(ConditionalAccessPoliciesResults) == 2 and ConditionalAccessPoliciesResults has_all ("unknownFutureValue", "notEnabled")))
+    and isnotempty(tostring(DeviceDetail["deviceId"]))
+    and NetworkLocationDetails has "trustedNamedLocation"
+    and (UserType == "Member" and AADTenantId == ResourceTenantId)
+    and AuthenticationRequirement == "singleFactorAuthentication"
+    )
+| summarize
+    StartTime = min(CreatedDateTime),
+    EndTime = max(CreatedDateTime),
+    ResultTypes = array_sort_asc(make_set(ResultType)),
+    AppDisplayNames = array_sort_asc(make_set(AppDisplayName)),
+    ResourceDisplayNames = array_sort_asc(make_set(ResourceDisplayName)),
+    UserAgents = array_sort_asc(make_set(UserAgent)),
+    CorrelationIds = array_sort_asc(make_set(CorrelationId)),
+    take_any(UserPrincipalName, UserDisplayName, Location, ConditionalAccessStatus, ConditionalAccessPolicies, DeviceDetail, AuthenticationRequirement, AuthenticationRequirementPolicies,NetworkLocationDetails, UserType, Category)
+    by UserId, IPAddress, ClientAppUsed, TokenIssuerType
+| project
+    StartTime,
+    EndTime,
+    Category,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    NetworkLocationDetails,
+    ResultTypes,
+    AppDisplayNames,
+    ResourceDisplayNames,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    DeviceDetail,
+    ClientAppUsed,
+    UserAgents,
+    TokenIssuerType,
+    UserType,
+    UserId,
+    CorrelationIds
