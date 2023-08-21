@@ -1,5 +1,6 @@
 SecurityEvent
-| where EventID in (4624, 4625) and LogonType in (7, 10) and IpAddress has_any ("::1","127.0.0.1")
+| where EventID in (4624, 4625) and LogonType in (7, 10) and IpAddress has_any ("::1", "127.0.0.1")
+| where not(LogonType == 7 and IpAddress == "127.0.0.1")
 | project
     TimeGenerated,
     Computer,
@@ -9,8 +10,12 @@ SecurityEvent
     IpAddress,
     Process,
     LogonTypeName,
+    FailureReason,
+    Status,
+    SubStatus,
     ElevatedToken,
     VirtualAccount,
     RestrictedAdminMode,
     TargetLogonId,
-    TargetLinkedLogonId
+    TargetLinkedLogonId,
+    WorkstationName
