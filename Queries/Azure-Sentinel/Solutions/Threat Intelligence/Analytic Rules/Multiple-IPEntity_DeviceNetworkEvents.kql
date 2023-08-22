@@ -22,7 +22,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         // Take the earliest TimeGenerated and the latest column info
         | summarize hint.strategy=shuffle
             minTimeGenerated = min(TimeGenerated),
-            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress)
+            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation, ExternalIndicatorId, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress)
             by IndicatorId
         // Remove inactive or expired indicators
         | where not(not(Active) or ExpirationDateTime < now())
@@ -59,7 +59,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
             and not(RemoteIPType in ("Private", "Loopback", "Teredo", "Broadcast"))//Reserved
         //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
         | extend IPAddress = iff(RemoteIPType == "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
-        | where not(ipv4_is_private(IPAddress))
+        | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
         //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
         | project-rename DeviceNetworkEvents_TimeGenerated = TimeGenerated
     ;
@@ -72,8 +72,34 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
     //| where not(todynamic(AdditionalInformation)["value_type"] in ("domain", "url") and isempty(RemoteUrl))
     | project
         DeviceNetworkEvents_TimeGenerated,
-        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, TI_IPAddress, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress,
-        DeviceName, LocalIP, ActionType, RemoteUrl, RemoteIP, RemotePort, Protocol, LocalPort, InitiatingProcessCommandLine, InitiatingProcessFolderPath, InitiatingProcessAccountName, InitiatingProcessAccountUpn
+        Description,
+        ActivityGroupNames,
+        IndicatorId,
+        ThreatType,
+        DomainName,
+        Url,
+        ExpirationDateTime,
+        ConfidenceScore,
+        SourceSystem,
+        Tags,
+        AdditionalInformation,
+        TI_IPAddress,
+        NetworkIP,
+        NetworkSourceIP,
+        NetworkDestinationIP,
+        EmailSourceIpAddress,
+        DeviceName,
+        LocalIP,
+        ActionType,
+        RemoteUrl,
+        RemoteIP,
+        RemotePort,
+        Protocol,
+        LocalPort,
+        InitiatingProcessCommandLine,
+        InitiatingProcessFolderPath,
+        InitiatingProcessAccountName,
+        InitiatingProcessAccountUpn
 };
 union// isfuzzy=true
     // Match      current table events                                all indicators available
