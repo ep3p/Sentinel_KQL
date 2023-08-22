@@ -56,14 +56,14 @@ let _AtypicaltravelAlerts = materialize(
         union
             (SigninLogs
             | where TimeGenerated > ago(query_period)
-            | where CorrelationId in (toscalar(_Alerts | summarize make_list(CorrelationId))) and RiskState != "none" and RiskEventTypes has "unlikelyTravel"
+            | where CorrelationId in (toscalar(_Alerts | summarize make_list(CorrelationId))) and RiskState == "atRisk" and RiskEventTypes has "unlikelyTravel"
             | extend
                 DeviceDetail = tostring(DeviceDetail),
                 TimeReceived = _TimeReceived
             ),
             (AADNonInteractiveUserSignInLogs
             | where TimeGenerated > ago(query_period)
-            | where CorrelationId in (toscalar(_Alerts | summarize make_list(CorrelationId))) and RiskState != "none" and RiskEventTypes has "unlikelyTravel"
+            | where CorrelationId in (toscalar(_Alerts | summarize make_list(CorrelationId))) and RiskState == "atRisk" and RiskEventTypes has "unlikelyTravel"
             | extend TimeReceived = _TimeReceived
             )
         | summarize
@@ -137,7 +137,10 @@ _AtypicaltravelAlerts
         AlertName
     )
 // Remove benign cases where alert severity is not High
-| where not(BenignAlert and AlertSeverity != "High")
+| where not(BenignAlert)// and AlertSeverity != "High")
+| project-rename
+    Alert_PreviousIPAddress = ['Alert_Previous IP Address'],
+    Alert_CurrentIPAddress = ['Alert_Current IP Address']
 | project-reorder
     TimeGenerated,
     ProductName,
