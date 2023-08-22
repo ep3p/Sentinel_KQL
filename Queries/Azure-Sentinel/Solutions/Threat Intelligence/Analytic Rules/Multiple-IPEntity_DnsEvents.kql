@@ -22,7 +22,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         // Take the earliest TimeGenerated and the latest column info
         | summarize hint.strategy=shuffle
             minTimeGenerated = min(TimeGenerated),
-            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress)
+            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation, ExternalIndicatorId, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress)
             by IndicatorId
         // Remove inactive or expired indicators
         | where not(not(Active) or ExpirationDateTime < now())
@@ -57,20 +57,40 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where isnotempty(IPAddresses) and SubType == "LookupQuery"
         //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddresses has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
         | mv-expand IPAddress = split(IPAddresses, ", ") to typeof(string)
-        | where not(ipv4_is_private(IPAddress))
+        | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
         //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
         | project-rename DnsEvents_TimeGenerated = TimeGenerated
     ;
     _Indicators
     | join kind=inner hint.strategy=shuffle _TableEvents on IPAddress
-    //| where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has Name or Name has DomainName))
-    //| where not(todynamic(AdditionalInformation)["value_type"] == "url" and not(trim_end(@"\/", Url) endswith Name))
     // Take only a single event by key columns
     //| summarize hint.strategy=shuffle take_any(*) by IPAddress, ClientIP
     | project
         DnsEvents_TimeGenerated,
-        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, TI_IPAddress, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress,
-        Computer, SubType, ClientIP, QueryType, Name, IPAddresses, MaliciousIP, IndicatorThreatType
+        Description,
+        ActivityGroupNames,
+        IndicatorId,
+        ThreatType,
+        DomainName,
+        Url,
+        ExpirationDateTime,
+        ConfidenceScore,
+        SourceSystem,
+        Tags,
+        AdditionalInformation,
+        TI_IPAddress,
+        NetworkIP,
+        NetworkSourceIP,
+        NetworkDestinationIP,
+        EmailSourceIpAddress,
+        Computer,
+        SubType,
+        ClientIP,
+        QueryType,
+        Name,
+        IPAddresses,
+        MaliciousIP,
+        IndicatorThreatType
 };
 union// isfuzzy=true
     // Match      current table events                                all indicators available
