@@ -32,7 +32,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         // Take the earliest TimeGenerated and the latest column info
         | summarize hint.strategy=shuffle
             minTimeGenerated = min(TimeGenerated),
-            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress)
+            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation, ExternalIndicatorId, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress)
             by IndicatorId
         // Remove inactive or expired indicators
         | where not(not(Active) or ExpirationDateTime < now())
@@ -69,9 +69,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         //| where not(_IndicatorsPrefilterLength < 10000 and not(log_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
         | mv-expand IPAddress = todynamic(dynamic_to_json(extract_all(strcat(@'\"', "(", _IPv4Regex, "|", _IPv6Regex, ")"), dynamic([1]), log_s)))
         | extend IPAddress = tostring(IPAddress[0])
-        | where isnotempty(IPAddress)
-            and not(ipv4_is_private(IPAddress))
-            and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+        | where isnotempty(IPAddress) and not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
         //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
         | project-rename AzureDiagnostics_TimeGenerated = TimeGenerated
     ;
@@ -81,8 +79,31 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
     //| summarize hint.strategy=shuffle take_any(*) by IPAddress, ResourceId
     | project
         AzureDiagnostics_TimeGenerated,
-        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, TI_IPAddress, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress,
-        Category, ResourceId, ResourceType, OperationName, Environment_s, pod_s, UnderlayName_s, stream_s, log_s
+        Description,
+        ActivityGroupNames,
+        IndicatorId,
+        ThreatType,
+        DomainName,
+        Url,
+        ExpirationDateTime,
+        ConfidenceScore,
+        SourceSystem,
+        Tags,
+        AdditionalInformation,
+        TI_IPAddress,
+        NetworkIP,
+        NetworkSourceIP,
+        NetworkDestinationIP,
+        EmailSourceIpAddress,
+        Category,
+        ResourceId,
+        ResourceType,
+        OperationName,
+        Environment_s,
+        pod_s,
+        UnderlayName_s,
+        stream_s,
+        log_s
 };
 union// isfuzzy=true
     // Match      current table events                                all indicators available
