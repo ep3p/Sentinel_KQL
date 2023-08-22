@@ -70,18 +70,18 @@ _RiskEvents
 | extend
     BenignAlert = case(
         // Remove Unfamiliar sign-in properties cases where MFA was not set previously and the location or IP address is expected, depending on severity
-        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationMethod", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)), true,
+        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationMethod", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or (isnotempty(parse_ipv4(IpAddress)) and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges))), true,
         // Remove Unfamiliar sign-in properties cases where MFA was not set previously and the location or IP address is expected, depending on severity
-        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationPhoneAppDetail", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)), true,
+        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationPhoneAppDetail", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or (isnotempty(parse_ipv4(IpAddress)) and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges))), true,
         // Remove Unfamiliar sign-in properties cases where MFA was not set previously and the location or IP address is expected, depending on severity
-        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationUserDetails", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)), true,
+        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_StrongAuthenticationUserDetails", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or (isnotempty(parse_ipv4(IpAddress)) and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges))), true,
         // Remove Unfamiliar sign-in properties cases where MFA was not set previously and the location or IP address is expected, depending on severity
-        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_SearchableDeviceKey", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)), true,
+        RiskEventType == "unfamiliarFeatures" and RiskLevel in ("medium", "low") and column_ifexists("AuthMethodChange_SearchableDeviceKey", dynamic(null))["oldValue"] == "[]" and (Location in (_ExpectedLocations) or (isnotempty(parse_ipv4(IpAddress)) and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges))), true,
         // Remove Atypical travel cases from expected locations, depending on severity
         RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and RelatedLocation_Location == Location and RelatedLocation_Location in (_ExpectedLocations) and Location in (_ExpectedLocations), true,
         // Remove Atypical travel cases from expected IP addresses, depending on severity
-        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and ipv4_is_in_any_range(RelatedLocation_IpAddress, _ExpectedIPRanges) and Location in (_ExpectedLocations), true,
-        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges) and RelatedLocation_Location in (_ExpectedLocations), true,
+        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and (isnotempty(parse_ipv4(IpAddress)) and ipv4_is_in_any_range(RelatedLocation_IpAddress, _ExpectedIPRanges)) and Location in (_ExpectedLocations), true,
+        RiskEventType == "unlikelyTravel" and RiskLevel in ("medium", "low") and (isnotempty(parse_ipv4(IpAddress)) and ipv4_is_in_any_range(IpAddress, _ExpectedIPRanges)) and RelatedLocation_Location in (_ExpectedLocations), true,
         false
     )
 // Remove benign cases where risk level is not High
