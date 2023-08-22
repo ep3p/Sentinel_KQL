@@ -30,7 +30,7 @@ let _DisabledAttempts =
         take_anyif(Location, isnotempty(Location))
         by Category, UserId, IPAddress
     // Remove expected IP addresses
-    | where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
+    | where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
     | lookup kind = leftouter (
         AuditLogs
         | where TimeGenerated > ago(query_period)
