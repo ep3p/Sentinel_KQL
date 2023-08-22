@@ -22,7 +22,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         // Take the earliest TimeGenerated and the latest column info
         | summarize hint.strategy=shuffle
             minTimeGenerated = min(TimeGenerated),
-            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress)
+            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation, ExternalIndicatorId, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress)
             by IndicatorId
         // Remove inactive or expired indicators
         | where not(not(Active) or ExpirationDateTime < now())
@@ -57,7 +57,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where not(isempty(RemoteIp))
         //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
         | extend IPAddress = trim_start("::ffff:", RemoteIp)
-        | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+        | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
         //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
         | project-rename VMConnection_TimeGenerated = TimeGenerated
     ;
