@@ -111,5 +111,4 @@ union// isfuzzy=true
 | extend
     timestamp = Syslog_TimeGenerated,
     HostCustomEntity = HostName,
-    //IPCustomEntity = HostIP,
     IPCustomEntity = TI_IPAddress
