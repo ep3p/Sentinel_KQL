@@ -23,7 +23,7 @@ let _CorrelationIds = toscalar(
     SigninLogs
     | where ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)
     | where not(AuthenticationDetails has "Incorrect password" or ResultType in (_UncompromisedResultTypes))
-    | where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPRanges))
+    | where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPRanges))
     | summarize make_list(CorrelationId)
 );
 SigninLogs
