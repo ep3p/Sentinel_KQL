@@ -1374,7 +1374,7 @@
                 | where not(isempty(RemoteIp))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = trim_start("::ffff:", RemoteIp)
-                | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1403,7 +1403,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(SyslogMessage has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = todynamic(dynamic_to_json(extract_all(strcat(@"\s", "(", _IPv4Regex, "|", _IPv6Regex, ")"), dynamic([1]), SyslogMessage)))
                 | extend IPAddress = tostring(IPAddress[0])
-                | where isnotempty(IPAddress) and not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where isnotempty(IPAddress) and not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1421,7 +1421,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), CallerIpAddress)[0]
                 | extend IPAddress = tostring(ClientIPValues[0])
-                | where (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))) and not(ipv4_is_private(IPAddress))
+                | where isnotempty(parse_ipv6(IPAddress)) or not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_private(IPAddress))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1439,7 +1439,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), CallerIpAddress)[0]
                 | extend IPAddress = tostring(ClientIPValues[0])
-                | where (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))) and not(ipv4_is_private(IPAddress))
+                | where isnotempty(parse_ipv6(IPAddress)) or not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_private(IPAddress))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1527,7 +1527,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = todynamic(dynamic_to_json(extract_all(strcat("(", _IPv4Regex, "|", _IPv6Regex, ")"), dynamic([1]), Entities)))
                 | extend IPAddress = tostring(IPAddress[0])
-                | where isnotempty(IPAddress) and not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where isnotempty(IPAddress) and not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1580,7 +1580,7 @@
                 | where isnotempty(IPAddresses) and SubType == "LookupQuery"
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddresses has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = split(IPAddresses, ", ") to typeof(string)
-                | where not(ipv4_is_private(IPAddress))
+                | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         //| where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has Name or Name has DomainName))
@@ -1601,7 +1601,7 @@
                     and not(RemoteIPType in ("Private", "Loopback", "Teredo", "Broadcast"))//Reserved
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = iff(RemoteIPType == "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
-                | where not(ipv4_is_private(IPAddress))
+                | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         // | where not(todynamic(AdditionalInformation)["value_type"] == "domain" and not(DomainName has RemoteUrl or RemoteUrl has DomainName))
@@ -1620,7 +1620,7 @@
                 ```
                 | where isnotempty(IPAddress) and (isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress)))
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-                | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1648,7 +1648,7 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(log_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = todynamic(dynamic_to_json(extract_all(strcat(@'\"', "(", _IPv4Regex, "|", _IPv6Regex, ")"), dynamic([1]), log_s)))
                 | extend IPAddress = tostring(IPAddress[0])
-                | where isnotempty(IPAddress) and not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where isnotempty(IPAddress) and not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1665,7 +1665,7 @@
                 | where isnotempty(CallerIPAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = trim_start("::ffff:", CallerIPAddress)
-                | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -1708,7 +1708,7 @@
                 | where isnotempty(IPAddress)
                 // Remove denied traffic where the source was remote
                 | where not(IPAddress == SourceAddress and FirewallAction == "Deny")
-                | where not(ipv4_is_private(IPAddress))
+                | where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_private(IPAddress))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         //// Remove indicators of certain type
@@ -1727,7 +1727,7 @@
                 | where isnotempty(CallerIPAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = trim_start("::ffff:", CallerIPAddress)
-                | where not(ipv4_is_private(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8"))
+                | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
