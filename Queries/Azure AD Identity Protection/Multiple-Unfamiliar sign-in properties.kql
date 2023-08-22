@@ -39,7 +39,7 @@ let _UnfamiliarAlerts = materialize(
     | lookup kind=leftouter (
         (SigninLogs
         | where TimeGenerated > ago(query_period)
-        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState != "none"
+        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
         | extend
             DeviceDetail = tostring(DeviceDetail),
             TimeReceived = _TimeReceived
@@ -102,7 +102,7 @@ _UnfamiliarAlerts
         // Remove cases from expected locations, depending on detection, severity and legacy protocols
         Location in (_ExpectedLocations) and ["Alert_Detection Subcategory"] == "UnfamiliarLocation" and AlertSeverity in ("Medium", "Low") and not(ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)), true,
         // Remove cases from expected IP addresses, depending on severity
-        ipv4_is_in_any_range(IPAddress, _ExpectedIPRanges) and AlertSeverity in ("Medium", "Low"), true,
+        isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPRanges) and AlertSeverity in ("Medium", "Low"), true,
         false
     ),
     // If a user is put at high risk, the alert severity should be High and the incident name should have the string "User at risk"
@@ -115,7 +115,7 @@ _UnfamiliarAlerts
         AlertName
     )
 // Remove benign cases where alert severity is not High
-| where not(BenignAlert and not(AlertSeverity in ("High")))
+| where not(BenignAlert)// and not(AlertSeverity in ("High")))
 | project-reorder
     TimeGenerated,
     ProductName,
