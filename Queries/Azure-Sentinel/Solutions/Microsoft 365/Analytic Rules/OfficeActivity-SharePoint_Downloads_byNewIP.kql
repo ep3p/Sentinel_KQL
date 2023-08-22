@@ -49,7 +49,7 @@ OfficeActivity
     ) on ClientIP
 | where OperationCount > operation_threshold or FileCount > file_threshold
 // Remove operations from expected devices
-| where not(MachineDomainInfo in (_ExpectedMachineDomainInfo) or ipv4_is_in_any_range(ClientIP, _ExpectedIPRanges))
+| where not(MachineDomainInfo in (_ExpectedMachineDomainInfo) or (isnotempty(parse_ipv4(ClientIP)) and ipv4_is_in_any_range(ClientIP, _ExpectedIPRanges)))
 // Add geolocation from IP address
 | extend IPRange = parse_ipv6_mask(ClientIP, 128 - (32 - ipv4_prefix_mask))
 | lookup kind=leftouter (
