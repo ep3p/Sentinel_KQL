@@ -123,8 +123,8 @@ _AtypicaltravelAlerts
         // Remove cases from expected locations, depending on severity and legacy protocols
         ["Alert_Current Country"] == ["Alert_Previous Location"] and ["Alert_Current Country"] in (_ExpectedLocations) and ["Alert_Previous Location"] in (_ExpectedLocations) and AlertSeverity in ("Medium", "Low") and not(ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)), true,
         // Remove cases from expected IP addresses, depending on severity and legacy protocols
-        ipv4_is_in_any_range(["Alert_Previous IP Address"], _ExpectedIPRanges) and ["Alert_Current Country"] in (_ExpectedLocations) and AlertSeverity in ("Medium", "Low") and not(ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)), true,
-        ipv4_is_in_any_range(["Alert_Current IP Address"], _ExpectedIPRanges) and ["Alert_Previous Location"] in (_ExpectedLocations) and AlertSeverity in ("Medium", "Low"), true,
+        (isnotempty(parse_ipv4(["Alert_Previous IP Address"])) and ipv4_is_in_any_range(["Alert_Previous IP Address"], _ExpectedIPRanges)) and ["Alert_Current Country"] in (_ExpectedLocations) and AlertSeverity in ("Medium", "Low") and not(ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)), true,
+        (isnotempty(parse_ipv4(["Alert_Current IP Address"])) and ipv4_is_in_any_range(["Alert_Current IP Address"], _ExpectedIPRanges)) and ["Alert_Previous Location"] in (_ExpectedLocations) and AlertSeverity in ("Medium", "Low"), true,
         false
     ),
     // If a user is put at high risk, the alert severity should be High and the incident name should have the string "User at risk"
