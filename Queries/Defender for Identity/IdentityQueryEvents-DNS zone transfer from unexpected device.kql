@@ -5,7 +5,7 @@ let _ExpectedIPAddresses = toscalar(
 );
 IdentityQueryEvents
 | where ActionType == "DNS query" and QueryType == "Axfr"
-| where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
+| where not((isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses)))
 | extend AdditionalFieldsCount = toint(AdditionalFields["Count"])
 | summarize
     Count = sum(AdditionalFieldsCount),
