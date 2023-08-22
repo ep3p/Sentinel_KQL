@@ -38,7 +38,7 @@ let _Queries = (start_time: datetime, end_time: datetime) {
         DnsEvents
         | where TimeGenerated between (start_time..end_time)
         | extend QueriedIPAddress = extract(strcat(@"(", _IPv4Regex, @"|", _IPv6Regex, @")\b.+$"), 1, Name)
-        | where not(isempty(QueriedIPAddress) or QueriedIPAddress == "127.0.0.1")// or ipv4_is_private(QueriedIPAddress)
+        | where not(isempty(QueriedIPAddress) or QueriedIPAddress == "127.0.0.1")// or (isnotempty(parse_ipv4(QueriedIPAddress)) and ipv4_is_private(QueriedIPAddress))
         | lookup _ResultCodeTable on ResultCode
         | project
             TimeGenerated,
@@ -55,7 +55,7 @@ let _Queries = (start_time: datetime, end_time: datetime) {
         Cisco_Umbrella_dns_CL
         | where TimeGenerated between (start_time..end_time)
         | extend QueriedIPAddress = extract(strcat(@"(", _IPv4Regex, @"|", _IPv6Regex, @")\b.+\.$"), 1, Domain_s)
-        | where not(isempty(QueriedIPAddress) or QueriedIPAddress == "127.0.0.1")// or ipv4_is_private(QueriedIPAddress)
+        | where not(isempty(QueriedIPAddress) or QueriedIPAddress == "127.0.0.1")// or (isnotempty(parse_ipv4(QueriedIPAddress)) and ipv4_is_private(QueriedIPAddress))
         | parse QueryType_s with DnsQueryType:int " (" DnsQueryTypeName:string ")"
         | mv-apply Identities_s_aux = todynamic(Identities_s) to typeof(string), Identity_Types_s_aux = todynamic(Identity_Types_s) to typeof(string) on ( 
             summarize Identities = make_bag(bag_pack(Identity_Types_s_aux, Identities_s_aux))
