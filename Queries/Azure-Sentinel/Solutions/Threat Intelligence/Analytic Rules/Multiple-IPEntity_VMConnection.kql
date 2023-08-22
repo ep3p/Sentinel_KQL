@@ -67,8 +67,34 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
     //| summarize hint.strategy=shuffle take_any(*) by IPAddress, Computer
     | project
         VMConnection_TimeGenerated,
-        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, TI_IPAddress, NetworkIP, NetworkSourceIP, NetworkDestinationIP, EmailSourceIpAddress,
-        _ResourceId, Computer, SourceIp, DestinationIp, Protocol, DestinationPort, Direction, RemoteIp, ProcessName, RemoteDnsQuestions, RemoteDnsCanonicalNames, ConnectionId
+        Description,
+        ActivityGroupNames,
+        IndicatorId,
+        ThreatType,
+        DomainName,
+        Url,
+        ExpirationDateTime,
+        ConfidenceScore,
+        SourceSystem,
+        Tags,
+        AdditionalInformation,
+        TI_IPAddress,
+        NetworkIP,
+        NetworkSourceIP,
+        NetworkDestinationIP,
+        EmailSourceIpAddress,
+        _ResourceId,
+        Computer,
+        SourceIp,
+        DestinationIp,
+        Protocol,
+        DestinationPort,
+        Direction,
+        RemoteIp,
+        ProcessName,
+        RemoteDnsQuestions,
+        RemoteDnsCanonicalNames,
+        ConnectionId
 };
 union// isfuzzy=true
     // Match      current table events                                all indicators available
