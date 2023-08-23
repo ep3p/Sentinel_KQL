@@ -51,7 +51,7 @@ let _RoleManagementCoreDirectory = materialize(
         AdditionalDetails,
         CorrelationId = todynamic(CorrelationId)
     | extend
-        PermanentOperation = iff(not(Identity == "MS-PIM" and bag_has_key(InitiatedBy, "app")), true, bool(null)) //not(ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids))
+        PermanentOperation = iff(not(ActorIdentity == "MS-PIM" and bag_has_key(InitiatedBy, "app")), true, bool(null)) //not(ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids))
 );
 let _RoleManagementPIM =
     AuditLogs
