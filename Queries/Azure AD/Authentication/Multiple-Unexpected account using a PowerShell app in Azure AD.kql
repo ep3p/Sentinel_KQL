@@ -63,12 +63,13 @@ union SigninLogs, AADNonInteractiveUserSignInLogs
 // Remove unsuccessful guest signins from app "Microsoft Azure CLI", when they use this app we assume a signin event happens in all tenants where they are a guest
 | where not(AppId == MicrosoftAzureCLI_appid and ResultType in (_MicrosoftAzureCLIExpectedResultTypes))// and (UserType != "Member" or not(HomeTenantId in (_HomeTenantId))))
 | summarize arg_max(TimeGenerated, *) by CorrelationId, ResultType
+| extend DeviceDetail = coalesce(tostring(DeviceDetail_dynamic), DeviceDetail_string)
 | summarize
     TimeGenerated = min(TimeGenerated),
     CorrelationIds = make_set(CorrelationId),
     ResultTypes = make_set(ResultType),
-    take_anyif(UserPrincipalName, not(UserPrincipalName matches regex UUID_regex)),
-    take_any(Location, ClientAppUsed, ResourceDisplayName, UserAgent, AuthenticationDetails, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated)
+    take_anyif(UserPrincipalName, not(UserPrincipalName == UserId)),
+    take_any(Location, ClientAppUsed, ResourceDisplayName, UserAgent, AuthenticationDetails, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, DeviceDetail)
     by UserId, IPAddress, AppDisplayName, AppId
 | join kind=leftouter _Users on $left.UserId == $right.AccountObjectId
 | extend UserPrincipalName = tolower(case(isnotempty(UserPrincipalName), UserPrincipalName, isnotempty(MailAddress), MailAddress, AccountUPN))
@@ -82,6 +83,8 @@ union SigninLogs, AADNonInteractiveUserSignInLogs
     AppDisplayName,
     ResourceDisplayName,
     ClientAppUsed,
+    DeviceDetail,
+    UserAgent,
     UserType,
     GroupMembership,
     AssignedRoles,
