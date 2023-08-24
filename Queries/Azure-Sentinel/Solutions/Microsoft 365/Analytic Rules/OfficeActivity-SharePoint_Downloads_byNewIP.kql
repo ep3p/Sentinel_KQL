@@ -3,7 +3,6 @@ let query_period = 14d;
 let monitored_operations = dynamic(["FileDownloaded", "FileSyncDownloadedFull"]);
 let operation_threshold = 10;
 let file_threshold = 1;
-let ipv4_prefix_mask = 23;
 let _ExpectedLocations = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "CorporateGeolocation" 
@@ -51,22 +50,16 @@ OfficeActivity
 // Remove operations from expected devices
 | where not(MachineDomainInfo in (_ExpectedMachineDomainInfo) or (isnotempty(parse_ipv4(ClientIP)) and ipv4_is_in_any_range(ClientIP, _ExpectedIPRanges)))
 // Add geolocation from IP address
-| extend IPRange = parse_ipv6_mask(ClientIP, 128 - (32 - ipv4_prefix_mask))
-| lookup kind=leftouter (
-    union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs
-    | where TimeGenerated > ago(query_period)
-    | summarize hint.strategy=shuffle take_anyif(Location, isnotempty(Location)) by IPAddress
-    | summarize Locations = make_set_if(Location, isnotempty(Location)) by IPRange = parse_ipv6_mask(IPAddress, 128 - (32 - ipv4_prefix_mask))
-    ) on IPRange
+| extend Location = geo_info_from_ip_address(ClientIP)
 // Remove home tenant users from expected locations
-| where not(array_length(Locations) == 1 and tostring(Locations[0]) in (_ExpectedLocations) and UserId has_any (_ExpectedDomain))
+| where not(Location in (_ExpectedLocations) and UserId has_any (_ExpectedDomain))
 | project
     StartTime,
     EndTime,
     OfficeWorkload,
     UserId,
     ClientIP,
-    Locations,
+    Location,
     MachineDomainInfo,
     OperationCount,
     Operations,
