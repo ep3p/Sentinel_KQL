@@ -8,6 +8,10 @@ let _ExpectedLocations = toscalar(
     | where Activity == "CorporateGeolocation" 
     | summarize make_list(Auxiliar)
 );
+let _CountryCodes =
+    _GetWatchlist("Code-GeoNamesCountryCodes")
+    | project Country, Location = ISO
+;
 let _DefaultSharePointAdministrators = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "SharePointAdministrator" and Notes has "[Default]"
@@ -50,7 +54,8 @@ OfficeActivity
 // Remove operations from expected devices
 | where not(MachineDomainInfo in (_ExpectedMachineDomainInfo) or (isnotempty(parse_ipv4(ClientIP)) and ipv4_is_in_any_range(ClientIP, _ExpectedIPRanges)))
 // Add geolocation from IP address
-| extend Location = geo_info_from_ip_address(ClientIP)
+| extend Country = tostring(geo_info_from_ip_address(ClientIP)["country"])
+| lookup kind=leftouter _CountryCodes on Country
 // Remove home tenant users from expected locations
 | where not(Location in (_ExpectedLocations) and UserId has_any (_ExpectedDomain))
 | project
