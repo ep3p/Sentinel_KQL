@@ -48,7 +48,7 @@
         UserIdentityAccountName = column_ifexists("UserIdentityAccountName", ""),
         UserIdentityAccountId = column_ifexists("UserIdentityAccountId", ""),
         Identity = column_ifexists("Identity", ""),
-        RoleRequested = column_ifexists("RoleRequested", "")
+        RequestedRole = column_ifexists("RequestedRole", "")
     | project-reorder
         TimeGenerated
 //};
