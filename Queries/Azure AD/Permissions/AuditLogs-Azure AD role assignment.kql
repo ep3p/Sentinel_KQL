@@ -177,7 +177,7 @@ union
     AlertDescription = strcat(
         'This rule detects operations with Azure AD roles.\n\nThe ',
         case(TargetType == "User", 'user', TargetType == "ServicePrincipal", 'service principal', 'member'),
-        case(TargetType == "User", strcat(' "', TargetDisplayName, '" (', TargetUserPrincipalName, ')'), strcat(' "', coalesce(TargetDisplayName, TargetId),'"')),
+        case(TargetType == "User", strcat(' "', TargetDisplayName, '" (', TargetUserPrincipalName, ')'), strcat(' "', coalesce(TargetDisplayName, TargetId), '"')),
         ' was ',
         iff(RemoveOperation, 'removed from', 'added to'),
         ' role "',
