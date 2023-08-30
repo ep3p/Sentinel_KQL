@@ -189,25 +189,25 @@ union
         '".\n'
     )
 | extend AlertSeverity = case(
-        // Direct Core Directory operations
-        LoggedByService == "Core Directory", "High",
-        // Non-user target
-        not(TargetType == "User"), "High",
-        // Remove operations by Azure AD PIM (assumedly automatic)
-        RemoveOperation and ActorIdentity == "Azure AD PIM" and (ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids)), "Informational",
-        // Voluntary deactivation operations
-        AADOperationType == "DeactivateRole", "Informational",
-        // Activation
-        AADOperationType == "ActivateRole" and not(WorkingTime), "Medium",
-        AADOperationType == "ActivateRole" and WorkingTime, "Informational",
-        // Non-working hours
-        not(WorkingTime), "High",
-        // Working hours
-        WorkingTime and PrivilegedRole and PermanentOperation, "Medium",
-        WorkingTime and PrivilegedRole and not(PermanentOperation), "Medium",
-        WorkingTime and not(PrivilegedRole) and PermanentOperation, "Low",
-        WorkingTime and not(PrivilegedRole) and not(PermanentOperation), "Informational",
-        "High"
+    // Direct Core Directory operations
+    LoggedByService == "Core Directory", "High",
+    // Non-user target
+    not(TargetType == "User"), "High",
+    // Remove operations by Azure AD PIM (assumedly automatic)
+    RemoveOperation and ActorIdentity == "Azure AD PIM" and (ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids)), "Informational",
+    // Voluntary deactivation operations
+    AADOperationType == "DeactivateRole", "Informational",
+    // Activation
+    AADOperationType == "ActivateRole" and not(WorkingTime), "Medium",
+    AADOperationType == "ActivateRole" and WorkingTime, "Informational",
+    // Non-working hours
+    not(WorkingTime), "High",
+    // Working hours
+    WorkingTime and PrivilegedRole and PermanentOperation, "Medium",
+    WorkingTime and PrivilegedRole and not(PermanentOperation), "Medium",
+    WorkingTime and not(PrivilegedRole) and PermanentOperation, "Low",
+    WorkingTime and not(PrivilegedRole) and not(PermanentOperation), "Informational",
+    "High"
     )
 | project
     TimeGenerated,
