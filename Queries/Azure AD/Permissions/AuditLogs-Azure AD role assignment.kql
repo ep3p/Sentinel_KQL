@@ -167,13 +167,15 @@ union
 | extend
     PrivilegedRole = TargetRoleDisplayName matches regex _PrivAADRoles or CoreDirectory_TargetRoleDisplayName  matches regex _PrivAADRoles,
     WorkingTime = IsWorkingTime(TimeGenerated),
-    AlertName = strcat_delim(" ",
+    AlertName = strcat(
         iff(RemoveOperation, "Remove", "Add"),
+        " ",
         iff(PermanentOperation, "permanent", iff(not(ActivateOperation), "temporary", "activated")),
-        iff(EligibleOperation, "eligible", ""),
-        "member",
+        " ",
+        iff(EligibleOperation, "eligible ", ""),
+        "member ",
         iff(RemoveOperation, "from", "to"),
-        "Azure AD role"),
+        " Azure AD role"),
     AlertDescription = strcat(
         'This rule detects operations with Azure AD roles.\n\nThe ',
         case(TargetType == "User", 'user', TargetType == "ServicePrincipal", 'service principal', 'member'),
