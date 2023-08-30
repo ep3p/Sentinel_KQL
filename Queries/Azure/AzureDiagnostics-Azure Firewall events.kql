@@ -1,6 +1,7 @@
-// Please, use the function you can find in:
+// Please, use any of the functions you can find in:
 //
 // https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/AzureDiagnostics-AzureFirewallLogs.kql
+// https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/AZFW*-AzureFirewallLogs.kql
 //
 AzureFirewallLogs()
 | limit 100
