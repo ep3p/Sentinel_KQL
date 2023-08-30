@@ -4,7 +4,7 @@
 
 In this repository you may find KQL (Kusto Query Language) queries and Watchlist schemes for data sources related to Microsoft Sentinel (a SIEM tool).
 
-I will be commenting the queries in [this Twitter thread](https://twitter.com/ep3p/status/1556248792269066241).
+<!--I will be commenting the queries in [this Twitter thread](https://twitter.com/ep3p/status/1556248792269066241).-->
 
 You could check other resources like:
 | GitHub |
