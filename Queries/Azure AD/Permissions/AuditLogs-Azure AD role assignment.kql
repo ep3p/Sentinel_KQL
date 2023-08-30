@@ -188,8 +188,7 @@ union
         coalesce(ActorUserPrincipalName, ActorAppName, ActorIdentity),
         '".\n'
     )
-| extend
-    AlertSeverity = case(
+| extend AlertSeverity = case(
         // Direct Core Directory operations
         LoggedByService == "Core Directory", "High",
         // Non-user target
