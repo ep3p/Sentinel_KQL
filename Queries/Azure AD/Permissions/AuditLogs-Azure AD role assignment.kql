@@ -190,7 +190,7 @@ union
     )
 | extend AlertSeverity = case(
     // Direct Core Directory operations
-    LoggedByService == "Core Directory", "High",
+    not(LoggedByService == "PIM"), "High",
     // Non-user target
     not(TargetType == "User"), "High",
     // Remove operations by Azure AD PIM (assumedly automatic)
