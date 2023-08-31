@@ -1,0 +1,269 @@
+// This query can help you to detect Azure AD role assignments.
+//
+// You can call this function by running this same query code, or if you save this function as "AzureADRoleAssignments", by simply calling:
+//
+// AzureADRoleAssignments
+//
+//let Function = (){
+let _PIM_ids = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "PrivilegedIdentityManagement" and Notes has "[App]"
+    | summarize make_list(ActorId)
+);
+let _PrivAADRoles = toscalar(
+    _GetWatchlist("RegEx-PrivAADRoles")
+    | summarize RegEx = make_list(RegEx)
+    | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
+);
+let _RoleManagementPIM = materialize(
+    AuditLogs
+    | where Category == "RoleManagement" and LoggedByService == "PIM" and OperationName has_any ("to role", "from role", "role assignment")
+    | mv-apply AdditionalDetail = AdditionalDetails on (
+        summarize ParsedAdditionalDetails = make_bag(pack(tostring(AdditionalDetail["key"]), tostring(AdditionalDetail["value"])))
+    )
+    // | mv-apply TargetResource = TargetResources on (
+    //     summarize TargetResourcesTypes = make_list(tostring(TargetResource["type"]))
+    // )
+    | mv-apply TargetResource = TargetResources on (
+        summarize TargetResource = make_list(TargetResource) by TargetResourceType = tostring(TargetResource["type"])
+        | extend TargetResource = iff(array_length(TargetResource) == 1, TargetResource[0], TargetResource)
+        | summarize ParsedTargetResources = make_bag(pack(TargetResourceType, TargetResource))
+    )
+    | project
+        TimeGenerated,
+        LoggedByService,
+        Category,
+        AADOperationType,
+        OperationName,
+        Result,
+        ResultReason,
+        ActivateOperation = OperationName has_any ("activation", "deactivate"),
+        EligibleOperation = OperationName has "eligible",
+        RemoveOperation = OperationName has "remove",
+        PermanentOperation = OperationName has "permanent",
+        // Information about the actor
+        ActorIdentity = Identity,
+        // Information about the actor, if it was a user
+        ActorUserId = tostring(InitiatedBy["user"]["id"]),
+        ActorUserPrincipalName = tolower(tostring(InitiatedBy["user"]["userPrincipalName"])),
+        ActorUserIPAddress = tostring(coalesce(InitiatedBy["user"]["ipAddress"], ParsedAdditionalDetails["ipaddr"])),
+        ActorUserRoles = tostring(InitiatedBy["user"]["roles"]),
+        // Information about the actor, if it was an application
+        ActorAppName = tostring(InitiatedBy["app"]["displayName"]),
+        ActorAppId = tostring(InitiatedBy["app"]["appId"]),
+        ActorAppServicePrincipalName = tostring(InitiatedBy["app"]["servicePrincipalName"]),
+        ActorAppServicePrincipalId = tostring(InitiatedBy["app"]["servicePrincipalId"]),
+        // Information about the role
+        RoleProvider = tostring(ParsedTargetResources["Provider"]["displayName"]),
+        TargetRoleDisplayName = tostring(ParsedTargetResources["Role"]["displayName"]),
+        TargetRoleDefinitionOriginType = tostring(ParsedAdditionalDetails["RoleDefinitionOriginType"]),
+        TargetRoleDefinitionOriginId = tostring(ParsedAdditionalDetails["RoleDefinitionOriginId"]), // (!= TargetRoleTemplateId == TargetRoleDefitionObjectId for CustomRoles)
+        TargetRoleTemplateId = tostring(ParsedAdditionalDetails["TemplateId"]),
+        // Information about the target object
+        TargetType = tostring(coalesce(ParsedTargetResources["User"]["type"], ParsedTargetResources["ServicePrincipal"]["type"])),
+        TargetId = tostring(coalesce(ParsedTargetResources["User"]["id"], ParsedTargetResources["ServicePrincipal"]["id"])),
+        TargetDisplayName = tostring(coalesce(ParsedTargetResources["User"]["displayName"], ParsedTargetResources["ServicePrincipal"]["displayName"])),
+        TargetUserPrincipalName = tolower(tostring(ParsedTargetResources["User"]["userPrincipalName"])),
+        // Other information
+        ExpirationTime = todatetime(ParsedAdditionalDetails["ExpirationTime"]),
+        TriggeredByTargetSubType = tostring(ParsedAdditionalDetails["TriggeredByTargetSubType"]),
+        // JSONs containers
+        InitiatedBy,
+        AdditionalDetails,
+        TargetResources,
+        CorrelationId
+    | summarize
+        StartTime = min(TimeGenerated),
+        EndTime = max(TimeGenerated),
+        RequestedTimeGenerated = make_list_if(TimeGenerated, OperationName has "requested"),
+        CompletedTimeGenerated = make_list_if(TimeGenerated, not(OperationName has "requested") and Result == "success"),
+        RequestedCount = countif(OperationName has "requested"),
+        CompletedCount = countif(not(OperationName has "requested") and Result == "success"),
+        arg_max(TimeGenerated, *)
+        by CorrelationId, ActivateOperation, EligibleOperation, RemoveOperation, PermanentOperation, TargetRoleDefinitionOriginId, TargetRoleTemplateId, TargetId
+    | extend
+        RequestedTimeGenerated = iff(array_length(RequestedTimeGenerated) == 0, dynamic(null), RequestedTimeGenerated),
+        RequestedCount = iff(RequestedCount == 0, int(null), RequestedCount)
+);
+let _RoleManagementCoreDirectory = materialize(
+    AuditLogs
+    | where Category == "RoleManagement" and LoggedByService == "Core Directory" and AADOperationType in ("Assign", "Unassign")
+    | mv-apply ModifiedProperty = TargetResources[0]["modifiedProperties"] on (
+        summarize ModifiedProperties = make_bag(bag_pack(tostring(ModifiedProperty["displayName"]), replace_string(tostring(iff(OperationName has "remove", ModifiedProperty["oldValue"], ModifiedProperty["newValue"])), '"', "")))
+    )
+    | project
+        TimeGenerated,
+        LoggedByService,
+        Category,
+        AADOperationType,
+        OperationName,
+        EligibleOperation = OperationName has "eligible",
+        RemoveOperation = OperationName has "remove",
+        Result,
+        // Information about the actor
+        ActorIdentity = Identity,
+        // Information about the actor, if it was a user
+        ActorUserId = tostring(InitiatedBy["user"]["id"]),
+        ActorUserPrincipalName = tolower(tostring(InitiatedBy["user"]["userPrincipalName"])),
+        ActorUserIPAddress = tostring(InitiatedBy["user"]["ipAddress"]),
+        ActorUserRoles = tostring(InitiatedBy["user"]["roles"]),
+        // Information about the actor, if it was an application
+        ActorAppName = tostring(InitiatedBy["app"]["displayName"]),
+        ActorAppId = tostring(InitiatedBy["app"]["appId"]),
+        ActorAppServicePrincipalName = tostring(InitiatedBy["app"]["servicePrincipalName"]),
+        ActorAppServicePrincipalId = tostring(InitiatedBy["app"]["servicePrincipalId"]),
+        // Information about the role
+        TargetRoleDisplayName = tostring(coalesce(ModifiedProperties["Role.DisplayName"], ModifiedProperties["RoleDefinition.DisplayName"])),
+        //TargetRoleObjectId = tostring(ModifiedProperties["Role.ObjectID"]),
+        TargetRoleDefinitionOriginId = tostring(ModifiedProperties["RoleDefinition.ObjectID"]),
+        TargetRoleTemplateId = tostring(ModifiedProperties["Role.TemplateId"]),
+        TargetRoleWellKnownObjectName = tostring(ModifiedProperties["Role.WellKnownObjectName"]),
+        // Information about the target object
+        TargetType = tostring(TargetResources[0]["type"]),
+        TargetId = tostring(TargetResources[0]["id"]),
+        TargetDisplayName = tostring(TargetResources[0]["displayName"]), // In case of service principal added to role
+        TargetUserPrincipalName = tolower(TargetResources[0]["userPrincipalName"]), // In case of user added to role
+        // JSONs containers
+        InitiatedBy,
+        AdditionalDetails,
+        TargetResources,
+        CorrelationId
+    | extend
+        PermanentOperation = iff(ActorIdentity == "MS-PIM" and ActorAppServicePrincipalId in (_PIM_ids), bool(null), true),
+        TargetRoleDefinitionOriginType = iff(isnotempty(TargetRoleWellKnownObjectName), "BuiltInRole", "")
+);
+union
+    (
+    _RoleManagementPIM
+    | extend TargetRoleKey = iff(TargetRoleDefinitionOriginType == "CustomRole", TargetRoleDefinitionOriginId, TargetRoleTemplateId)
+    | lookup kind=leftouter (
+        _RoleManagementCoreDirectory
+        | extend TargetRoleKey = iff(isempty(TargetRoleTemplateId), TargetRoleDefinitionOriginId, TargetRoleTemplateId)
+        | where ActorAppName == "MS-PIM" and ActorAppServicePrincipalId  in (_PIM_ids) and isnotempty(TargetRoleKey) and isnotempty(TargetId) and isnotempty(EligibleOperation) and isnotempty(RemoveOperation)
+        | project-rename
+            CoreDirectory_TimeGenerated = TimeGenerated,
+            CoreDirectory_CorrelationId = CorrelationId,
+            CoreDirectory_TargetRoleDisplayName = TargetRoleDisplayName,
+            CoreDirectory_InitiatedBy = InitiatedBy,
+            CoreDirectory_AdditionalDetails = AdditionalDetails,
+            CoreDirectory_TargetResources = TargetResources
+        | project-away LoggedByService, Category, AADOperationType, OperationName, PermanentOperation, Result, ActorIdentity, ActorUserId, ActorUserPrincipalName, ActorUserIPAddress, ActorUserRoles, ActorAppId, ActorAppName, ActorAppServicePrincipalId, ActorAppServicePrincipalName, TargetRoleDefinitionOriginType, TargetRoleDefinitionOriginId, TargetRoleTemplateId, TargetType, TargetDisplayName, TargetUserPrincipalName
+        ) on TargetRoleKey, TargetId, EligibleOperation, RemoveOperation
+    | where not(isnotempty(CoreDirectory_TimeGenerated) and CoreDirectory_TimeGenerated > EndTime)
+    | summarize arg_max(CoreDirectory_TimeGenerated, *) by TimeGenerated, CorrelationId, TargetRoleKey, TargetId, EligibleOperation, RemoveOperation
+    | project-away CoreDirectory_TimeGenerated, TargetRoleKey
+    | project-rename
+        PIM_CorrelationId = CorrelationId,
+        PIM_InitiatedBy = InitiatedBy,
+        PIM_AdditionalDetails = AdditionalDetails,
+        PIM_TargetResources = TargetResources
+    ),
+    (
+    _RoleManagementCoreDirectory
+    | extend TargetRoleKey = iff(isempty(TargetRoleTemplateId), TargetRoleDefinitionOriginId, TargetRoleTemplateId)
+    | where not(ActorAppName == "MS-PIM" and ActorAppServicePrincipalId  in (_PIM_ids) and isnotempty(TargetRoleKey) and isnotempty(TargetId) and isnotempty(EligibleOperation) and isnotempty(RemoveOperation))
+    | project-rename
+        CoreDirectory_CorrelationId = CorrelationId,
+        CoreDirectory_TargetRoleDisplayName = TargetRoleDisplayName,
+        CoreDirectory_InitiatedBy = InitiatedBy,
+        CoreDirectory_AdditionalDetails = AdditionalDetails,
+        CoreDirectory_TargetResources = TargetResources
+    | project-away TargetRoleKey
+    )
+| where not(LoggedByService == "PIM" and isnotempty(CompletedCount) and CompletedCount == 0)
+| extend
+    PrivilegedRole = TargetRoleDisplayName matches regex _PrivAADRoles or CoreDirectory_TargetRoleDisplayName  matches regex _PrivAADRoles,
+    WorkingTime = IsWorkingTime(TimeGenerated),
+    AlertName = strcat(
+        iff(RemoveOperation, "Remove", "Add"),
+        " ",
+        iff(PermanentOperation, "permanent", iff(not(ActivateOperation), "temporary", "activated")),
+        " ",
+        iff(EligibleOperation, "eligible ", ""),
+        "member ",
+        iff(RemoveOperation, "from", "to"),
+        " Azure AD role"),
+    AlertDescription = strcat(
+        'This rule detects operations with Azure AD roles.\n\nThe ',
+        case(TargetType == "User", 'user', TargetType == "ServicePrincipal", 'service principal', 'member'),
+        case(TargetType == "User", strcat(' "', TargetDisplayName, '" (', TargetUserPrincipalName, ')'), strcat(' "', coalesce(TargetDisplayName, TargetId), '"')),
+        ' was ',
+        iff(RemoveOperation, 'removed from', 'added to'),
+        ' role "',
+        coalesce(TargetRoleDisplayName, CoreDirectory_TargetRoleDisplayName),
+        '" by "',
+        coalesce(ActorUserPrincipalName, ActorAppName, ActorIdentity),
+        '".\n'
+    )
+| extend AlertSeverity = case(
+    // Direct Core Directory operations
+    not(LoggedByService == "PIM"), "High",
+    // Non-user target
+    not(TargetType == "User"), "High",
+    // Remove operations by Azure AD PIM (assumedly automatic)
+    RemoveOperation and ActorIdentity == "Azure AD PIM" and (ActorUserId in (_PIM_ids) or ActorAppServicePrincipalId in (_PIM_ids)), "Informational",
+    // Voluntary deactivation operations
+    AADOperationType == "DeactivateRole", "Informational",
+    // Activation
+    AADOperationType == "ActivateRole" and not(WorkingTime), "Medium",
+    AADOperationType == "ActivateRole" and WorkingTime, "Informational",
+    // Non-working hours
+    not(WorkingTime), "High",
+    // Working hours
+    WorkingTime and PrivilegedRole and PermanentOperation, "Medium",
+    WorkingTime and PrivilegedRole and not(PermanentOperation), "Medium",
+    WorkingTime and not(PrivilegedRole) and PermanentOperation, "Low",
+    WorkingTime and not(PrivilegedRole) and not(PermanentOperation), "Informational",
+    "High"
+    )
+| project
+    TimeGenerated,
+    StartTime,
+    EndTime,
+    LoggedByService,
+    Category,
+    AADOperationType,
+    OperationName,
+    Result,
+    ResultReason,
+    // WorkingTime,
+    // ActivateOperation,
+    // EligibleOperation,
+    // RemoveOperation,
+    // PermanentOperation,
+    ActorIdentity,
+    ActorUserId,
+    ActorUserPrincipalName,
+    ActorUserIPAddress,
+    ActorUserRoles,
+    ActorAppName,
+    ActorAppId,
+    ActorAppServicePrincipalName,
+    ActorAppServicePrincipalId,
+    // RoleProvider,
+    TargetRoleDisplayName,
+    CoreDirectory_TargetRoleDisplayName,
+    TargetRoleWellKnownObjectName,
+    TargetRoleDefinitionOriginType,
+    TargetRoleDefinitionOriginId,
+    TargetRoleTemplateId,
+    //PrivilegedRole,
+    TargetType,
+    TargetId,
+    TargetDisplayName,
+    TargetUserPrincipalName,
+    ExpirationTime,
+    TriggeredByTargetSubType,
+    PIM_CorrelationId,
+    PIM_InitiatedBy,
+    PIM_AdditionalDetails,
+    PIM_TargetResources,
+    CoreDirectory_CorrelationId,
+    CoreDirectory_InitiatedBy,
+    CoreDirectory_AdditionalDetails,
+    CoreDirectory_TargetResources,
+    AlertName,
+    AlertSeverity,
+    AlertDescription
+//};
+//Function()
