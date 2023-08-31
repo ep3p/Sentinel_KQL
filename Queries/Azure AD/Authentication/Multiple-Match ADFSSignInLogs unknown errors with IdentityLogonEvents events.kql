@@ -1,0 +1,25 @@
+ADFSSignInLogs
+| where ResultType in (300030, 90000)
+// | where IPAddress has "" or UserPrincipalName has "" // Custom condition
+| project ADFSSignInLogs_TimeGenerated = TimeGenerated, UserPrincipalName//, IPAddress
+| join kind=inner (
+    IdentityLogonEvents
+    | where Protocol == "Adfs"
+) on $left.UserPrincipalName == $right.AccountUpn//, IPAddress
+| project-away UserPrincipalName
+| where ADFSSignInLogs_TimeGenerated between (TimeGenerated .. (TimeGenerated + 1h))
+| summarize arg_max(TimeGenerated, *) by AccountUpn, ADFSSignInLogs_TimeGenerated
+| join kind=leftouter (
+    IdentityLogonEvents
+    | where not(Protocol == "Adfs")
+    | project
+        NonAdfs_TimeGenerated = TimeGenerated,
+        NonAdfs_Protocol = Protocol,
+        NonAdfs_LogonType = LogonType,
+        NonAdfs_FailureReason = FailureReason,
+        Application, ActionType, AccountUpn, DeviceName
+    ) on Application, ActionType, AccountUpn, $left.DestinationDeviceName == $right.DeviceName
+| project-away *1
+| where NonAdfs_TimeGenerated <= TimeGenerated 
+| summarize arg_max(NonAdfs_TimeGenerated, *) by ReportId, NonAdfs_Protocol, NonAdfs_LogonType, NonAdfs_FailureReason
+// | where not(NonAdfs_FailureReason in ("WrongPassword", "Policy", "AccountLocked", "AccountDisabled"))
