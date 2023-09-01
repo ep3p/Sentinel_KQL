@@ -146,6 +146,7 @@ let event_list = dynamic([
     "CreateEventBus",
     "DeleteEventBus",
     "CreateConnection",
+    "DeactivateEventSource",
     // https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_Operations.html
     //"CreateLogStream",
     "DeleteLogStream",
