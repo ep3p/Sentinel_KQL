@@ -140,7 +140,8 @@ let event_list = dynamic([
     "DeleteEventDataStore",
     "StartEventDataStoreIngestion",
     "StopEventDataStoreIngestion",
-    "PutEventSelectors",    
+    "PutEventSelectors",
+    "PutInsightSelectors",
     // https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Operations.html
     "CreateEventBus",
     "DeleteEventBus",
