@@ -225,9 +225,19 @@ let _RoleAssignmentsAzure = materialize(
         )
     | project-away Body, CoalescedProperties, BodyPropertiesKeys, Start_HTTPRequest, Group_HTTPRequest, AllCapsPropertiesDynamic, TitlePropertiesDynamic//, TargetRoleDefinitionId
     | lookup kind=leftouter (
-        _AADApps
-        | project CallerType = "App", Caller = tostring(ObjectId), CallerDisplayName = AppDisplayName
-        ) on CallerType, Caller
+        union
+            (
+            _AADApps
+            | project CallerType = "App", Caller = tostring(ObjectId), CallerDisplayName = AppDisplayName
+            ),
+            (
+            AuditLogs
+            | where TimeGenerated > ago(query_period)
+            | where Category == "ApplicationManagement" and OperationName has "service principal" and not(AADOperationType in ("Assign", "Unassign"))
+            | distinct Caller = tostring(TargetResources[0]["id"]), CallerDisplayName = tostring(TargetResources[0]["displayName"])//, TargetType = "ServicePrincipal"
+            | extend CallerType = "App"
+            )
+        ) on Caller//, CallerType
     | extend CallerDisplayName = coalesce(CallerDisplayName, tostring(Claims_d["name"]))
     | extend PermanentOperation = iff(CallerDisplayName == "MS-PIM" and Caller in (_PIM_ids), bool(null), true)
     | lookup kind=leftouter (
@@ -247,7 +257,7 @@ let _RoleAssignmentsAzure = materialize(
             ),
             (
             AuditLogs
-            | where TimeGenerated > ago(query_frequency)
+            | where TimeGenerated > ago(query_period)
             | where Category == "ApplicationManagement" and OperationName has "service principal" and not(AADOperationType in ("Assign", "Unassign"))
             | distinct TargetId = tostring(TargetResources[0]["id"]), Target = tostring(TargetResources[0]["displayName"])//, TargetType = "ServicePrincipal"
             ),
@@ -261,6 +271,7 @@ let _RoleAssignmentsAzure = materialize(
             | where isnotempty(ObjectId) and isnotempty(DisplayName)
             | project TargetId = tostring(ObjectId), Target = tostring(DisplayName)//, TargetType = "Group"
             )
+        | where isnotempty(TargetId)
         | distinct *
         ) on TargetId//, TargetType
     | lookup kind=leftouter (
@@ -377,7 +388,7 @@ union
         'subscription "',
         coalesce(TargetSubscriptionName, TargetSubscriptionId),
         '" by "',
-        iff(Caller matches regex @"[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+", CallerDisplayName, Caller),
+        iff(Caller matches regex @"[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+", coalesce(CallerDisplayName, Caller), Caller),
         '".\n'
     )
 | extend AlertSeverity = case(
