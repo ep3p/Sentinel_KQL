@@ -1,5 +1,5 @@
-// Use here: https://portal.azure.com/#view/HubsExtension/ArgQueryBlade
-resources
+// Alternatively use here: https://portal.azure.com/#view/HubsExtension/ArgQueryBlade
+arg("").Resources
 | where type == 'microsoft.storage/storageaccounts'
 | extend DynamicProperties = todynamic(properties)
 //| evaluate bag_unpack(DynamicProperties, columnsConflict='replace_source') // Could not make this work
