@@ -1,5 +1,5 @@
-// Use here: https://portal.azure.com/#view/HubsExtension/ArgQueryBlade
-resources
+// Alternatively use here: https://portal.azure.com/#view/HubsExtension/ArgQueryBlade
+arg("").Resources
 | where type in~ (
     "microsoft.compute/virtualmachines",
     "microsoft.scvmm/virtualmachines",
@@ -35,13 +35,13 @@ resources
         ]["patchSettings"]["patchMode"]),
     LicenseType = tostring(properties["licenseType"]),
     VmId = tostring(properties["vmId"])
-| join kind=leftouter (
-    resourcecontainers
-    | where type == "microsoft.resources/subscriptions"
+| join hint.remote=local kind=leftouter (
+    arg("").ResourceContainers
+    | where type == "microsoft.resources/subscriptions"
     | project subscriptionId, subscriptionName = name
     ) on subscriptionId
 | sort by PowerState, LicenseType, DiskOption, DiskImageOffer
-| project 
+| project
     id,
     tenantId,
     subscriptionId,
