@@ -1,0 +1,9 @@
+SubscriptionInventory_CL
+| project-rename
+    ResourceId = id_s,
+    AuthorizationSource = authorizationSource_s,
+    ResourceName = displayName_s,
+    State = state_s,
+    LocationPlacementId = subscriptionPolicies_locationPlacementId_s,
+    QuotaId = subscriptionPolicies_quotaId_s,
+    SpendingLimit = subscriptionPolicies_spendingLimit_s
