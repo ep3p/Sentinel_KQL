@@ -1,6 +1,6 @@
 // This query is too long to be in an Analytics Rule (more than 10.000 characters), so it had to be made a function that can be called by the rule.
 // You can find the function in the next link.
 //
-// https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/AzureADRoleAssignments.kql
+// https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/Analytics-AzureADRoleAssignments.kql
 //
 AzureADRoleAssignments
