@@ -2,8 +2,8 @@
 // IdentityInfo table renews itself completely every ~14 days.
 //
 // Click "Save as function", in Parameters write in the fields:
-// "datetime"  "starttime"  "14d"
-// "datetime"  "endtime"    "time(null)"
+// "datetime"  "start_time"  "14d"
+// "datetime"  "end_time"    "time(null)"
 //
 // If you name the function "PrivilegedIdentityInfo", you can check the function with queries like the following:
 //
@@ -11,7 +11,7 @@
 //
 // PrivilegedIdentityInfo(26d, 12d)
 //
-//let Function = (starttime:timespan = 14d, endtime:timespan = time(null)){
+//let Function = (start_time:timespan = 14d, end_time:timespan = time(null)){
 let _PrivilegedGroupRegex = toscalar(
     union
         (_GetWatchlist("SID-AuditADObjects")
@@ -30,11 +30,11 @@ let _PrivilegedRoleRegex = toscalar(
     | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
 );
 IdentityInfo
-| where TimeGenerated between (ago(starttime) .. ago(endtime))
-| summarize arg_max(TimeGenerated, *) by AccountObjectId
+| where TimeGenerated between (ago(start_time) .. ago(end_time))
+| summarize arg_max(TimeGenerated, *) by AccountObjectId, AccountSID
 | mv-expand GroupMember = GroupMembership to typeof(string), AssignedRole = AssignedRoles to typeof(string)
 | where GroupMember matches regex _PrivilegedGroupRegex or AssignedRole matches regex _PrivilegedRoleRegex
 | project-away GroupMember, AssignedRole
-| summarize take_any(*) by AccountObjectId
+| summarize take_any(*) by AccountObjectId, AccountSID
 //};
 //Function(14d, time(null))
