@@ -3,4 +3,4 @@
 //
 // https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/Analytics-AzureRBACRoleAssignments.kql
 //
-AzureRBACRoleAssignments(1h)
+AzureRBACRoleAssignments(query_frequency = 1h)
