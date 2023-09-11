@@ -1,0 +1,1 @@
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/https%3A%2F%2Fraw.githubusercontent.com%2Fep3p%2FSentinel_KQL%2Fmain%2FTemporary%2FAWSIdentityRole.json)
