@@ -1,0 +1,38 @@
+let _AWSAccounts = _GetWatchlist("AccountId-AuditAWSAccounts");
+T
+| extend
+    RecipientAccountId = column_ifexists("RecipientAccountId", ""),
+    UserIdentityAccountId = column_ifexists("UserIdentityAccountId", ""),
+    UserIdentityType = column_ifexists("UserIdentityType", ""),
+    UserIdentityPrincipalid = column_ifexists("UserIdentityPrincipalid", ""),
+    UserIdentityArn = column_ifexists("UserIdentityArn", ""),
+    SessionIssuerType = column_ifexists("SessionIssuerType", ""),
+    EventName = column_ifexists("EventName", ""),
+    RequestParameters = column_ifexists("RequestParameters", ""),
+    UserIdentityInvokedBy = column_ifexists("UserIdentityInvokedBy", ""),
+    UserIdentityUserName = column_ifexists("UserIdentityUserName", ""),
+    UserIdentityAccessKeyId = column_ifexists("UserIdentityAccessKeyId", ""),
+    SessionIssuerUserName = column_ifexists("SessionIssuerUserName", "")
+| lookup (_AWSAccounts | project RecipientAccountId = AccountId, RecipientAccountName = AccountName) on RecipientAccountId
+| lookup (_AWSAccounts | project UserIdentityAccountId = AccountId, UserIdentityAccountName = AccountName) on UserIdentityAccountId
+| extend
+    Identity = case(
+        UserIdentityType == "AWSAccount", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), extract(@"(\:[^\:]+$)", 1, UserIdentityPrincipalid)),
+        UserIdentityType == "Root", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), extract(@"(\:[^\:]+$)", 1, UserIdentityArn)),
+        UserIdentityType == "IAMUser", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), extract(@"(\:[^\:]+$)", 1, UserIdentityArn)),
+        UserIdentityType == "AssumedRole" and SessionIssuerType in ("", "Role"), extract(@"\:([^\:]+$)", 1, UserIdentityPrincipalid),
+        UserIdentityType == "AWSService" and EventName == "AssumeRole", tostring(todynamic(RequestParameters)["roleSessionName"]),
+        UserIdentityType == "AWSService" and not(EventName == "AssumeRole"), UserIdentityInvokedBy,
+        UserIdentityType == "SAMLUser" and EventName == "AssumeRoleWithSAML", UserIdentityUserName,
+        UserIdentityType == "WebIdentityUser" and EventName == "AssumeRoleWithWebIdentity", UserIdentityUserName,
+        UserIdentityType == "Unknown" and EventName == "UserAuthentication" and UserIdentityPrincipalid == UserIdentityAccountId, coalesce(UserIdentityAccountName, UserIdentityPrincipalid),
+        UserIdentityType == "Unknown" and not(EventName == "UserAuthentication"), coalesce(UserIdentityUserName, UserIdentityPrincipalid, UserIdentityAccessKeyId),
+        UserIdentityType == "", coalesce(UserIdentityInvokedBy, tostring(split(todynamic(RequestParameters)["sessionId"], "-")[0])),
+        extract(@"\:([^\:]+$)", 1, UserIdentityPrincipalid)
+    ),
+    Role = case(
+        UserIdentityType == "AssumedRole", coalesce(SessionIssuerUserName, extract(@"\:assumed-role\/([^\/]+)\/", 1, UserIdentityArn)),
+        EventName matches regex "^AssumeRole", tostring(split(todynamic(RequestParameters)["roleArn"], "/")[-1]),
+        UserIdentityType == "Unknown" and EventName in ("Federate", "GetRoleCredentials"), tostring(todynamic(ServiceEventDetails)["role_name"]),
+        ""
+    )
