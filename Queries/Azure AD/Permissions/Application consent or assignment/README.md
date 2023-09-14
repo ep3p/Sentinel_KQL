@@ -19,4 +19,5 @@ A partial view of some example results:
 
 ![image](https://user-images.githubusercontent.com/2527990/184629573-5ef53f40-7c51-49ab-8bca-c373acbc04f5.png)
 
-You could list Microsoft Graph permissions with [this query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Permissions/ExternalData-Microsoft%20Graph%20permissions.kql) and build your consent risk dictionary from there.
+You could list Microsoft Graph permissions with [this query](https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure%20AD/Permissions/ExternalData-Microsoft%20Graph%20permissions.kql) and build your consent risk dictionary from there.
+https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Azure%20AD/Permissions/ExternalData-Microsoft%20Graph%20permissions.kql
