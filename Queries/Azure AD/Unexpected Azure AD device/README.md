@@ -11,7 +11,7 @@ The query checks different AuditLogs operations regarding an added device, and a
 It is **recommended to check the different filter conditions along the query** ( ```| where not(``` statements), because they may not adapt to your needs.
 
 Azure AD devices may be joined with different trust types:
-- Workplace (indicates bring your own personal devices)
+- Workplace
 - AzureAd (Cloud only joined devices)
 - ServerAd (on-premises domain joined devices joined to Azure AD)
 
