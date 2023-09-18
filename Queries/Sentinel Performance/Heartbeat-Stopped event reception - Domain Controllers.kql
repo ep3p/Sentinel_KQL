@@ -7,7 +7,8 @@ let _DomainControllers = toscalar(
 );
 Heartbeat
 | where TimeGenerated > ago(query_wait + query_frequency)
-| summarize arg_max(TimeGenerated, *) by Category, VMUUID, SourceComputerId
+| extend TimeReceived = _TimeReceived
+| summarize arg_max(TimeReceived, *) by Category, VMUUID, SourceComputerId
 | where Computer has_any (_DomainControllers)
-| where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
-| project TimeGenerated, Computer, OSType, Version, ComputerEnvironment, Type, Solutions
+| where TimeReceived between (ago(query_frequency + query_wait) .. ago(query_wait))
+| project TimeReceived, Computer, OSType, Version, ComputerEnvironment, Type, Solutions
