@@ -1,0 +1,39 @@
+let _BreakGlassUserId = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "AWSBreakGlass"
+    | summarize make_list(ActorId)
+);
+AWSCloudTrail
+| where UserIdentityPrincipalid in (_BreakGlassUserId)
+| summarize arg_min(TimeGenerated, *) by EventTypeName, EventName, UserIdentityType, SessionCreationDate, SourceIpAddress, ErrorCode
+| invoke AWSIdentityRole()
+| sort by TimeGenerated asc
+| project
+    SessionCreationDate,
+    TimeGenerated,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    UserIdentityType,
+    UserIdentityInvokedBy,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    UserIdentityUserName,
+    SourceIpAddress,
+    RecipientAccountId,
+    RecipientAccountName,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ErrorCode,
+    ErrorMessage,
+    TargetRole,
+    TargetRoleSessionName,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    AdditionalEventData,
+    ReadOnly,
+    ManagementEvent,
+    UserAgent
