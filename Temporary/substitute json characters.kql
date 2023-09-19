@@ -1,0 +1,8 @@
+let text = ```text```;
+print
+    replace_strings(
+        replace_string(
+            text
+        , @"\", @"\\")
+    ,   dynamic([ '"' ,  '\n']),
+        dynamic([@'\"', @'\n']))
