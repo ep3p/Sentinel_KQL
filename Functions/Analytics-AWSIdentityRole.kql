@@ -17,22 +17,33 @@ T
 | lookup (_AWSAccounts | project UserIdentityAccountId = AccountId, UserIdentityAccountName = AccountName) on UserIdentityAccountId
 | extend
     Identity = case(
-        UserIdentityType == "AWSAccount", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), extract(@"(\:[^\:]+$)", 1, UserIdentityPrincipalid)),
-        UserIdentityType == "Root", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), extract(@"(\:[^\:]+$)", 1, UserIdentityArn)),
-        UserIdentityType == "IAMUser", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), extract(@"(\:[^\:]+$)", 1, UserIdentityArn)),
-        UserIdentityType == "AssumedRole" and SessionIssuerType in ("", "Role"), extract(@"\:([^\:]+$)", 1, UserIdentityPrincipalid),
-        UserIdentityType == "AWSService" and EventName == "AssumeRole", tostring(todynamic(RequestParameters)["roleSessionName"]),
-        UserIdentityType == "AWSService" and not(EventName == "AssumeRole"), UserIdentityInvokedBy,
+        UserIdentityType == "Root", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), ":", extract(@"\:([^\:]+$)", 1, UserIdentityArn)),
+        UserIdentityType == "IAMUser", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), ":", coalesce(extract(@"\:([^\:]+$)", 1, UserIdentityArn), strcat("user/", UserIdentityUserName))),
+        UserIdentityType == "AssumedRole" and SessionIssuerType in ("", "Role"), strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), ":", "roleSessionName/", extract(@"\:([^\:]+$)", 1, UserIdentityPrincipalid)),
+        UserIdentityType == "AWSAccount" and isempty(UserIdentityPrincipalid), strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), ":"),
+        UserIdentityType == "AWSAccount" and UserIdentityPrincipalid matches regex @"^[A-Z0-9]{21}$", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), ":", UserIdentityPrincipalid),
+        UserIdentityType == "AWSAccount" and UserIdentityPrincipalid matches regex @"^[A-Z0-9]{21}\:[^\:]+$", strcat(coalesce(UserIdentityAccountName, UserIdentityAccountId), ":", "roleSessionName/", extract(@"\:([^\:]+$)", 1, UserIdentityPrincipalid)),
+        UserIdentityType == "AWSService", UserIdentityInvokedBy,
         UserIdentityType == "SAMLUser" and EventName == "AssumeRoleWithSAML", UserIdentityUserName,
         UserIdentityType == "WebIdentityUser" and EventName == "AssumeRoleWithWebIdentity", UserIdentityUserName,
-        UserIdentityType == "Unknown" and EventName == "UserAuthentication" and UserIdentityPrincipalid == UserIdentityAccountId, coalesce(UserIdentityAccountName, UserIdentityPrincipalid),
-        UserIdentityType == "Unknown" and not(EventName == "UserAuthentication"), coalesce(UserIdentityUserName, UserIdentityPrincipalid, UserIdentityAccessKeyId),
-        UserIdentityType == "", coalesce(UserIdentityInvokedBy, tostring(split(todynamic(RequestParameters)["sessionId"], "-")[0])),
-        extract(@"\:([^\:]+$)", 1, UserIdentityPrincipalid)
+        UserIdentityType == "Unknown" and isnotempty(UserIdentityAccountId) and UserIdentityAccountId == UserIdentityPrincipalid, coalesce(UserIdentityAccountName, UserIdentityAccountId),
+        UserIdentityType == "Unknown" and isnotempty(UserIdentityAccountId) and not(UserIdentityAccountId == UserIdentityPrincipalid), coalesce(UserIdentityUserName, UserIdentityPrincipalid, UserIdentityAccessKeyId),
+        UserIdentityType == "", coalesce(UserIdentityInvokedBy, extract(@"(.+)\-[a-f0-9]{17}$", 1, tostring(todynamic(RequestParameters)["sessionId"]))),
+        strcat("UnexpectedUserIdentityType", ":", extract(@"\:([^\:]+$)", 1, UserIdentityPrincipalid))
     ),
-    Role = case(
+    ActorRole = case(
         UserIdentityType == "AssumedRole", coalesce(SessionIssuerUserName, extract(@"\:assumed-role\/([^\/]+)\/", 1, UserIdentityArn)),
-        EventName matches regex "^AssumeRole", tostring(split(todynamic(RequestParameters)["roleArn"], "/")[-1]),
+        ""
+    )
+| extend
+    TargetRole = case(
+        EventName in ("SwitchRole", "ExitRole", "RenewRole") and UserIdentityType == "AssumedRole", ActorRole,
+        EventName in ("SwitchRole", "ExitRole") and not(UserIdentityType == "AssumedRole"), coalesce(extract(@"\:assumed-role\/([^\/]+)\/", 1, tostring(todynamic(AdditionalEventData)["SwitchFrom"])), extract(@"\/([^\/]+)$", 1, tostring(todynamic(AdditionalEventData)["SwitchTo"]))),
+        EventName matches regex "^AssumeRole", coalesce(tostring(split(todynamic(RequestParameters)["roleArn"], "/")[-1]), extract(@"AssumeRole\w* on resource\: \S+\/([^\/]+)$", 1, ErrorMessage)),
         UserIdentityType == "Unknown" and EventName in ("Federate", "GetRoleCredentials"), tostring(todynamic(ServiceEventDetails)["role_name"]),
+        ""
+    ),
+    TargetRoleSessionName = case(
+        EventName matches regex "^AssumeRole", tostring(todynamic(RequestParameters)["roleSessionName"]),
         ""
     )
