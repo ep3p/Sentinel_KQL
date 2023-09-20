@@ -73,12 +73,14 @@ let _ResourceManagementPIM = materialize(
         ActorAppServicePrincipalId = tostring(InitiatedBy["app"]["servicePrincipalId"]),
         // Information about the role
         RoleProvider = tostring(ParsedTargetResources["Provider"]["displayName"]),
-        TargetSubscriptionId = extract(@"\/subscriptions\/([^\/]+)\/", 1, tostring(ParsedAdditionalDetails["RoleDefinitionOriginId"])),
-        TargetSubscriptionName = tostring(ParsedTargetResources["subscription"]["displayName"]),
         //RoleDefinitionOriginType = tostring(ParsedAdditionalDetails["RoleDefinitionOriginType"]),
         TargetRoleName = tostring(TargetResources[0]["displayName"]),
         TargetRoleTemplateId = tostring(ParsedAdditionalDetails["TemplateId"]),
         // Information about the targets
+        TargetManagementGroupId = tostring(ParsedTargetResources["managementgroup"]["id"]),
+        TargetManagementGroupName = tostring(ParsedTargetResources["managementgroup"]["displayName"]),
+        TargetSubscriptionId = extract(@"\/subscriptions\/([^\/]+)\/", 1, tostring(ParsedAdditionalDetails["RoleDefinitionOriginId"])),
+        TargetSubscriptionName = tostring(ParsedTargetResources["subscription"]["displayName"]),
         TargetGroupName = tostring(ParsedTargetResources["Group"]["displayName"]),
         TargetGroupId = tostring(ParsedTargetResources["Group"]["id"]),
         TargetUserPrincipalName = tostring(ParsedTargetResources["User"]["userPrincipalName"]),
@@ -106,7 +108,7 @@ let _ResourceManagementPIM = materialize(
         RequestedCount = countif(OperationName has "requested"),
         CompletedCount = countif(not(OperationName has "requested") and Result == "success"),
         arg_max(TimeGenerated, *)
-        by CorrelationId, EligibleOperation, RemoveOperation, PermanentOperation, TargetSubscriptionId, TargetRoleTemplateId, TargetGroupName, TargetUserPrincipalName, TargetUserId
+        by CorrelationId, EligibleOperation, RemoveOperation, PermanentOperation, TargetManagementGroupId, TargetSubscriptionId, TargetRoleTemplateId, TargetGroupName, TargetUserPrincipalName, TargetUserId
     | extend
         RequestedTimeGenerated = iff(array_length(RequestedTimeGenerated) == 0, dynamic(null), RequestedTimeGenerated),
         RequestedCount = iff(RequestedCount == 0, int(null), RequestedCount)
@@ -385,8 +387,14 @@ union
         coalesce(TargetRoleName, TargetRoleTemplateId),
         '" in ',
         iff(isnotempty(TargetResourceGroup), strcat('resource group "', TargetResourceGroup,'" from '), ''),
-        'subscription "',
-        coalesce(TargetSubscriptionName, TargetSubscriptionId),
+        case(
+            isnotempty(TargetSubscriptionId), 'subscription "',
+            isnotempty(TargetManagementGroupId), 'management group "',
+            ''),
+        case(
+            isnotempty(TargetSubscriptionId), coalesce(TargetSubscriptionName, TargetSubscriptionId),
+            isnotempty(TargetManagementGroupId), coalesce(TargetManagementGroupName, TargetManagementGroupId),
+            ''),
         '" by "',
         iff(Caller matches regex @"[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+\-[a-f0-9]+", coalesce(CallerDisplayName, Caller), Caller),
         '".\n'
@@ -433,6 +441,7 @@ union
     OperationName,
     Result,
     ResultReason,
+    TargetManagementGroupName,
     TargetSubscriptionName,
     TargetResourceGroup,
     TargetRoleName,
@@ -440,6 +449,7 @@ union
 	//PrivilegedRole,
     Target,
     TargetType,
+    TargetManagementGroupId,
     TargetSubscriptionId,
     TargetRoleTemplateId,
     TargetId,
