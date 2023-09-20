@@ -42,6 +42,7 @@ EventID,Field,Value,Hexadecimal,Translation,Notes
 ,,"%%1622",,"Change Hardware Environment Privilege",
 ,,"%%1623",,"Change Notify (and Traverse) Privilege",
 ,,"%%1624",,"Remotely Shut System Down Privilege",
+,,"%%1793",,,"<value not set>"
 ,,"%%1801",,"Granted by","The requested permission was granted by explicit Allow ACE. This type of access reason also contains details about an ACE in the DACL that allowed the requested access permission. This entry contains an ACE in Security Descriptor Definition Language (SDDL) format."
 ,,"%%1802",,"Denied by","The requested permission was denied by explicit Deny ACE. This type of access reason also contains details about an ACE in the DACL that denied the requested access permission. This entry contains an ACE in Security Descriptor Definition Language (SDDL) format."
 ,,"%%1803",,"Denied by","Integrity Policy check If the access request was sent by a process with a lower integrity level than the integrity level of the filesystem object, you will get this access reason."
