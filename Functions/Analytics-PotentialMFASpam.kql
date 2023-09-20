@@ -304,7 +304,7 @@ SigninLogs
 | mv-apply Source = Sources on (
     extend Source = todynamic(dynamic_to_json(Source))
     | extend
-        ExpectedIPAddress = iff(isnotempty(parse_ipv4(IPAddress)), ipv4_is_in_any_range(tostring(Source[0]), _ExpectedIPRanges), bool(null)),
+        ExpectedIPAddress = iff(isnotempty(parse_ipv4(tostring(Source[0]))), ipv4_is_in_any_range(tostring(Source[0]), _ExpectedIPRanges), bool(null)),
         ExpectedLocation = isempty(Source[1]) or tostring(Source[1]) in (_ExpectedLocations)
     | extend ExpectedSource = (isnotempty(ExpectedIPAddress) and ExpectedIPAddress) or (isnotempty(ExpectedLocation) and ExpectedLocation)
     | summarize Sources = make_bag(pack(tostring(Source[0]), tostring(Source[1]))), ExpectedSources = make_list(ExpectedSource), ExpectedIPAddresses = make_list(ExpectedIPAddress)
