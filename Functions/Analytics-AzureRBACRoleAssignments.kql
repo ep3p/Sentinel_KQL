@@ -73,7 +73,7 @@ let _ResourceManagementPIM = materialize(
         ActorAppServicePrincipalId = tostring(InitiatedBy["app"]["servicePrincipalId"]),
         // Information about the role
         RoleProvider = tostring(ParsedTargetResources["Provider"]["displayName"]),
-        TargetSubscriptionId = tostring(split(tostring(ParsedAdditionalDetails["RoleDefinitionOriginId"]), "/")[2]),
+        TargetSubscriptionId = extract(@"\/subscriptions\/([^\/]+)\/", 1, tostring(ParsedAdditionalDetails["RoleDefinitionOriginId"])),
         TargetSubscriptionName = tostring(ParsedTargetResources["subscription"]["displayName"]),
         //RoleDefinitionOriginType = tostring(ParsedAdditionalDetails["RoleDefinitionOriginType"]),
         TargetRoleName = tostring(TargetResources[0]["displayName"]),
