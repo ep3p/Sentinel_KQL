@@ -1,93 +1,103 @@
-let _AWSAccounts =
-    _GetWatchlist("AccountId-AuditAWSAccounts")
-    | project RecipientAccountId = AccountId, RecipientAccountName = AccountName
-;
-union
-    (
-    AWSCloudTrail
-    | where EventName in ("ProvisionProduct", "UpdateProvisionedProduct")
-    | extend
-        DynamicResponseElements = todynamic(ResponseElements),
-        DynamicRequestParameters = todynamic(RequestParameters)
-    | where tostring(DynamicResponseElements["recordDetail"]["provisionedProductType"]) has "ACCOUNT"
-    | mv-apply ProvisioningParameter = DynamicRequestParameters["provisioningParameters"] on (
-        summarize ProvisioningParameters = make_bag(bag_pack(tostring(ProvisioningParameter["key"]), ProvisioningParameter["value"]))
-        )
-    | extend
-        Status = tostring(DynamicResponseElements["recordDetail"]["status"]),
-        ProvisionedProductId = tostring(DynamicResponseElements["recordDetail"]["provisionedProductId"]),
-        AccountName = tostring(ProvisioningParameters["AccountName"]),
-        ManagedOrganizationalUnit = tostring(split(tostring(ProvisioningParameters["ManagedOrganizationalUnit"]), " ")[0]),
-        AccountEmail = tostring(ProvisioningParameters["AccountEmail"]),
-        SSOUserEmail = tostring(ProvisioningParameters["SSOUserEmail"])
-    ),
-    (
-    AWSCloudTrail
-    | where EventTypeName == "AwsApiCall" and EventName in ("CreateManagedAccount")//, "UpdateManagedAccount")
-    | extend DynamicRequestParameters = todynamic(RequestParameters)
-    | extend
-        ProvisionedProductId = tostring(DynamicRequestParameters["provisionedProductId"]),
-        AccountName = tostring(DynamicRequestParameters["accountName"]),
-        ManagedOrganizationalUnit = tostring(split(tostring(DynamicRequestParameters["parentOrganizationalUnitName"]), " ")[0]),
-        AccountId = tostring(DynamicRequestParameters["accountId"])
-    )
-| summarize
-    StartTime = min(TimeGenerated),
-    EndTime = max(TimeGenerated),
-    take_any(UserIdentityType),
-    //take_any(UserIdentityPrincipalid),
-    take_any(UserIdentityArn),
-    take_any(UserIdentityAccountId),
-    take_any(UserIdentityUserName),
-    take_any(SessionIssuerAccountId),
-    take_any(SessionIssuerUserName),
-    SourceIPAddresses = array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has_any (".amazonaws.com", "AWS Internal")))),
-    EventSource = array_sort_asc(make_set(EventSource)),
-    EventName = array_sort_asc(make_set(EventName)),
-    take_any(AWSRegion),
-    take_any(Status),
-    arg_max(TimeGenerated, ManagedOrganizationalUnit),
-    take_any(AccountId),
-    take_any(ProvisionedProductId),
-    UserAgent = array_sort_asc(make_set_if(UserAgent, not(SourceIpAddress has_any (".amazonaws.com", "AWS Internal"))))
-    by UserIdentityPrincipalid, RecipientAccountId, AccountName
-| where EventName has "ProvisionProduct"
-| lookup kind=leftouter (
-    AWSCloudTrail
-    | where EventName in ("CreateManagedAccount", "UpdateManagedAccount") and EventTypeName == "AwsServiceEvent"
-    | extend DynamicServiceEventDetails = todynamic(ServiceEventDetails)
-    | extend ServiceEventDetailsKey = tostring(bag_keys(DynamicServiceEventDetails)[0])
-    | project
-        TimeGenerated,
-        ServiceEventDetails,
-        AccountName = tostring(DynamicServiceEventDetails[ServiceEventDetailsKey]["account"]["accountName"]),
-        ManagedOrganizationalUnit = tostring(DynamicServiceEventDetails[ServiceEventDetailsKey]["organizationalUnit"]["organizationalUnitName"]),
-        AccountId = tostring(DynamicServiceEventDetails[ServiceEventDetailsKey]["account"]["accountId"])
-    | summarize arg_max(TimeGenerated, *) by AccountName, AccountId
-    | project-away TimeGenerated
-    ) on AccountName
-| extend AccountId = coalesce(AccountId1, AccountId)
-| lookup kind=leftouter _AWSAccounts on RecipientAccountId
+AWSCloudTrail
+| where EventName in ("CreateAccountResult")//, "CreateAccount")
+    and EventTypeName in ("AwsServiceEvent")//, "AwsApiCall")
+| extend DynamicServiceEventDetails = todynamic(ServiceEventDetails)
 | project
-    StartTime,
-    EndTime,
-    RecipientAccountId,
-    RecipientAccountName,
-    UserIdentityType,
-    UserIdentityPrincipalid,
-    UserIdentityArn,
+    TimeGenerated,
     UserIdentityAccountId,
-    UserIdentityUserName,
-    SessionIssuerAccountId,
-    SessionIssuerUserName,
-    SourceIPAddresses,
-    EventSource,
+    RecipientAccountId,
     EventName,
-    Status,
-    ManagedOrganizationalUnit,
-    AccountName,
-    AccountId,
-    ProvisionedProductId,
-    AWSRegion,
     ServiceEventDetails,
-    UserAgent
+    State = tostring(DynamicServiceEventDetails["createAccountStatus"]["state"]),
+    AccountId = tostring(DynamicServiceEventDetails["createAccountStatus"]["accountId"])
+| join kind=leftouter (
+    union
+        (
+        AWSCloudTrail
+        | where EventName in ("ProvisionProduct", "UpdateProvisionedProduct")
+        | extend
+            DynamicResponseElements = todynamic(ResponseElements),
+            DynamicRequestParameters = todynamic(RequestParameters)
+        | where tostring(DynamicResponseElements["recordDetail"]["provisionedProductType"]) has "ACCOUNT"
+        | mv-apply ProvisioningParameter = DynamicRequestParameters["provisioningParameters"] on (
+            summarize ProvisioningParameters = make_bag(bag_pack(tostring(ProvisioningParameter["key"]), ProvisioningParameter["value"]))
+            )
+        | extend
+            Status = tostring(DynamicResponseElements["recordDetail"]["status"]),
+            ProvisionedProductId = tostring(DynamicResponseElements["recordDetail"]["provisionedProductId"]),
+            AccountName = tostring(ProvisioningParameters["AccountName"]),
+            ManagedOrganizationalUnit = tostring(split(tostring(ProvisioningParameters["ManagedOrganizationalUnit"]), " ")[0]),
+            AccountEmail = tostring(ProvisioningParameters["AccountEmail"]),
+            SSOUserEmail = tostring(ProvisioningParameters["SSOUserEmail"])
+        ),
+        (
+        AWSCloudTrail
+        | where EventTypeName == "AwsApiCall" and EventName in ("CreateManagedAccount")//, "UpdateManagedAccount")
+        | extend DynamicRequestParameters = todynamic(RequestParameters)
+        | extend
+            ProvisionedProductId = tostring(DynamicRequestParameters["provisionedProductId"]),
+            AccountName = tostring(DynamicRequestParameters["accountName"]),
+            ManagedOrganizationalUnit = tostring(split(tostring(DynamicRequestParameters["parentOrganizationalUnitName"]), " ")[0]),
+            AccountId = tostring(DynamicRequestParameters["accountId"])
+        )
+    | summarize
+        StartTime = min(TimeGenerated),
+        EndTime = max(TimeGenerated),
+        take_any(UserIdentityType),
+        //take_any(UserIdentityPrincipalid),
+        take_any(UserIdentityArn),
+        take_any(UserIdentityAccountId),
+        take_any(UserIdentityUserName),
+        take_any(SessionIssuerAccountId),
+        take_any(SessionIssuerUserName),
+        SourceIPAddresses = array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has_any (".amazonaws.com", "AWS Internal")))),
+        EventSource = array_sort_asc(make_set(EventSource)),
+        EventName = array_sort_asc(make_set(EventName)),
+        take_any(AWSRegion),
+        take_any(Status),
+        arg_max(TimeGenerated, ManagedOrganizationalUnit),
+        take_any(AccountId),
+        take_any(ProvisionedProductId),
+        UserAgent = array_sort_asc(make_set_if(UserAgent, not(SourceIpAddress has_any (".amazonaws.com", "AWS Internal"))))
+        by UserIdentityPrincipalid, RecipientAccountId, AccountName
+    | where EventName has "ProvisionProduct"
+    | lookup kind=leftouter (
+        AWSCloudTrail
+        | where EventName in ("CreateManagedAccount", "UpdateManagedAccount") and EventTypeName == "AwsServiceEvent"
+        | extend DynamicServiceEventDetails = todynamic(ServiceEventDetails)
+        | extend ServiceEventDetailsKey = tostring(bag_keys(DynamicServiceEventDetails)[0])
+        | project
+            TimeGenerated,
+            ServiceEventDetails,
+            AccountName = tostring(DynamicServiceEventDetails[ServiceEventDetailsKey]["account"]["accountName"]),
+            ManagedOrganizationalUnit = tostring(DynamicServiceEventDetails[ServiceEventDetailsKey]["organizationalUnit"]["organizationalUnitName"]),
+            AccountId = tostring(DynamicServiceEventDetails[ServiceEventDetailsKey]["account"]["accountId"])
+        | summarize arg_max(TimeGenerated, *) by AccountName, AccountId
+        | project-away TimeGenerated
+        ) on AccountName
+    | extend AccountId = coalesce(AccountId1, AccountId)
+    | project
+        StartTime,
+        EndTime,
+        RecipientAccountId,
+        UserIdentityType,
+        UserIdentityPrincipalid,
+        UserIdentityArn,
+        UserIdentityAccountId,
+        UserIdentityUserName,
+        SessionIssuerAccountId,
+        SessionIssuerUserName,
+        SourceIPAddresses,
+        EventSource,
+        ManagedAccount_EventName = EventName,
+        Status,
+        ManagedOrganizationalUnit,
+        AccountName,
+        AccountId,
+        ProvisionedProductId,
+        AWSRegion,
+        ManagedAccount_ServiceEventDetails = ServiceEventDetails,
+        UserAgent
+) on AccountId, UserIdentityAccountId, RecipientAccountId
+| project-away *1
+| invoke AWSIdentityRole()
