@@ -1,0 +1,56 @@
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.LOGIC" and ResourceType == "WORKFLOWS/RUNS" and Category == "WorkflowRuntime" and status_s == "Failed"
+| extend IncidentNumber = toint(extract(@"[a-f0-9]{8}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{12}\_(\d+)", 1, correlation_clientTrackingId_s))
+| project
+    TimeGenerated,
+    ResourceProvider,
+    ResourceType,
+    Category,
+    SubscriptionId,
+    ResourceGroup,
+    resource_workflowName_s,
+    resource_originRunId_s,
+    resource_runId_s,
+    IncidentNumber,
+    OperationName,
+    Level,
+    status_s,
+    code_s,
+    error_code_s,
+    error_message_s,
+    correlation_clientTrackingId_s,
+    executionClusterType_s
+| join kind=leftouter (
+    SentinelHealth 
+    | where SentinelResourceType == "Automation rule"
+    | mv-expand TriggeredPlaybook = ExtendedProperties["TriggeredPlaybooks"]
+    | project
+        SentinelResourceType,
+        SentinelResourceName,
+        Status,
+        RunId = tostring(TriggeredPlaybook["RunId"]),
+        IncidentNumber = toint(ExtendedProperties["IncidentNumber"])
+    ) on $left.resource_runId_s == $right.RunId, IncidentNumber
+| project-away IncidentNumber1
+| join kind=leftouter (
+    SecurityIncident
+    | summarize hint.strategy=shuffle arg_max(TimeGenerated, *) by IncidentName
+    | project
+        IncidentNumber,
+        IncidentTitle = Title,
+        Severity,
+        Description,
+        Status,
+        Classification,
+        ClassificationComment,
+        IncidentUrl
+) on IncidentNumber
+| project-away IncidentNumber1
+| summarize
+    StarTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Count = count(),
+    arg_min(TimeGenerated, *)
+    by SubscriptionId, ResourceGroup, resource_workflowName_s,  IncidentNumber
+| project-away TimeGenerated
+| sort by IncidentNumber asc, resource_workflowName_s
