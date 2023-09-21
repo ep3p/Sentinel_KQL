@@ -12,7 +12,9 @@ T
     UserIdentityInvokedBy = column_ifexists("UserIdentityInvokedBy", ""),
     UserIdentityUserName = column_ifexists("UserIdentityUserName", ""),
     UserIdentityAccessKeyId = column_ifexists("UserIdentityAccessKeyId", ""),
-    SessionIssuerUserName = column_ifexists("SessionIssuerUserName", "")
+    SessionIssuerUserName = column_ifexists("SessionIssuerUserName", ""),
+    AdditionalEventData = column_ifexists("AdditionalEventData", ""),
+    ErrorMessage = column_ifexists("ErrorMessage", "")
 | lookup (_AWSAccounts | project RecipientAccountId = AccountId, RecipientAccountName = AccountName) on RecipientAccountId
 | lookup (_AWSAccounts | project UserIdentityAccountId = AccountId, UserIdentityAccountName = AccountName) on UserIdentityAccountId
 | extend
