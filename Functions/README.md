@@ -11,3 +11,7 @@ Some of the queries in this repository are expected to be used in NRT rules and 
 ##### AWSIdentityRole:
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fep3p%2FSentinel%5FKQL%2Fmain%2FFunctions%2FTemplates%2FAnalytics%2DAWSIdentityRole.json)
+
+##### UnifySignInLogs:
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fep3p%2FSentinel%5FKQL%2Fmain%2FFunctions%2FTemplates%2FParsing%2DUnifySignInLogs.json)
