@@ -1,0 +1,13 @@
+T
+| extend
+    ConditionalAccessPolicies = coalesce(column_ifexists("ConditionalAccessPolicies_string", ""), tostring(column_ifexists("ConditionalAccessPolicies_dynamic", dynamic(null)))),
+    DeviceDetail = coalesce(column_ifexists("DeviceDetail_string", ""), tostring(column_ifexists("DeviceDetail_dynamic", dynamic(null)))),
+    LocationDetails = coalesce(column_ifexists("LocationDetails_string", ""), tostring(column_ifexists("LocationDetails_dynamic", dynamic(null)))),
+    MfaDetail = coalesce(column_ifexists("MfaDetail_string", ""), tostring(column_ifexists("MfaDetail_dynamic", dynamic(null)))),
+    Status = coalesce(column_ifexists("Status_string", ""), tostring(column_ifexists("Status_dynamic", dynamic(null))))
+| project-away
+    ConditionalAccessPolicies_*,
+    DeviceDetail_*,
+    LocationDetails_*,
+    MfaDetail_*,
+    Status_*
