@@ -1,4 +1,7 @@
+let query_frequency = 10m;
+let query_wait = 20m;
 AWSCloudTrail
+| where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
 | where EventName in ("CreateAccountResult")//, "CreateAccount")
     and EventTypeName in ("AwsServiceEvent")//, "AwsApiCall")
 | extend DynamicServiceEventDetails = todynamic(ServiceEventDetails)
@@ -14,6 +17,7 @@ AWSCloudTrail
     union
         (
         AWSCloudTrail
+        | where TimeGenerated > ago(query_frequency + query_wait)
         | where EventName in ("ProvisionProduct", "UpdateProvisionedProduct")
         | extend
             DynamicResponseElements = todynamic(ResponseElements),
@@ -32,6 +36,7 @@ AWSCloudTrail
         ),
         (
         AWSCloudTrail
+        | where TimeGenerated > ago(query_frequency + query_wait)
         | where EventTypeName == "AwsApiCall" and EventName in ("CreateManagedAccount")//, "UpdateManagedAccount")
         | extend DynamicRequestParameters = todynamic(RequestParameters)
         | extend
