@@ -10,13 +10,16 @@ let _Identities =
 ;
 IdentityLogonEvents
 | where TimeGenerated > ago(1h)
-| where ActionType == "LogonSuccess" and Protocol in ("Adfs", "NTLM") and isnotempty(DeviceName) and not(DeviceName has_any (_ExpectedDomain))
-| summarize hint.shufflekey=TimeGenerated
+| where ActionType == "LogonSuccess" and Protocol in ("Adfs", "Ntlm") and isnotempty(DeviceName) and not(DeviceName has_any (_ExpectedDomain))
+| mv-expand BinTimeGenerated = range(bin(TimeGenerated, 1s)-1s, bin(TimeGenerated, 1s)+1s, 1s) to typeof(datetime)
+| summarize hint.shufflekey=BinTimeGenerated
+    TimeGenerated = min(TimeGenerated),
     Protocols = array_sort_asc(make_set(Protocol)),
     DeviceNames = array_sort_asc(make_set(DeviceName)),
     LogonTypes = array_sort_asc(make_list(LogonType))
-    by AccountUpn, TimeGenerated
-| where Protocols has_all ("Adfs", "NTLM") and LogonTypes has_all ("Logon with ADFS authentication", "Resource access")
+    by AccountUpn, BinTimeGenerated
+| where Protocols has_all ("Adfs", "Ntlm") and LogonTypes has_all ("Logon with ADFS authentication", "Resource access")
+| summarize take_any(*) by AccountUpn, TimeGenerated
 | lookup kind=leftouter _Identities on $left.AccountUpn == $right.AccountUPN
 | where SourceSystem has "ActiveDirectory" or UserAccountControl has "PasswordNeverExpires"
 | project
