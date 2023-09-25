@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "Workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "The Microsoft Sentinel workspace into which the function will be deployed. Has to be in the selected Resource Group."
+      }
+    },
+    "WorkspaceRegion": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "The region of the selected workspace. The default value will use the Region selection above."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2017-03-15-preview",
+      "name": "[parameters('Workspace')]",
+      "location": "[parameters('WorkspaceRegion')]",
+      "resources": [
+        {
+          "type": "savedSearches",
+          "apiVersion": "2020-08-01",
+          "name": "UnifySignInLogs",
+          "dependsOn": [
+            "[concat('Microsoft.OperationalInsights/workspaces/', parameters('Workspace'))]"
+          ],
+          "properties": {
+            "etag": "*",
+            "displayName": "This function merges columns with the same name but different type in several signinlogs tables",
+            "category": "Parsing",
+            "FunctionAlias": "UnifySignInLogs",
+            "query": "T\n| extend\n    ConditionalAccessPolicies = coalesce(ConditionalAccessPolicies_string, tostring(ConditionalAccessPolicies_dynamic)),\n    DeviceDetail = coalesce(DeviceDetail_string, tostring(DeviceDetail_dynamic)),\n    LocationDetails = coalesce(LocationDetails_string, tostring(LocationDetails_dynamic)),\n    MfaDetail = coalesce(MfaDetail_string, tostring(MfaDetail_dynamic)),\n    Status = coalesce(Status_string, tostring(Status_dynamic))\n| project-away\n    ConditionalAccessPolicies_string,\n    ConditionalAccessPolicies_dynamic,\n    DeviceDetail_string,\n    DeviceDetail_dynamic,\n    LocationDetails_string,\n    LocationDetails_dynamic,\n    MfaDetail_string,\n    MfaDetail_dynamic,\n    Status_string,\n    Status_dynamic",
+            "version": 1,
+            "functionParameters": "T:(*)"
+          }
+        }
+      ]
+    }
+  ]
+}
