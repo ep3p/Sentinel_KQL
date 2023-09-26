@@ -21,7 +21,7 @@ let _PrivilegedObjects =
 IdentityQueryEvents
 | where Protocol == "Ldap"
 | where not(DeviceName has_any (_ExpectedDomains))
-| parse Query with "LDAP Search Scope: " SearchScope ", Base Object:" BaseObject ", Search Filter: " SearchFilter
+| parse Query with 'LDAP Search Scope: "' SearchScope '", Base Object: "' BaseObject '", Search Filter:  "' SearchFilter ' "'
 | where (QueryType has_any ("AllUsers", "AllGroups", "AllComputers", "AllTrustDomains", "AllDomains", "AllSecurityPrincipals", "AllObjects") // "AllAccounts")
         and SearchScope has "WholeSubtree")
     or trim(@"\s", QueryTarget) in (toscalar(_PrivilegedObjects | summarize make_list(SAMAccountName)))
@@ -35,7 +35,7 @@ IdentityQueryEvents
     DeviceNames = make_set_if(DeviceName, DeviceName != IPAddress),
     arg_min(TimeGenerated, *)
     by IPAddress
-// | where not(array_length(QueryType) == 1 and QueryType[0] == "None" and array_length(QueryTarget) == 1 and QueryTarget[0] == "Admins. del dominio")
+// | where not((array_length(QueryType) == 0 or (array_length(QueryType) == 1 and QueryType[0] == "None")) and array_length(QueryTarget) == 1 and QueryTarget[0] == "Admins. del dominio")
 // | where not(array_length(QueryTarget) == 0  and array_length(QueryType) == 1 and QueryType[0] == "AllComputers")
 | project
     TimeGenerated,
