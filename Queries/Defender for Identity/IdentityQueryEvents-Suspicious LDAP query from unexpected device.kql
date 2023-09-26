@@ -22,22 +22,25 @@ IdentityQueryEvents
 | where Protocol == "Ldap"
 | where not(DeviceName has_any (_ExpectedDomains))
 | parse Query with "LDAP Search Scope: " SearchScope ", Base Object:" BaseObject ", Search Filter: " SearchFilter
-| where (QueryType has_any ("AllUsers", "AllGroups", "AllComputers", "AllTrustDomains", "AllDomains", "AllSecurityPrincipals", "AllObjects") and SearchScope == "WholeSubtree")
+| where (QueryType has_any ("AllUsers", "AllGroups", "AllComputers", "AllTrustDomains", "AllDomains", "AllSecurityPrincipals", "AllObjects") // "AllAccounts")
+        and SearchScope has "WholeSubtree")
     or trim(@"\s", QueryTarget) in (toscalar(_PrivilegedObjects | summarize make_list(SAMAccountName)))
     or Query has_any (toscalar(_PrivilegedObjects | summarize make_list(SID)))
 | where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
 | extend AdditionalFieldsCount = toint(AdditionalFields["Count"])
 | summarize
     Count = sum(AdditionalFieldsCount),
-    QueryType = make_set_if(split(QueryType, ", "), isnotempty(QueryType) and SearchScope == "WholeSubtree"),
+    QueryType = make_set_if(split(QueryType, ", "), isnotempty(QueryType) and SearchScope has "WholeSubtree"),
     QueryTarget = make_set_if(QueryTarget, isnotempty(QueryTarget)),
+    DeviceNames = make_set_if(DeviceName, DeviceName != IPAddress),
     arg_min(TimeGenerated, *)
     by IPAddress
-// | where not(array_length(QueryType) == 0 and array_length(QueryTarget) == 1 and QueryTarget[0] == "Admins. del dominio")
+// | where not(array_length(QueryType) == 1 and QueryType[0] == "None" and array_length(QueryTarget) == 1 and QueryTarget[0] == "Admins. del dominio")
 // | where not(array_length(QueryTarget) == 0  and array_length(QueryType) == 1 and QueryType[0] == "AllComputers")
 | project
     TimeGenerated,
-    DeviceName = iff(DeviceName != IPAddress, DeviceName, ""),
+    DeviceName = tostring(DeviceNames[0]),
+    DeviceNames,
     IPAddress,
     ActionType,
     Count,
