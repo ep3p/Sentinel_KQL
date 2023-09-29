@@ -19,7 +19,7 @@ union
 | project-rename PreviousState = State, CurrentState = State1
 | extend AlertName = case(
     minTimeGenerated > ago(query_frequency), strcat("Azure subscription created", " - ", ResourceName),
-    maxTimeGenerated < ago(ingestion_period), strcat("Azure subscription removed", " - ", ResourceName),
+    maxTimeGenerated between (ago(query_frequency + ingestion_period) .. ago(ingestion_period)), strcat("Azure subscription removed", " - ", ResourceName),
     isnotempty(PreviousState) and isnotempty(CurrentState) and CurrentState != PreviousState, strcat("Azure subscription ", tolower(CurrentState), " - ", ResourceName),
     ""
     )
