@@ -239,12 +239,14 @@ let _RoleAssignmentsAzure = materialize(
             | distinct Caller = tostring(TargetResources[0]["id"]), CallerDisplayName = tostring(TargetResources[0]["displayName"])//, TargetType = "ServicePrincipal"
             | extend CallerType = "App"
             )
+            | where isnotempty(Caller)
         ) on Caller//, CallerType
     | extend CallerDisplayName = coalesce(CallerDisplayName, tostring(Claims_d["name"]))
     | extend PermanentOperation = iff(CallerDisplayName == "MS-PIM" and Caller in (_PIM_ids), bool(null), true)
     | lookup kind=leftouter (
         _AADApps
         | project AppId = tostring(AppId), AppDisplayName
+        | where isnotempty(AppId)
         ) on AppId
     | project-rename TargetSubscriptionId = SubscriptionId
     | lookup kind=leftouter (
@@ -279,6 +281,7 @@ let _RoleAssignmentsAzure = materialize(
     | lookup kind=leftouter (
         _AzureRBACRoles
         | project TargetRoleTemplateId = tostring(RoleId), TargetRoleName = tostring(RoleName)
+        | where isnotempty(TargetRoleTemplateId)
         ) on TargetRoleTemplateId
     | project
         TimeGenerated,
