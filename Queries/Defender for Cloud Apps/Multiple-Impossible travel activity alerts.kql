@@ -55,14 +55,14 @@ let _ImpossibleTravelAlerts = materialize(
         union
             (SigninLogs
             | where TimeGenerated > ago(query_period)
-            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
             | extend
                 DeviceDetail = tostring(DeviceDetail),
                 TimeReceived = _TimeReceived
             ),
             (AADNonInteractiveUserSignInLogs
             | where TimeGenerated > ago(query_period)
-            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and RiskState == "atRisk"
+            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
             | extend TimeReceived = _TimeReceived
             )
         | summarize
