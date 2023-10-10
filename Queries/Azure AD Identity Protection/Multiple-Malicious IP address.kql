@@ -52,7 +52,6 @@ SecurityAlert
         DeviceDetail,
         UserAgent,
         AuthenticationDetails,
-        RiskState,
         RiskEventTypes,
         RiskLevelDuringSignIn,
         RiskLevelAggregated,
