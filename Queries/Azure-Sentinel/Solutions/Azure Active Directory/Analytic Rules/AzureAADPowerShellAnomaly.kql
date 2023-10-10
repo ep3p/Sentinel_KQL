@@ -1,0 +1,38 @@
+let _SuccessResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has_all ("[Success]", "[Complete]") and isnotempty(ResultDescription)
+    | summarize make_list(ResultType)
+);
+let _PowerShellAppExpectedResource = 
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "PowerShellAppExpectedResource"
+    | project AppId = tostring(SourceResource), ResourceIdentity = tostring(DestinationResource)
+;
+SignInLogsTables
+| where ResultType in (_SuccessResultTypes)
+| where AppDisplayName has_any ("CLI", "PowerShell", "Management Shell")
+| join kind=leftanti _PowerShellAppExpectedResource on AppId, ResourceIdentity
+| invoke UnifySignInLogs()
+| project
+    TimeGenerated,
+    CreatedDateTime,
+    Category,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    ResultType,
+    AppDisplayName,
+    ResourceDisplayName,
+    AppId,
+    ResourceIdentity,
+    ResourceTenantId,
+    ClientAppUsed,
+    UserAgent,
+    Status,
+    LocationDetails,
+    DeviceDetail,
+    AuthenticationDetails,
+    AuthenticationProcessingDetails,
+    OriginalRequestId,
+    CorrelationId
