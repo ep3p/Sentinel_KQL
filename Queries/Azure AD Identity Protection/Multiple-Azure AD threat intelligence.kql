@@ -22,7 +22,7 @@ AADUserRiskEvents
 | lookup kind=leftouter (
     (SigninLogs
     | where TimeGenerated > ago(query_period)
-    | where CorrelationId in (toscalar(_Events | summarize make_list(CorrelationId))) and RiskState != "none"// and RiskEventTypes_V2 has "azureADThreatIntel"
+    | where CorrelationId in (toscalar(_Events | summarize make_list(CorrelationId))) and not(RiskState == "none")// and RiskEventTypes_V2 has "azureADThreatIntel"
     | extend
         DeviceDetail = tostring(DeviceDetail),
         TimeReceived = _TimeReceived
