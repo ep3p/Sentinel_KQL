@@ -1,5 +1,5 @@
 let _ADGroups =
-    _GetWatchlist('SID-AuditADObjects')
+    _GetWatchlist("SID-AuditADObjects")
     | where Notes has ("[GroupActivity]")
     | project GroupSID = SID, SAMAccountName, Auditors = Auditor, MonitoredEventID, Severity
     | mv-apply split(MonitoredEventID, " ") to typeof(string) on (
@@ -10,15 +10,15 @@ let _ADGroups =
         )
 ;
 let _ExpectedActivityADGroups =
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "ADGroupEventID"
     | project
         Activity = Auxiliar,
         ActorAccount = ActorPrincipalName,
-        GroupSid = DestinationResource
+        GroupSid = tostring(DestinationResource)
 ;
 let _ExpectedADGroupDomains = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "MonitorADGroupFromDomain"
     | summarize make_list(Auxiliar)
 );
