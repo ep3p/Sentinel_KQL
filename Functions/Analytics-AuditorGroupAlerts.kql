@@ -57,8 +57,10 @@
         '\n\nThis activity was performed on the group "<<<GroupName>>>".\n\nThis activity was performed on the accounts:\n\n- <<<MembersList>>>\n'
         | extend
             AlertName = strcat(AlertName, case(
-                Activity has_any (add_member_eventids) or OperationTypeTranslated == "ValueAdded", strcat(" - Account added to ", GroupName),
-                Activity has_any (remove_member_eventids) or OperationTypeTranslated == "ValueDeleted", strcat(" - Account removed from ", GroupName),
+                Activity has_any (add_member_eventids), strcat(" - Account added to ", GroupName),
+                Activity has_any (remove_member_eventids), strcat(" - Account removed from ", GroupName),
+                OperationTypeTranslated == "ValueAdded", strcat(" - Value added to attribute of ", GroupName),
+                OperationTypeTranslated == "ValueDeleted", strcat(" - Value removed from attribute of ", GroupName),
                 ""
                 )),
             AlertDescription =
@@ -158,12 +160,14 @@
     | join kind=leftanti _MultipleEventDatas on Computer, Activity, ActorAccount, GroupName
     | extend
         AlertName = strcat(AlertName, case(
-            Activity has_any (add_member_eventids) or OperationTypeTranslated == "ValueAdded", strcat(" - Account added to ", GroupName),
-            Activity has_any (remove_member_eventids) or OperationTypeTranslated == "ValueDeleted", strcat(" - Account removed from ", GroupName),
+            Activity has_any (add_member_eventids), strcat(" - Account added to ", GroupName),
+            Activity has_any (remove_member_eventids), strcat(" - Account removed from ", GroupName),
+            OperationTypeTranslated == "ValueAdded", strcat(" - Value added to attribute of ", GroupName),
+            OperationTypeTranslated == "ValueDeleted", strcat(" - Value removed from attribute of ", GroupName),
             ""
         )),
         AlertDescription = strcat(AlertDescription, case(
-            Activity has_any (array_concat(add_member_eventids, remove_member_eventids)) or OperationTypeTranslated in ("ValueAdded", "ValueDeleted"), strcat('\nThis activity was performed on the account "', iff(isnotempty(MemberAccount), MemberAccount, MemberSid), '".\n'),
+            Activity has_any (array_concat(add_member_eventids, remove_member_eventids)), strcat('\nThis activity was performed on the account "', iff(isnotempty(MemberAccount), MemberAccount, MemberSid), '".\n'),
             ""
         ))
     | union _MultipleMembers, _MultipleGroups, _MultipleEventDatas
