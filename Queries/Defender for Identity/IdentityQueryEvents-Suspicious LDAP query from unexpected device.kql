@@ -1,32 +1,43 @@
 let _ExpectedIPAddresses = toscalar(
     union
-        (_GetWatchlist('Service-PrivateCorporateServices')
+        (_GetWatchlist("Service-PrivateCorporateServices")
         | where Notes has "[LDAPQuery]"
         ),
-        (_GetWatchlist('IP-PrivateAddressing')
+        (_GetWatchlist("IP-PrivateAddressing")
         | where Notes has "[LDAPQuery]"
         )
     | summarize make_list(IPAddress)
 );
+let _AnonymousExpectedIPAddresses = toscalar(
+    union
+        (_GetWatchlist("Service-PrivateCorporateServices")
+        | where Notes has "[AnonymousLDAPQuery]"
+        ),
+        (_GetWatchlist("IP-PrivateAddressing")
+        | where Notes has "[AnonymousLDAPQuery]"
+        )
+    | summarize make_list(IPAddress)
+);
 let _ExpectedDomains = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "DomainJoinedLDAP"
     | summarize make_list(strcat(".", Auxiliar))
 );
 let _PrivilegedObjects =
-    _GetWatchlist('SID-AuditADObjects')
+    _GetWatchlist("SID-AuditADObjects")
     | where Notes has "[LDAPQuery]"
     | project SID, SAMAccountName
 ;
 IdentityQueryEvents
 | where Protocol == "Ldap"
 | where not(DeviceName has_any (_ExpectedDomains))
-| parse Query with 'LDAP Search Scope: "' SearchScope '", Base Object: "' BaseObject '", Search Filter:  "' SearchFilter ' "'
-| where (QueryType has_any ("AllUsers", "AllGroups", "AllComputers", "AllTrustDomains", "AllDomains", "AllSecurityPrincipals", "AllObjects") // "AllAccounts")
+| parse Query with "LDAP Search Scope: " SearchScope ", Base Object:" BaseObject ", Search Filter: " SearchFilter
+| where (QueryType has_any ("AllUsers", "AllGroups", "AllComputers", "AllTrustDomains", "AllDomains", "AllSecurityPrincipals", "AllObjects", "AllAccounts")
         and SearchScope has "WholeSubtree")
     or trim(@"\s", QueryTarget) in (toscalar(_PrivilegedObjects | summarize make_list(SAMAccountName)))
     or Query has_any (toscalar(_PrivilegedObjects | summarize make_list(SID)))
 | where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
+| where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _AnonymousExpectedIPAddresses) and IPAddress == DeviceName)
 | extend AdditionalFieldsCount = toint(AdditionalFields["Count"])
 | summarize
     Count = sum(AdditionalFieldsCount),
@@ -35,8 +46,9 @@ IdentityQueryEvents
     DeviceNames = make_set_if(DeviceName, DeviceName != IPAddress),
     arg_min(TimeGenerated, *)
     by IPAddress
-// | where not((array_length(QueryType) == 0 or (array_length(QueryType) == 1 and QueryType[0] == "None")) and array_length(QueryTarget) == 1 and QueryTarget[0] == "Admins. del dominio")
-// | where not(array_length(QueryTarget) == 0  and array_length(QueryType) == 1 and QueryType[0] == "AllComputers")
+// | where not(array_length(QueryType) == 1 and QueryType[0] == "None" and array_length(QueryTarget) == 1 and QueryTarget[0] == "Admins. del dominio")
+// | where not(array_length(QueryTarget) == 0 and array_length(QueryType) == 1 and QueryType[0] == "AllComputers")
+// | where not(array_length(QueryTarget) == 0 and array_length(QueryType) == 1 and QueryType[0] == "AllAccounts" and isnotempty(parse_ipv4(IPAddress)) and not(ipv4_is_in_any_range(IPAddress, _AnonymousExpectedIPAddresses)))
 | project
     TimeGenerated,
     DeviceName = tostring(DeviceNames[0]),
