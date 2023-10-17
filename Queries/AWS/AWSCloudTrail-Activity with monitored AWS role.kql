@@ -1,3 +1,5 @@
+let query_frequency = 15m;
+let query_wait = 15m;
 let _MonitoredRoles =
     _GetWatchlist("AccountId-AuditAWSAccounts")
     | where Notes has "[RoleActivity]"
@@ -10,6 +12,7 @@ let _AWSAccounts =
 union
     (
     AWSCloudTrail
+    | where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
     | where EventName in ("Federate", "GetRoleCredentials")
     | extend DynamicServiceEventDetails = todynamic(ServiceEventDetails)
     | extend
@@ -17,7 +20,8 @@ union
         RequestedRoleAccountId = tostring(DynamicServiceEventDetails["account_id"])
     ),
     (
-    AWSCloudTrail 
+    AWSCloudTrail
+    | where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
     | where EventName in ("AssumeRole")
     | extend RoleArn = tostring(todynamic(RequestParameters)["roleArn"])
     | extend
@@ -29,18 +33,41 @@ union
     _AWSAccounts
     | project RequestedRoleAccountName = AccountName, AccountId
     ) on $left.RequestedRoleAccountId == $right.AccountId
+| as _Events
+| join kind=leftouter (
+    AWSCloudTrail
+    | where TimeGenerated > ago(query_frequency + query_wait)
+    | where UserIdentityType == "AssumedRole" and not(ReadOnly) and not(EventTypeName == "AwsConsoleSignIn") and UserIdentityArn matches regex toscalar(_Events | summarize 
+    strcat(@"(", strcat_array(make_set(regex_quote(RequestedRole)), "|"), @")"))
+    | summarize WriteEventNames = make_set(EventName) by UserIdentityArn, SessionIssuerAccountId
+    | project
+        EventNames_UserIdentityArn = UserIdentityArn,
+        EventNames_SessionIssuerAccountId = SessionIssuerAccountId,
+        WriteEventNames
+) on $left.RequestedRoleAccountId == $right.EventNames_SessionIssuerAccountId
+| where isempty(EventNames_SessionIssuerAccountId) or EventNames_UserIdentityArn contains RequestedRole
+| project-away EventNames_*
 | summarize
     StartTime = min(TimeGenerated),
     EndTime = max(TimeGenerated),
     SourceIpAddresses = array_sort_asc(make_set_if(SourceIpAddress, isnotempty(SourceIpAddress), 100)),
+    UserIdentityTypes = array_sort_asc(make_set(UserIdentityType)),
+    UserIdentityUserName = take_any(UserIdentityUserName),
     EventNames = array_sort_asc(make_set(EventName)),
+    WriteEventNames = array_sort_asc(make_set(WriteEventNames)),
     ReadOnly = make_set_if(ReadOnly, isnotempty(ReadOnly)),
     RequestedRoleAccounts = array_sort_asc(make_set(coalesce(RequestedRoleAccountName, RequestedRoleAccountId))),
+    ShareEventIds = array_sort_asc(make_set(SharedEventId)),
     take_any(*)
-    by RequestedRole, UserIdentityType, UserIdentityAccountId, SessionIssuerArn, UserIdentityPrincipalid, RecipientAccountId, EventSource, EventTypeName
+    by RequestedRole, UserIdentityAccountId, SessionIssuerArn, UserIdentityPrincipalid, EventSource, EventTypeName
 | extend Identity = coalesce(UserIdentityUserName, UserIdentityPrincipalid)
-| mv-apply SourceIpAddress = SourceIpAddresses to typeof(string) on (
-    summarize AddressesList = strcat_array(array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has ".amazonaws.com"))), '\n\n- ')
+| mv-apply
+    SourceIpAddress = iff(array_length(SourceIpAddresses) > 0, SourceIpAddresses, dynamic([""])) to typeof(string),
+    WriteEventName = iff(array_length(WriteEventNames) > 0, WriteEventNames, dynamic([""])) to typeof(string)
+    on (
+    summarize
+        AddressesList = strcat_array(array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has ".amazonaws.com"))), '\n\n- '),
+        WriteEventNamesList = strcat_array(array_sort_asc(make_set_if(WriteEventName, isnotempty(WriteEventName))), '\n\n- ')
     )
 | extend AlertDescription = strcat(
     'This rule detects operations of specified roles in AWS accounts.\n\nThe role "',
@@ -51,12 +78,13 @@ union
     strcat_array(RequestedRoleAccounts, '\n\n- '),
     '\n\nThe operations were made from the addresses:\n\n- ',
     AddressesList,
+    iff(array_length(WriteEventNames) > 0, strcat('\n\nThe role performed the write operations:\n\n- ', WriteEventNamesList), '\n\nThe role has not performed write operations yet.'),
     '\n'
     )
 | project
     StartTime,
     EndTime,
-    UserIdentityType,
+    UserIdentityTypes,
     UserIdentityAccountId,
     SessionCreationDate,
     SessionIssuerUserName,
@@ -66,12 +94,12 @@ union
     UserIdentityPrincipalid,
     UserIdentityArn,
     UserIdentityAccessKeyId,
-    RecipientAccountId,
     Identity,
     SourceIpAddresses,
     EventSource,
     EventTypeName,
     EventNames,
+    WriteEventNames,
     RequestedRole,
     RequestedRoleAccounts,
     ManagementEvent,
@@ -85,6 +113,7 @@ union
     SessionMfaAuthenticated,
     UserAgent,
     AwsEventId,
+    ShareEventIds,
     AlertSeverity,
     AlertDescription,
     Auditors
