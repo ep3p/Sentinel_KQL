@@ -1,4 +1,4 @@
-let query_frequency = 5m;
+let query_frequency = 15m;
 let query_period = 2d;
 let _HomeTenantDomains = toscalar(
     _GetWatchlist("UUID-AADTenantIds")
