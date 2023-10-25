@@ -1,0 +1,59 @@
+AWSCloudTrail
+| where EventName in ("CreatePolicy", "CreatePolicyVersion")
+    and isempty(ErrorCode)
+    and isempty(ErrorMessage)
+| extend DynamicRequestParameters = todynamic(RequestParameters)
+| extend Statement = case(
+    bag_keys(DynamicRequestParameters) has "policyDocument", todynamic(tostring(DynamicRequestParameters["policyDocument"]))["Statement"],
+    bag_keys(DynamicRequestParameters) has "content", todynamic(tostring(DynamicRequestParameters["content"]))["Statement"],
+    dynamic(null)
+)
+| mv-expand Statement = iff(isnotempty(bag_keys(Statement)), pack_array(Statement), Statement)
+| extend
+    Effect = tostring(Statement["Effect"]),
+    Action = tostring(Statement["Action"]),
+    Resource = tostring(Statement["Resource"])
+| where Effect == "Allow" and Resource has "*" and Action has "*"
+| summarize take_any(*) by AwsEventId
+| invoke AWSIdentityRole()
+| extend PolicyArn = tostring(todynamic(ResponseElements)["policy"]["arn"])
+| join kind=leftouter (
+    AWSCloudTrail
+    | where EventName in ("AttachUserPolicy","AttachRolePolicy","AttachGroupPolicy")
+        and isempty(ErrorCode)
+        and isempty(ErrorMessage)
+    | extend PolicyArn = tostring(todynamic(RequestParameters)["policyArn"])
+    | where isnotempty(PolicyArn)
+    | summarize AttachedEntities = make_list(RequestParameters, 200) by PolicyArn
+    ) on PolicyArn
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    TargetRole,
+    TargetRoleSessionName,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    PolicyArn,
+    Statement = iff(isnotempty(bag_keys(Statement)), pack_array(Statement), Statement),
+    AttachedEntities,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
