@@ -1,0 +1,41 @@
+AWSCloudTrail
+| where (EventName == "CreateKey" or EventName == "PutKeyPolicy")
+    and isempty(ErrorCode)
+    and isempty(ErrorMessage)
+| mv-expand Statement = todynamic(tostring(todynamic(RequestParameters)["policy"]))["Statement"]
+| extend
+    Action = tostring(Statement["Action"]),
+    Effect = tostring(Statement["Effect"]),
+    Principal = tostring(Statement["Principal"])
+| where Effect == "Allow" and Principal has "*"// and Action has_any ("kms:Encrypt", "kms:*")
+| summarize take_any(*) by AwsEventId
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    TargetRole,
+    TargetRoleSessionName,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    Statement = todynamic(tostring(todynamic(RequestParameters)["policy"]))["Statement"],
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
