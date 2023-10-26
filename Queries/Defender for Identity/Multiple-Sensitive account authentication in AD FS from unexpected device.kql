@@ -7,6 +7,7 @@ let _Identities =
     IdentityInfo
     | where TimeGenerated > ago(14d)
     | summarize arg_max(TimeGenerated, *) by AccountUPN
+    | extend AccountUPN = tolower(AccountUPN)
 ;
 IdentityLogonEvents
 | where TimeGenerated > ago(1h)
@@ -21,6 +22,7 @@ IdentityLogonEvents
     by AccountUpn, BinTimeGenerated
 | where Protocols has_all ("Adfs", "Ntlm") and LogonTypes has_all ("Logon with ADFS authentication", "Resource access")
 | summarize take_any(*) by AccountUpn, TimeGenerated
+| extend AccountUpn = tolower(AccountUpn)
 | lookup kind=leftouter (_Identities | where isnotempty(AccountUPN)) on $left.AccountUpn == $right.AccountUPN
 | where SourceSystem has "ActiveDirectory"
     or UserAccountControl has "PasswordNeverExpires"
