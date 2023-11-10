@@ -18,7 +18,8 @@ IdentityLogonEvents
     Protocols = array_sort_asc(make_set(Protocol)),
     DeviceNames = array_sort_asc(make_set(DeviceName)),
     DeviceNamesSample = array_sort_asc(make_set_if(DeviceName, not(DeviceName matches regex @"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}"))),
-    LogonTypes = array_sort_asc(make_list(LogonType))
+    LogonTypes = array_sort_asc(make_list(LogonType)),
+    AccountSid = make_set_if(AccountSid, isnotempty(AccountSid))
     by AccountUpn, BinTimeGenerated
 | where Protocols has_all ("Adfs", "Ntlm") and LogonTypes has_all ("Logon with ADFS authentication", "Resource access")
 | summarize take_any(*) by AccountUpn, TimeGenerated
@@ -44,5 +45,6 @@ IdentityLogonEvents
     GroupMembership,
     AssignedRoles,
     SourceSystem,
+    AccountSid,
     AccountSID,
     AccountObjectId
