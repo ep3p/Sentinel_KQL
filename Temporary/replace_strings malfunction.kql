@@ -19,5 +19,7 @@ print
         dynamic(["00000006-0000-0ff1-ce00-000000000000 , 04b07795-8ddb-461a-bbee-02f9e1bf7b46"]),
         dynamic(["test"])
     )
-// Output
+// Real output
 // 00000006-0000-0ff1-ce00-000000000000 , 04b07795-8ddb-461a-bbee-02f9e1bf7b46    test0 , 04b07795-8ddb-461a-bbee-02f9e1bf7b46    0test , 04b07795-8ddb-461a-bbee-02f9e1bf7b46    test
+// Desired output
+// test , 04b07795-8ddb-461a-bbee-02f9e1bf7b46    test0 , 04b07795-8ddb-461a-bbee-02f9e1bf7b46    0test , 04b07795-8ddb-461a-bbee-02f9e1bf7b46    test
