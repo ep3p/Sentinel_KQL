@@ -1,0 +1,22 @@
+let unexpected_strings_useragent = strcat("(?i)(", strcat_array(dynamic([
+    "kali",
+    "AZURECLI"
+]), "|"), ")");
+MicrosoftGraphActivityLogs
+| where UserAgent matches regex unexpected_strings_useragent
+| summarize arg_min(TimeGenerated, *) by UserId, ServicePrincipalId
+| project TimeGenerated, UserId, ServicePrincipalId, IPAddress, RequestMethod, ApiVersion, RequestUri, UserAgent, SignInActivityId, AppId, TokenIssuedAt
+| join hint.strategy=shuffle kind=leftouter (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | project
+        UserPrincipalName,
+        UserDisplayName,
+        AppDisplayName,
+        ResourceDisplayName,
+        Token_IPAddress = IPAddress,
+        Token_Location = Location,
+        Token_UserAgent = UserAgent,
+        Token_OriginalRequestId = OriginalRequestId,
+        Token_CorrelationId = CorrelationId,
+        UniqueTokenIdentifier
+    ) on $left.SignInActivityId == $right.UniqueTokenIdentifier
