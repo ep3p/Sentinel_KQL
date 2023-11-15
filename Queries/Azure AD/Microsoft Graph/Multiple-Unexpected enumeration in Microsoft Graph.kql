@@ -1,0 +1,106 @@
+let query_frequency = 1h;
+let query_period = 1d; // 14d in rule parameters for IdentityInfo
+// https://learn.microsoft.com/en-us/graph/query-parameters?tabs=http#skip-parameter
+let paging_threshold = 100;
+let paging_resource_types = dynamic(["applications", "devices", "groups", "members", "servicePrincipals", "users"]);
+let paging_resource_types_threshold = 2;
+let _ExpectedPagingAccountIds =
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "MicrosoftGraphPaging"
+    | project ServicePrincipalId = tostring(ActorId), AppId = tostring(SourceResource)
+;
+let _Users =
+    IdentityInfo
+    | where TimeGenerated > ago(14d)
+    | summarize arg_max(TimeGenerated, *) by AccountObjectId
+    | project UserId = AccountObjectId, UserPrincipalName = tolower(AccountUPN)
+;
+let _ServicePrincipals =
+    _GetWatchlist("UUID-AADApps")
+    | project ServicePrincipalId = tostring(ObjectId), AppId = tostring(AppId), ServicePrincipalName = AppDisplayName
+;
+let _AppIdsDynamic = toscalar(_ServicePrincipals | summarize make_list(AppId));
+let _AppDisplayNamesDynamic = toscalar(_ServicePrincipals | summarize make_list(ServicePrincipalName));
+MicrosoftGraphActivityLogs
+| where TimeGenerated > ago(query_period)
+| where RequestUri has_any ("$skip=", "$skiptoken=")
+| join hint.strategy=shuffle kind=leftanti _ExpectedPagingAccountIds on ServicePrincipalId, AppId
+| extend Endpoint = replace_regex(tostring(split(RequestUri, "?")[0]), @"[a-f0-9]{8}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{12}", "<<<replaced_UUID>>>")
+| extend ResourceType = tostring(split(trim_end(@"\/", Endpoint), "/")[-1])
+| summarize hint.strategy=shuffle
+    EndTime = max(TimeGenerated),
+    PagingCount = count(),
+    PagingResourceTypes = array_sort_asc(make_set(ResourceType, 200))//,
+    //PagingEndpoints = array_sort_asc(make_set(Endpoint, 200))
+    by UserId, ServicePrincipalId
+| where EndTime > ago(query_frequency)
+| where PagingCount > paging_threshold and array_length(set_intersect(paging_resource_types, PagingResourceTypes)) >= paging_resource_types_threshold
+| project UserId, ServicePrincipalId, PagingCount, PagingResourceTypes//, PagingEndpoints
+| as hint.materialized=true _Events
+| join kind=leftouter (
+    MicrosoftGraphActivityLogs
+    | where TimeGenerated > ago(query_period)
+    | where UserId in (toscalar(_Events | summarize make_set_if(UserId, isnotempty(UserId))))
+        or ServicePrincipalId in (toscalar(_Events | summarize make_set_if(ServicePrincipalId, isnotempty(ServicePrincipalId))))
+    | extend AccountId = coalesce(UserId, ServicePrincipalId)
+    | partition hint.strategy=native by AccountId (
+        extend RequestUri = iff(isnotempty(ServicePrincipalId), "", RequestUri) // ServicePrincipal RequestUris are expensive for reduce operator
+        | extend ReplacedRequestUri = replace_regex(RequestUri, @"\?\$skiptoken\=[A-Za-z0-9\_\-]+", "?$skiptoken=<<<replaced_token>>>")
+        | extend ReplacedRequestUri = replace_regex(ReplacedRequestUri, @"[a-f0-9]{8}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{12}", "<<<replaced_UUID>>>")
+        | reduce kind=source by ReplacedRequestUri with threshold=0.5, characters="/?$=()"
+        | summarize
+            StartTime = min(TimeGenerated),
+            EndTime = max(TimeGenerated),
+            Count = count(),
+            ApiVersion = make_set_if(ApiVersion, isnotempty(IPAddress), 50),
+            IPAddress = make_set(IPAddress, 50),
+            AppId = make_set(AppId, 100),
+            UserAgent = make_set_if(UserAgent, isnotempty(UserAgent), 50),
+            UniqueTokenIdentifier = make_set(SignInActivityId, 20),
+            Scopes = make_set(split(Scopes, " "), 100),
+            RoleClaims = make_set_if(split(Wids, " "), isnotempty(Wids), 50),
+            take_any(UserId, ServicePrincipalId)
+            by Pattern
+        | sort by Count desc
+        | summarize
+            StartTime = min(StartTime),
+            EndTime = max(EndTime),
+            IPAddresses = array_sort_asc(make_set(IPAddress, 50)),
+            AppIds = array_sort_asc(make_set(AppId, 100)),
+            ApiVersions = array_sort_asc(make_set(ApiVersion, 50)),
+            RequestUriPatterns = make_list(tostring(pack(Pattern, Count)), 100),
+            UserAgents = array_sort_asc(make_set(UserAgent, 50)),
+            Scopes = array_sort_asc(make_set(Scopes, 100)),
+            RoleClaims = array_sort_asc(make_set(RoleClaims, 50)),
+            UniqueTokenIdentifiers = make_set(UniqueTokenIdentifier, 20),
+            take_any(UserId, ServicePrincipalId)
+        )
+    ) on UserId, ServicePrincipalId
+| project-away *1
+| lookup kind=leftouter (
+    _ServicePrincipals
+    | where isnotempty(ServicePrincipalId)
+    | project ServicePrincipalId, ServicePrincipalName
+    ) on ServicePrincipalId
+| lookup kind=leftouter (
+    _Users
+    | where isnotempty(UserId)
+    ) on UserId
+| extend Apps = todynamic(replace_strings(tostring(AppIds), _AppIdsDynamic, _AppDisplayNamesDynamic))
+| project
+    StartTime,
+    EndTime,
+    UserPrincipalName,
+    ServicePrincipalName,
+    IPAddresses,
+    Apps,
+    UserAgents,
+    PagingCount,
+    PagingResourceTypes,
+    ApiVersions,
+    RequestUriPatterns,
+    Scopes,
+    RoleClaims,
+    UserId,
+    ServicePrincipalId,
+    UniqueTokenIdentifiers
