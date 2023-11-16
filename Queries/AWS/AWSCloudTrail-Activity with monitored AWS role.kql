@@ -66,7 +66,7 @@ union
     WriteEventName = iff(array_length(WriteEventNames) > 0, WriteEventNames, dynamic([""])) to typeof(string)
     on (
     summarize
-        AddressesList = strcat_array(array_sort_asc(make_set_if(SourceIpAddress, not(SourceIpAddress has ".amazonaws.com"))), '\n\n- '),
+        AddressesList = strcat_array(array_sort_asc(make_set_if(SourceIpAddress, not(isempty(SourceIpAddress) or SourceIpAddress has ".amazonaws.com"))), '\n\n- '),
         WriteEventNamesList = strcat_array(array_sort_asc(make_set_if(WriteEventName, isnotempty(WriteEventName))), '\n\n- ')
     )
 | extend AlertDescription = strcat(
