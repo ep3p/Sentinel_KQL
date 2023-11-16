@@ -1,19 +1,28 @@
-let query_frequency = 15m;
-let query_period = 1h;
+let query_frequency = 1h;
+let query_period = 2h; // 14d in rule parameters for IdentityInfo
 let unexpected_strings_useragent = strcat("(?i)(", strcat_array(dynamic([
     "kali",
     "AZURECLI"
 ]), "|"), ")");
+let _Users =
+    IdentityInfo
+    | where TimeGenerated > ago(14d)
+    | summarize arg_max(TimeGenerated, *) by AccountObjectId
+    | project UserId = AccountObjectId, UserPrincipalName = tolower(AccountUPN)
+;
 MicrosoftGraphActivityLogs
 | where TimeGenerated > ago(query_frequency)
 | where UserAgent matches regex unexpected_strings_useragent
 | summarize arg_min(TimeGenerated, *) by UserId, ServicePrincipalId
 | project TimeGenerated, UserId, ServicePrincipalId, IPAddress, RequestMethod, ApiVersion, RequestUri, UserAgent, SignInActivityId, AppId, TokenIssuedAt
+| lookup kind=leftouter (
+    _Users
+    | where isnotempty(UserId)
+    ) on UserId
 | join hint.strategy=shuffle kind=leftouter (
     union SigninLogs, AADNonInteractiveUserSignInLogs
     | where TimeGenerated > ago(query_period)
     | project
-        UserPrincipalName,
         UserDisplayName,
         AppDisplayName,
         ResourceDisplayName,
