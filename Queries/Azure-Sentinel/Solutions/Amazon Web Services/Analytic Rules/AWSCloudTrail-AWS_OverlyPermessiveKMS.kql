@@ -1,5 +1,5 @@
 AWSCloudTrail
-| where (EventName == "CreateKey" or EventName == "PutKeyPolicy")
+| where EventName in ("CreateKey", "PutKeyPolicy")
     and isempty(ErrorCode)
     and isempty(ErrorMessage)
 | mv-expand Statement = todynamic(tostring(todynamic(RequestParameters)["policy"]))["Statement"]
