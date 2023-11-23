@@ -1,3 +1,5 @@
+let query_frequency = 1h;
+let query_period = 14d;
 let _ExpectedDomain = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "DomainJoinedLDAP"
@@ -5,12 +7,12 @@ let _ExpectedDomain = toscalar(
 );
 let _Identities =
     IdentityInfo
-    | where TimeGenerated > ago(14d)
+    | where TimeGenerated > ago(query_period)
     | summarize arg_max(TimeGenerated, *) by AccountUPN
     | extend AccountUPN = tolower(AccountUPN)
 ;
 IdentityLogonEvents
-| where TimeGenerated > ago(1h)
+| where TimeGenerated > ago(query_frequency)
 | where ActionType == "LogonSuccess" and Protocol in ("Adfs", "Ntlm") and isnotempty(DeviceName) and not(DeviceName has_any (_ExpectedDomain))
 | mv-expand BinTimeGenerated = range(bin(TimeGenerated, 1s) - 1s, bin(TimeGenerated, 1s) + 1s, 1s) to typeof(datetime)
 | summarize hint.shufflekey=BinTimeGenerated
