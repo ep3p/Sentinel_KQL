@@ -1,15 +1,14 @@
 let query_frequency = 1h;
 let query_period = 3d;
 let _ExpectedFrequencies =
-    _GetWatchlist('DataType-IngestedTables')
+    _GetWatchlist("DataType-IngestedTables")
     | where Type == "ThreatIntelligenceIndicator"
-    | project Type, Critical, ExpectedIngestionFrequency = totimespan(Frequency)
+    | project Type, Critical, SourceSystem = Auxiliar, ExpectedIngestionFrequency = totimespan(Frequency)
 ;
 ThreatIntelligenceIndicator
 | where TimeGenerated > ago(query_period)
-| where not(ExternalIndicatorId has "indicator--")
-| summarize IngestionTime = max(ingestion_time()) by Type
-| lookup kind=inner _ExpectedFrequencies on Type
+| summarize IngestionTime = max(ingestion_time()) by Type, SourceSystem
+| lookup kind=inner _ExpectedFrequencies on Type, SourceSystem
 | where IngestionTime between (ago(ExpectedIngestionFrequency + query_frequency) .. ago(ExpectedIngestionFrequency))
 | extend
     TimespanWithoutIngestion = now() - IngestionTime,
@@ -17,4 +16,10 @@ ThreatIntelligenceIndicator
         Critical == "true", "High",
         "Informational"
         )
-| project Type, Critical, ExpectedIngestionFrequency, TimespanWithoutIngestion, AlertSeverity
+| project
+    Type,
+    SourceSystem,
+    Critical,
+    ExpectedIngestionFrequency,
+    TimespanWithoutIngestion,
+    AlertSeverity
