@@ -10,7 +10,7 @@ let _PowerShellAppExpectedResource =
 ;
 SignInLogsTables
 | where ResultType in (_SuccessResultTypes)
-| where AppDisplayName has_any ("CLI", "PowerShell", "Management Shell")
+| where AppDisplayName has_any ("CLI", "PowerShell", "Management Shell", "Command Line")
 | join kind=leftanti _PowerShellAppExpectedResource on AppId, ResourceIdentity
 | invoke UnifySignInLogs()
 | project
@@ -34,5 +34,6 @@ SignInLogsTables
     DeviceDetail,
     AuthenticationDetails,
     AuthenticationProcessingDetails,
+    UserId,
     OriginalRequestId,
     CorrelationId
