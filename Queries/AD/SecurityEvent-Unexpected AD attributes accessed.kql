@@ -1,7 +1,7 @@
 let query_frequency = 1h;
 let query_period = 14d;
 let _Dictionary =
-    _GetWatchlist('Value-WindowsEventsDictionary')
+    _GetWatchlist("Value-WindowsEventsDictionary")
     | project Value = tostring(Value), Translation
 ;
 let _ExpectedAccounts = toscalar(
@@ -19,34 +19,44 @@ let _Identities =
     | where TimeGenerated > ago(query_period) and isnotempty(AccountDomain)
     | summarize arg_max(TimeGenerated, *) by AccountObjectId
     | project
-        AccountName = coalesce(extract(@"(?i:CN\=)([^,]+)", 1, OnPremisesDistinguishedName), AccountName),
+        SubjectUserName = coalesce(extract(@"(?i:CN\=)([^,]+)", 1, OnPremisesDistinguishedName), AccountName),
         GroupMembership = array_sort_asc(GroupMembership)
 ;
 SecurityEvent
-| where TimeGenerated > ago(query_frequency)
+| where TimeGenerated > ago(2 * query_frequency)
 | where EventID == 4662
+    and (AccessMask == "0x100" or AccessList == "%%7688" or Properties has "%%7688")
     and not(Account in (_ExpectedAccounts))
-    and Properties has_all (
-        "%%7688",
-        "612cb747-c0e8-4f92-9221-fdd5f15b550d", // unixUserPassword
-        "6617e4ac-a2f1-43ab-b60c-11fbd1facf05", // ms-PKI-RoamingTimeStamp - Indicates the time of the last synchronization
-        "b3f93023-9239-4f7c-b99c-6745d87adbc2", // ms-PKI-DPAPIMasterKeys - Stores the DPAPI Master Keys. These symmetric keys encrypt the private keys and are themselves encrypted.
-        "b7ff5a38-0818-42b0-8110-d3d154c97f24", // ms-PKI-Credential-Roaming-Tokens
-        "b8dfa744-31dc-4ef1-ac7c-84baf7ef9da7"  // ms-PKI-AccountCredentials - Stores certificates, certificate signing requests, private keys and saved passwords.
-    )
+    and (Properties has_all (
+            "612cb747-c0e8-4f92-9221-fdd5f15b550d", // unixUserPassword
+            "6617e4ac-a2f1-43ab-b60c-11fbd1facf05", // ms-PKI-RoamingTimeStamp - Indicates the time of the last synchronization
+            "b3f93023-9239-4f7c-b99c-6745d87adbc2", // ms-PKI-DPAPIMasterKeys - Stores the DPAPI Master Keys. These symmetric keys encrypt the private keys and are themselves encrypted.
+            "b7ff5a38-0818-42b0-8110-d3d154c97f24", // ms-PKI-Credential-Roaming-Tokens
+            "b8dfa744-31dc-4ef1-ac7c-84baf7ef9da7"  // ms-PKI-AccountCredentials - Stores certificates, certificate signing requests, private keys and saved passwords.
+            )
+        or Properties has_all (
+            "612cb747-c0e8-4f92-9221-fdd5f15b550d", // unixUserPassword
+            "bf967a9c-0de6-11d0-a285-00aa003049e2"  // Group
+            )
+        or Properties has_any (
+            "7b8b558a-93a5-4af7-adca-c017e67f1057", // ms-DS-Group-Managed-Service-Account
+            "ea715d30-8f53-40d0-bd1e-6109186d782c", // ms-FVE-RecoveryInformation
+            "43061ac1-c8ad-4ccc-b785-2bfac20fc60a"  // ms-FVE-RecoveryPassword
+        ))
 | summarize
     StartTime = min(TimeGenerated),
     EndTime = max(TimeGenerated),
     EventCount = count(),
-    ObjectNameCount = dcount(ObjectName),
-    ObjectNamesSample = array_sort_asc(make_set_if(trim(@"[\%\{\}\s]+", ObjectName), isnotempty(ObjectName), 100)),
-    SubjectLogonId = make_set_if(SubjectLogonId, isnotempty(SubjectLogonId), 50),
+    ObjectNameCount = count_distinct(ObjectName),
+    ObjectNamesSample = array_sort_asc(make_set_if(trim(@"[\%\{\}\s]+", ObjectName), isnotempty(ObjectName), 20)),
+    SubjectLogonId = make_set_if(SubjectLogonId, isnotempty(SubjectLogonId), 20),
     Properties = make_set_if(Properties, isnotempty(Properties), 50),
-    take_any(Activity, OperationType, AccountType, SubjectUserName, EventOriginId)
-    by Computer, Account, AccessList, ObjectType//, bin(TimeGenerated, 1h)
-| where ObjectNameCount > 50
-| lookup kind=leftouter _Identities on $left.SubjectUserName == $right.AccountName
-| project-away SubjectUserName//, TimeGenerated
+    take_any(Activity, OperationType, AccountType, SubjectUserName, AccessList, EventOriginId)
+    by Computer, Account, AccessMask, ObjectType, bin(TimeGenerated, 1h)
+| where ObjectNameCount > 10
+| where not(ObjectNameCount < 100 and ObjectType has_any ("bf967aba-0de6-11d0-a285-00aa003049e2", "bf967a86-0de6-11d0-a285-00aa003049e2")) // User Computer
+| lookup kind=leftouter _Identities on SubjectUserName
+| project-away SubjectUserName
 | where not(array_length(_ExpectedGroups) > 0 and GroupMembership has_all (_ExpectedGroups))
 | extend AccessList = trim(@"\s+", AccessList)
 | lookup kind=leftouter (
@@ -54,16 +64,14 @@ SecurityEvent
     | project
         AccessList = Value,
         AccessListTranslated = Translation
-    )
-    on AccessList
+    ) on AccessList
 | extend ObjectType = trim(@"[\%\{\}\s]+", ObjectType)
 | lookup kind=leftouter (
     _Dictionary
     | project
         ObjectType = Value,
         ObjectTypeTranslated = Translation
-    )
-    on ObjectType
+    ) on ObjectType
 | mv-expand Properties to typeof(string)
 | mv-expand PropertiesKey = split(translate("{}", "", trim(@"\s+", replace_regex(Properties, @"\s+", " "))), " ") to typeof(string)
 | lookup kind=leftouter (
@@ -87,14 +95,33 @@ SecurityEvent
     )
     on Computer, Account, $left.SubjectLogonId == $right.TargetLogonId
 | summarize
-    take_any(*),
     SubjectLogonIds = make_set(SubjectLogonId),
-    IpAddresses = make_set_if(IpAddress, isnotempty(IpAddress))
+    IpAddresses = make_set_if(IpAddress, isnotempty(IpAddress)),
+    take_any(*)
     by EventOriginId
+| summarize
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    Computers = make_set(Computer),
+    SubjectLogonIds = make_set(SubjectLogonIds),
+    IpAddresses = make_set(IpAddress),
+    EventCount = sum(EventCount),
+    AccessLists = make_set(AccessList),
+    AccessListsTranslated = make_set(AccessListTranslated),
+    ObjectTypes = make_set(ObjectType),
+    ObjectTypesTranslated = array_sort_asc(make_set(ObjectTypeTranslated)),
+    ObjectNameCount = sum(ObjectNameCount),
+    ObjectNamesSample = make_set(ObjectNamesSample),
+    Properties = make_set(Properties),
+    PropertiesTranslated = make_set(PropertiesTranslated),
+    take_any(AccountType, Activity, OperationType, GroupMembership)
+    by Account, bin(TimeGenerated, 1h)
+| where EndTime > ago(query_frequency)
+| where not(array_length(ObjectTypes) == 1 and ObjectTypes has_any ("bf967aba-0de6-11d0-a285-00aa003049e2", "bf967a86-0de6-11d0-a285-00aa003049e2", "bf967a9c-0de6-11d0-a285-00aa003049e2")) // User Computer Group
 | project
     StartTime,
     EndTime,
-    Computer,
+    Computers,
     Account,
     AccountType,
     SubjectLogonIds,
@@ -103,11 +130,12 @@ SecurityEvent
     Activity,
     EventCount,
     OperationType,
-    AccessList,
-    AccessListTranslated,
-    ObjectType,
-    ObjectTypeTranslated,
+    AccessLists,
+    AccessListsTranslated,
+    ObjectTypes,
+    ObjectTypesTranslated,
     ObjectNameCount,
+    ObjectNameEventCountRatio = round(ObjectNameCount / toreal(EventCount), 2),
     ObjectNamesSample,
     Properties,
     PropertiesTranslated,
