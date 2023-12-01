@@ -1,5 +1,5 @@
 AWSCloudTrail
-| where  EventName in ("CreateDBInstance", "ModifyDBInstance")
+| where EventName in ("CreateDBInstance", "ModifyDBInstance")
     and isempty(ErrorCode)
     and isempty(ErrorMessage)
 | where tobool(todynamic(RequestParameters)["publiclyAccessible"])
