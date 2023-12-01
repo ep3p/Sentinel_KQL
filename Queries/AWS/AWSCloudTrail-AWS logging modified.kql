@@ -21,8 +21,6 @@ AWSCloudTrail
     UserIdentityType,
     Identity,
     ActorRole,
-    TargetRole,
-    TargetRoleSessionName,
     UserIdentityAccountId,
     UserIdentityAccountName,
     RecipientAccountId,
