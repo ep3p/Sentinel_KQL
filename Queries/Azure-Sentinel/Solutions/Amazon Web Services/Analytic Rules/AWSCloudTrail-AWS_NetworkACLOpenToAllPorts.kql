@@ -1,0 +1,53 @@
+// https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-networkaclentry.html
+// https://awscli.amazonaws.com/v2/documentation/api/latest/reference/ec2/create-network-acl-entry.html
+// https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+AWSCloudTrail
+| where EventName in ("CreateNetworkAclEntry", "ReplaceNetworkAclEntry")
+    and isempty(ErrorCode)
+    and isempty(ErrorMessage)
+| extend DynamicRequestParameters = todynamic(RequestParameters)
+| extend
+    NetworkAclId = tostring(DynamicRequestParameters["networkAclId"]),
+    RuleNumber = toint(DynamicRequestParameters["ruleNumber"]),
+    Egress = tobool(DynamicRequestParameters["egress"]),
+    RuleAction = tostring(DynamicRequestParameters["ruleAction"]),
+    PortFrom = toint(DynamicRequestParameters["portRange"]["from"]),
+    PortTo = toint(DynamicRequestParameters["portRange"]["to"]),
+    AclProtocol = toint(DynamicRequestParameters["aclProtocol"]),
+    CiderBlock = tostring(coalesce(DynamicRequestParameters["cidrBlock"], DynamicRequestParameters["ipv6CidrBlock"]))
+| where not(Egress) and RuleAction == "allow" and (AclProtocol == -1 or (PortTo - PortFrom) > 100)
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    NetworkAclId,
+    RuleNumber,
+    Egress,
+    RuleAction,
+    PortFrom,
+    PortTo,
+    AclProtocol,
+    CiderBlock,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
