@@ -66,8 +66,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
             RemotePort == 80 and not(RemoteUrl has @"http:"), strcat(@"http://", RemoteUrl),
             RemoteUrl
             ))))
-        | mv-expand Url = Urls
-        | extend Url = tostring(Url[0])
+        | mv-expand Url = Urls to typeof(string)
         | where isnotempty(Url)
         | extend Url = trim_end(@"\/", Url)
         //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000
