@@ -113,8 +113,7 @@ dynamic({
         ```
         | where isnotempty(SyslogMessage)
         | extend Urls = todynamic(dynamic_to_json(extract_all(_URLRegex, dynamic([1]), SyslogMessage)))
-        | mv-expand Url = Urls
-        | extend Url = tostring(Url[0])
+        | mv-expand Url = Urls to typeof(string)
         | where isnotempty(Url)
         | extend Url = trim_end(@"\/", Url)```
 })
