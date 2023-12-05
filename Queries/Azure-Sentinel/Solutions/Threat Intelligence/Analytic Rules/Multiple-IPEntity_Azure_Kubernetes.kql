@@ -67,8 +67,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         // Filter events that may contain indicators
         | where not(log_s has_any (@'"status":"Failure"', @'"message":"Authentication failed, no credentials provided"'))
         //| where not(_IndicatorsPrefilterLength < 10000 and not(log_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-        | mv-expand IPAddress = todynamic(dynamic_to_json(extract_all(strcat(@'\"', "(", _IPv4Regex, "|", _IPv6Regex, ")"), dynamic([1]), log_s)))
-        | extend IPAddress = tostring(IPAddress[0])
+        | mv-expand IPAddress = todynamic(dynamic_to_json(extract_all(strcat(@'\"', "(", _IPv4Regex, "|", _IPv6Regex, ")"), dynamic([1]), log_s))) to typeof(string)
         | where isnotempty(IPAddress) and not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
         //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
         | project-rename AzureDiagnostics_TimeGenerated = TimeGenerated
