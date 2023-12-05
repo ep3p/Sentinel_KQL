@@ -61,8 +61,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where isnotempty(RemoteUrl)
         //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteUrl has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
         | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), RemoteUrl)))
-        | mv-expand Domain = Domains
-        | extend Domain = tolower(tostring(Domain[0]))
+        | mv-expand Domain = Domains to typeof(string)
         | where isnotempty(Domain)
         | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
         //| where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
