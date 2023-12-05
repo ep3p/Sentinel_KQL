@@ -84,8 +84,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
             )
         // Extract recognized and unrecognized addresses
         | extend EntityEmails = todynamic(dynamic_to_json(extract_all(_EmailAddressRegex, dynamic([1]), strcat(tostring(EntityEmails), Entities))))
-        | mv-expand EmailAddress = EntityEmails
-        | extend EmailAddress = tolower(tostring(EmailAddress[0]))
+        | mv-expand EmailAddress = EntityEmails to typeof(string)
         | where isnotempty(EmailAddress)
         | summarize take_any(*) by EmailAddress
         // Parse original address
