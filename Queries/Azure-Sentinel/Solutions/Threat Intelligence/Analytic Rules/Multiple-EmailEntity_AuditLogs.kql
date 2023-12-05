@@ -68,8 +68,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where not(array_length(TargetResources) == 0)
         //| where not(_IndicatorsPrefilterLength < 10000 and not(TargetResources has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
         | extend TargetResourcesEmails = todynamic(dynamic_to_json(extract_all(_EmailAddressRegex, dynamic([1]), tostring(TargetResources))))
-        | mv-expand EmailAddress = TargetResourcesEmails
-        | extend EmailAddress = tolower(tostring(EmailAddress[0]))
+        | mv-expand EmailAddress = TargetResourcesEmails to typeof(string)
         | where isnotempty(EmailAddress)
         | summarize take_any(*) by EmailAddress
         // Parse original address
