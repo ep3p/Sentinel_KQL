@@ -1,0 +1,55 @@
+let query_period = 1d;
+let query_frequency = 1h;
+AWSCloudTrail
+| where TimeGenerated > ago(query_period)
+| where EventName in ("SendCommand", "CreateAssociation", "UpdateAssociation", "CreateAssociationBatch")
+| extend DynamicRequestParameters = todynamic(RequestParameters)
+| mv-expand DynamicRequestParameter = iff(EventName == "CreateAssociationBatch", DynamicRequestParameters["Entries"], DynamicRequestParameters)
+| extend OutputS3BucketName = case(
+    EventName == "SendCommand", tostring(DynamicRequestParameter["OutputS3BucketName"]),
+    EventName in ("CreateAssociation", "UpdateAssociation", "CreateAssociationBatch"), tostring(DynamicRequestParameter["OutputLocation"]["S3Location"]["OutputS3BucketName"]),
+    "")
+| where isnotempty(OutputS3BucketName)
+| join kind=leftouter (
+    AWSCloudTrail
+    | where TimeGenerated > ago(query_frequency)
+    | where EventName == "PutObject"
+    | project
+        BucketName = tostring(todynamic(RequestParameters)["bucketName"]),
+        PutObject_TimeGenerated = TimeGenerated,
+        PutObject_Resources = Resources
+    ) on $left.OutputS3BucketName == $right.BucketName
+| mv-expand Resource = todynamic(PutObject_Resources)
+| where tostring(Resource["type"]) == "AWS::S3::Bucket"
+| extend BucketAccountId = tostring(Resource["accountId"])
+| where RecipientAccountId != BucketAccountId
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    OutputS3BucketName,
+    PutObject_TimeGenerated,
+    PutObject_Resources,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
