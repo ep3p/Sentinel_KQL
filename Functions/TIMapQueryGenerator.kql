@@ -1019,6 +1019,43 @@
                 '0h'
             ,
             "TableAdditionalLets":
+                ```
+                let AKSTables = union
+                    // Choose one in diagnostic settings, AKSAudit events contain AKSAuditAdmin events
+                    AKSAudit,
+                    AKSAuditAdmin;```
+            ,
+            "TableName":
+                'AKSTables'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ', _ResourceId'
+            ,
+            "TableColumns&LookUp":
+                '_ResourceId, PodName, Level, User, SourceIps, UserAgent, Verb, RequestUri, Stage, ObjectRef, ResponseStatus, RequestObject, ResponseObject, Annotations, AuditId'
+            ,
+            "TableCustomEntityExtend":
+                ``````
+            ,
+            "TableExclusion":
+                ``````
+        })
+        ,
+        'Azure_Kubernetes_legacy',
+        dynamic({
+            "TableQueryWait":
+                '0h'
+            ,
+            "TableAdditionalLets":
                 ``````
             ,
             "TableName":
@@ -1048,6 +1085,46 @@
         })
         ,
         'Azure_Key_Vault',
+        dynamic({
+            "TableQueryWait":
+                '0h'
+            ,
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'AZKVAuditLogs'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ```
+                | extend Dynamic_Identity = todynamic(Identity)
+                | extend
+                    CallerObjectId = coalesce(tostring(Dynamic_Identity["claim"]["http://schemas.microsoft.com/identity/claims/objectidentifier"]), tostring(Dynamic_Identity["claim"]["oid"])),
+                    CallerObjectUPN = coalesce(tostring(Dynamic_Identity["claim"]["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn"]), ""),
+                    CallerName = coalesce(tostring(Dynamic_Identity["claim"]["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"]), "")```
+            ,
+            "TableGroupByColumn":
+                ', CallerObjectId, _ResourceId'
+            ,
+            "TableColumns&LookUp":
+                '_ResourceId, OperationName, CallerName, CallerObjectUPN, CallerObjectId, CallerIpAddress, RequestUri, ResultType, ResultSignature, HttpStatusCode, Id, Identity, Properties, CorrelationId'
+            ,
+            "TableCustomEntityExtend":
+                ```,
+                AccountCustomEntity = CallerObjectUPN,
+                //IPCustomEntity = CallerIPAddress```
+            ,
+            "TableExclusion":
+                ``````
+        })
+        ,
+        'Azure_Key_Vault_legacy',
         dynamic({
             "TableQueryWait":
                 '0h'
@@ -1098,6 +1175,47 @@
         })
         ,
         'Azure_Firewall',
+        dynamic({
+            "TableQueryWait":
+                '0h'
+            ,
+            "TableAdditionalLets":
+                ```
+                let AZFWTables = union
+                    // Some kinds of operations could be excluded
+                    AZFWApplicationRule,
+                    AZFWIdpsSignature,
+                    //AZFWNatRule,
+                    AZFWNetworkRule,
+                    AZFWThreatIntel;```
+            ,
+            "TableName":
+                'AZFWTables'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ', SourceIp, DestinationIp'
+            ,
+            "TableColumns&LookUp":
+                ``` Type, FirewallAction, Protocol, SourceIp, SourcePort, DestinationIp, DestinationPort, // TranslatedIp, TranslatedPort,
+                _ResourceId```
+            ,
+            "TableCustomEntityExtend":
+                ``````
+            ,
+            "TableExclusion":
+                ``````
+        })
+        ,
+        'Azure_Firewall_legacy',
         dynamic({
             "TableQueryWait":
                 '0h'
@@ -1234,6 +1352,74 @@
                 ```,
                 //AccountCustomEntity = UserPrincipalName,
                 //IPCustomEntity = IPAddress```
+            ,
+            "TableExclusion":
+                ``````
+        })
+        ,
+        'AppServiceIPSecAuditLogs',
+        dynamic({
+            "TableQueryWait":
+                '0h'
+            ,
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'AppServiceIPSecAuditLogs'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ', _ResourceId'
+            ,
+            "TableColumns&LookUp":
+                'CIp, CsHost, ServiceEndpoint, Result, Details, XForwardedFor, XForwardedHost, _ResourceId'
+            ,
+            "TableCustomEntityExtend":
+                ``````
+            ,
+            "TableExclusion":
+                ``````
+        })
+        ,
+        'AppServiceAuditLogs',
+        dynamic({
+            "TableQueryWait":
+                '0h'
+            ,
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'AppServiceAuditLogs'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ', _ResourceId'
+            ,
+            "TableColumns&LookUp":
+                'Category, OperationName, User, UserDisplayName, UserAddress, Protocol, _ResourceId'
+            ,
+            "TableCustomEntityExtend":
+                ```,
+                //AccountCustomEntity = UserDisplayName,
+                //IPCustomEntity = UserAddress```
             ,
             "TableExclusion":
                 ``````
@@ -1620,6 +1806,23 @@
         'IP', 'Azure_Kubernetes',
         dynamic({
             "TITableLookback":
+                '6h'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where not(ResponseStatus["message"] == "Authentication failed, no credentials provided")
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(log_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | mv-expand IPAddress = SourceIps to typeof(string)
+                | where isnotempty(IPAddress) and not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'Azure_Kubernetes_legacy',
+        dynamic({
+            "TITableLookback":
                 '4h'
             ,
             "TITableAdditionalLets":
@@ -1654,6 +1857,23 @@
             ,
             "TITableConditions":
                 ```
+                | where isnotempty(CallerIpAddress)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIpAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | extend IPAddress = trim_start("::ffff:", CallerIpAddress)
+                | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'Azure_Key_Vault_legacy',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
                 | where isnotempty(CallerIPAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(CallerIPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = trim_start("::ffff:", CallerIPAddress)
@@ -1662,6 +1882,35 @@
         })
         ,
         'IP', 'Azure_Firewall',
+        dynamic({
+            "TITableLookback":
+                '24h'
+            ,
+            "TITableAdditionalLets":
+                ```
+                let _WAFAddresses = toscalar(
+                    _GetWatchlist('Service-PrivateCorporateServices')
+                    | where Service == "WAF"
+                    | summarize make_list(IPAddress)
+                );```
+            ,
+            "TITableConditions":
+                ```
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(SourceIp has_any (_IndicatorsPrefilter) or DestinationIp has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | project-rename FirewallAction = Action
+                // Remove special cases where WAF is involved
+                //| where not(DestinationIp in (_WAFAddresses))
+                | mv-expand IPAddress = pack_array(SourceIp, DestinationIp) to typeof(string) //, TranslatedIp)
+                | where isnotempty(IPAddress)
+                // Remove denied traffic where the source was remote
+                | where not(IPAddress == SourceIp and FirewallAction == "Deny")
+                | where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_private(IPAddress))
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        //// Remove indicators of certain type
+        //| where not(todynamic(AdditionalInformation)["value_type"] in ("domain", "url"))
+        ,
+        'IP', 'Azure_Firewall_legacy',
         dynamic({
             "TITableLookback":
                 '3h'
@@ -1769,6 +2018,40 @@
                 | where isnotempty(IPAddress)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(InitiatedBy has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'AppServiceIPSecAuditLogs',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(CIp)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(CIp has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                | extend IPAddressValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]%]+)(%\d+)?\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), CIp)[0]
+                | extend IPAddress = tostring(IPAddressValues[0])
+                | where isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'AppServiceAuditLogs',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(UserAddress) and (isnotempty(parse_ipv4(UserAddress)) or isnotempty(parse_ipv6(UserAddress)))
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(UserAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
+                //| where not(_IndicatorsLength < 1000000 and not(UserAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
+                | extend IPAddress = UserAddress```
         })
         ,
         'File_Hash', 'SecurityEvent',
