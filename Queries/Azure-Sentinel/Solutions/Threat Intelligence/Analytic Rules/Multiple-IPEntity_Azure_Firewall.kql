@@ -41,7 +41,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where isnotempty(IPAddress)
         | extend TI_IPAddress = IPAddress
         // Remove indicators from specific sources
-        | where not(AdditionalInformation has_any (_TIExcludedSources))
+        | where not(AdditionalInformation has_any (_TIExcludedSources) or Description has_any (_TIExcludedSources))
         // Remove indicators of certain type
         //| where not(todynamic(AdditionalInformation)["value_type"] in ("domain", "url"))
         // Remove excluded indicators with benign properties
