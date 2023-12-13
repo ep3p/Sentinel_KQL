@@ -30,7 +30,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where isnotempty(FileHashValue)
         | extend FileHashValue = toupper(FileHashValue)
         // Remove indicators from specific sources
-        | where not(AdditionalInformation has_any (_TIExcludedSources))
+        | where not(AdditionalInformation has_any (_TIExcludedSources) or Description has_any (_TIExcludedSources))
         // Remove excluded indicators with benign properties
         | join kind=leftanti _TIBenignProperty on IndicatorId, $left.FileHashValue == $right.BenignProperty
         // Deduplicate indicators by FileHashValue column, equivalent to using join kind=innerunique afterwards
