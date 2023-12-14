@@ -1884,7 +1884,7 @@
         'IP', 'Azure_Firewall',
         dynamic({
             "TITableLookback":
-                '24h'
+                '1d'
             ,
             "TITableAdditionalLets":
                 ```
