@@ -230,6 +230,42 @@
                 ``````
         })
         ,
+        'UrlClickEvents',
+        dynamic({
+            "TableQueryWait":
+                '0h'
+            ,
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'UrlClickEvents'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ```
+                | project-rename OriginalUrl = Url```
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ', NetworkMessageId'
+            ,
+            "TableColumns&LookUp":
+                'Workload, AccountUpn, IPAddress, ActionType, IsClickedThrough, OriginalUrl, UrlChain, NetworkMessageId'
+            ,
+            "TableCustomEntityExtend":
+                ```,
+                AccountCustomEntity = AccountUpn,
+                //IPCustomEntity = IPAddress```
+            ,
+            "TableExclusion":
+                ``````
+        })
+        ,
         'Syslog',
         dynamic({
             "TableQueryWait":
@@ -1426,6 +1462,23 @@
         })
     ];
     let _IndicatorXTableDatatable = datatable(IndicatorType:string, TableType:string, TITableDictionary:dynamic) [
+        'URL', 'UrlClickEvents',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(UrlChain has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
+                | mv-expand Url = array_concat(pack_array(OriginalUrl), todynamic(UrlChain)) to typeof(string)
+                | where isnotempty(Url)
+                | extend Url = trim_end(@"\/", Url)
+                //| where not(_IndicatorsLength < 1000000 and not(Url in (toscalar(_Indicators | summarize make_list(Url))))) // "in" limit 1.000.000```
+        })
+        ,
         'URL', 'Syslog',
         dynamic({
             "TITableLookback":
@@ -1556,6 +1609,21 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | extend IPAddress = trim_start("::ffff:", RemoteIp)
                 | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'UrlClickEvents',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where not(isempty(IPAddress))
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(IPAddress has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
@@ -2308,6 +2376,32 @@
                 | mv-expand Domain = array_concat(todynamic(RemoteDnsQuestions), todynamic(RemoteDnsCanonicalNames)) to typeof(string)
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(Domain has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
                 | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = tolower(Domain)
+                //| where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
+                | extend SplitLevelDomains = split(OriginalDomain, ".")
+                | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
+                | extend Domain = strcat_array(array_slice(SplitLevelDomains, Level, -1), ".")
+                //| where not(_IndicatorsLength < 1000000 and not(Domain in (toscalar(_Indicators | summarize make_list(Domain))))) // "in" limit 1.000.000```
+        })
+        ,
+        'Domain', 'UrlClickEvents',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ```
+                let _DomainRegex = toscalar(
+                    _GetWatchlist('RegEx-SingleRegularExpressions')
+                    | where UseCase == "Threat Intelligence Indicator Domain"
+                    | project RegEx
+                );```
+            ,
+            "TITableConditions":
+                ```
+                | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), strcat(OriginalUrl, UrlChain))))
+                | mv-expand Domain = Domains to typeof(string)
+                | where isnotempty(Domain)
+                | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(tostring(split(OriginalDomain, ".")[-1]) in (_IndicatorsPrefilter)))
                 | extend SplitLevelDomains = split(OriginalDomain, ".")
                 | mv-expand Level = range(0, array_length(SplitLevelDomains)-2) to typeof(int)
