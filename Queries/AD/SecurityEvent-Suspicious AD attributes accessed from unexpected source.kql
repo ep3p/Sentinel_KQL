@@ -52,7 +52,7 @@ SecurityEvent
     SubjectLogonId = make_set_if(SubjectLogonId, isnotempty(SubjectLogonId), 20),
     Properties = make_set_if(Properties, isnotempty(Properties), 50),
     take_any(Activity, OperationType, AccountType, SubjectUserName, AccessList, EventOriginId)
-    by Computer, Account, AccessMask, ObjectType, bin(TimeGenerated, 1h)
+    by Computer, Account, AccessMask, ObjectType
 | where ObjectNameCount > 10
 | where not(ObjectNameCount < 100 and ObjectType has_any ("bf967aba-0de6-11d0-a285-00aa003049e2", "bf967a86-0de6-11d0-a285-00aa003049e2")) // User Computer
 | lookup kind=leftouter _Identities on SubjectUserName
@@ -115,7 +115,7 @@ SecurityEvent
     Properties = make_set(Properties),
     PropertiesTranslated = make_set(PropertiesTranslated),
     take_any(AccountType, Activity, OperationType, GroupMembership)
-    by Account, bin(TimeGenerated, 1h)
+    by Account
 | where EndTime > ago(query_frequency)
 | where not(array_length(ObjectTypes) == 1 and ObjectTypes has_any ("bf967aba-0de6-11d0-a285-00aa003049e2", "bf967a86-0de6-11d0-a285-00aa003049e2", "bf967a9c-0de6-11d0-a285-00aa003049e2")) // User Computer Group
 | project
