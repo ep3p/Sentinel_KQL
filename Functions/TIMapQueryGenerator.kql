@@ -1882,7 +1882,7 @@
             "TITableConditions":
                 ```
                 | where not(ResponseStatus["message"] == "Authentication failed, no credentials provided")
-                | where not(ResponseStatus["message"] == "Unauthorized")
+                | where not(ResponseStatus["reason"] == "Unauthorized")
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(log_s has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = SourceIps to typeof(string)
                 | where isnotempty(IPAddress) and not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
