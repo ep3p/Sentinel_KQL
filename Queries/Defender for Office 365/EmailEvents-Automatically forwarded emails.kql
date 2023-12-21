@@ -1,0 +1,145 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let bin_period = 1h;
+let forwarded_threshold = 10;
+let _ForwardToDomains = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ForwardToDomain"
+    | summarize make_list(DestinationAddress)
+);
+let _ForwardingRule =
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ForwardingRule"
+    | project Original_RecipientEmailAddress = SourceAddress, Forwarded_RecipientEmailAddress = DestinationAddress
+;
+EmailEvents
+| where TimeGenerated > ago(query_period)
+| where EmailDirection == "Outbound"
+| where not(SenderMailFromAddress == RecipientEmailAddress)
+| project
+    Forwarded_EmailClusterId = EmailClusterId,
+    Forwarded_TimeGenerated = TimeGenerated,
+    Forwarded_SenderFromAddress = SenderFromAddress,
+    Forwarded_SenderMailFromAddress = SenderMailFromAddress,
+    Forwarded_SenderIPv4 = SenderIPv4,
+    Forwarded_SenderIPv6 = SenderIPv6,
+    Forwarded_RecipientEmailAddress = RecipientEmailAddress,
+    Forwarded_RecipientDomain = tostring(split(RecipientEmailAddress, "@")[1]),
+    Forwarded_Subject = Subject,
+    Forwarded_DeliveryAction = DeliveryAction,
+    Forwarded_DeliveryLocation = DeliveryLocation,
+    Forwarded_InternetMessageId = InternetMessageId,
+    Forwarded_NetworkMessageId = NetworkMessageId
+| where not(Forwarded_RecipientDomain in (_ForwardToDomains))
+| mv-expand AuxiliarSender = pack_array(Forwarded_SenderFromAddress)//, Forwarded_SenderMailFromAddress)
+    to typeof(string)
+| mv-expand BinTimeGenerated = range(bin(Forwarded_TimeGenerated, bin_period) - bin_period, bin(Forwarded_TimeGenerated, bin_period), bin_period) to typeof(datetime)
+| join kind=inner (
+    EmailEvents
+    | where TimeGenerated > ago(query_period)
+    | where not(EmailDirection == "Outbound")
+    | where not(SenderFromAddress == RecipientEmailAddress or SenderMailFromAddress == RecipientEmailAddress)
+    | project
+        Original_EmailClusterId = EmailClusterId,
+        Original_TimeGenerated = TimeGenerated,
+        Original_SenderFromAddress = SenderFromAddress,
+        Original_SenderFromDomain = SenderFromDomain,
+        Original_SenderMailFromAddress = SenderMailFromAddress,
+        Original_SenderMailFromDomain = SenderMailFromDomain,
+        Original_RecipientEmailAddress = RecipientEmailAddress,
+        Original_Subject = Subject,
+        Original_InternetMessageId = InternetMessageId,
+        Original_NetworkMessageId = NetworkMessageId,
+        BinTimeGenerated = bin(TimeGenerated, bin_period)
+    // EmailClusterId might be enough to detect automatic forwarding using Power Automate Flows
+    ) on BinTimeGenerated, $left.AuxiliarSender == $right.Original_RecipientEmailAddress//, $left.Forwarded_EmailClusterId == $right.Original_EmailClusterId
+| project-away AuxiliarSender, BinTimeGenerated
+| where Forwarded_TimeGenerated >= Original_TimeGenerated
+| summarize hint.shufflekey=Original_NetworkMessageId arg_min(Forwarded_TimeGenerated, *) by Original_NetworkMessageId, Original_RecipientEmailAddress, Forwarded_RecipientEmailAddress
+| where not(Original_SenderFromDomain == Forwarded_RecipientDomain or Original_SenderMailFromDomain == Forwarded_RecipientDomain)
+| extend MatchingEmailClusterId = Forwarded_EmailClusterId == Original_EmailClusterId
+| where MatchingEmailClusterId
+    or (isnotempty(Original_Subject) and Forwarded_Subject has Original_Subject)
+| join hint.strategy=shuffle kind=leftouter (
+    EmailEvents
+    | where TimeGenerated > ago(query_period)
+    | summarize Forwarded_Recipients = make_set(RecipientEmailAddress) by Forwarded_NetworkMessageId = NetworkMessageId
+    ) on Forwarded_NetworkMessageId
+| project-away Forwarded_NetworkMessageId*
+| where not(Forwarded_Recipients has Original_SenderFromAddress or Forwarded_Recipients has Original_SenderMailFromAddress)
+| extend ForwardingDelay = bin(Forwarded_TimeGenerated - Original_TimeGenerated, 1m)
+| summarize
+    StartTime = min(Original_TimeGenerated),
+    EndTime = max(Forwarded_TimeGenerated),
+    ForwardingDelayCount = count(),
+    Forwarded_DeliveryAction = make_set(Forwarded_DeliveryAction, 25),
+    Forwarded_DeliveryLocation = make_set(Forwarded_DeliveryLocation, 25),
+    MatchingEmailClusterId = countif(MatchingEmailClusterId),
+    Original_SenderFromAddress = make_set(Original_SenderFromAddress, 25),
+    Original_SenderMailFromAddress = make_set(Original_SenderMailFromAddress, 25),
+    Original_Subject = make_set(Original_Subject, 25),
+    Original_InternetMessageId = make_set(Original_InternetMessageId, 25),
+    Forwarded_SenderFromAddress = make_set(Forwarded_SenderFromAddress, 25),
+    Forwarded_SenderMailFromAddress = make_set(Forwarded_SenderMailFromAddress, 25),
+    Forwarded_SenderIPv4 = make_set_if(Forwarded_SenderIPv4, isnotempty(Forwarded_SenderIPv4), 25),
+    Forwarded_SenderIPv6 = make_set_if(Forwarded_SenderIPv6, isnotempty(Forwarded_SenderIPv6), 25),
+    Forwarded_Subject = make_set(Forwarded_Subject, 25),
+    Forwarded_InternetMessageId = make_set(Forwarded_InternetMessageId, 25),
+    take_any(Forwarded_RecipientDomain)
+    by ForwardingDelay, Original_RecipientEmailAddress, Forwarded_RecipientEmailAddress
+| where (ForwardingDelay <= 5m and ForwardingDelayCount > 2)
+    or (ForwardingDelay % 5m == 0 and ForwardingDelayCount > 2)
+    or (ForwardingDelayCount > 5)
+| summarize
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    ForwardedCount = sum(ForwardingDelayCount),
+    ForwardingDelays = make_bag(bag_pack(tostring(ForwardingDelay), ForwardingDelayCount)),
+    FrequenciesList = array_concat(make_list(ForwardingDelayCount), pack_array(1)),
+    Forwarded_DeliveryAction = array_sort_asc(make_set(Forwarded_DeliveryAction, 25)),
+    Forwarded_DeliveryLocation = array_sort_asc(make_set(Forwarded_DeliveryLocation, 25)),
+    MatchingEmailClusterId = sum(MatchingEmailClusterId),
+    Original_SenderFromAddress = array_sort_asc(make_set(Original_SenderFromAddress, 25)),
+    Original_SenderMailFromAddress = array_sort_asc(make_set(Original_SenderMailFromAddress, 25)),
+    Original_Subject = array_sort_asc(make_set(Original_Subject, 25)),
+    Original_InternetMessageId = array_sort_asc(make_set(Original_InternetMessageId, 25)),
+    Forwarded_SenderFromAddress = array_sort_asc(make_set(Forwarded_SenderFromAddress, 25)),
+    Forwarded_SenderMailFromAddress = array_sort_asc(make_set(Forwarded_SenderMailFromAddress, 25)),
+    Forwarded_SenderIPv4 = array_sort_asc(make_set(Forwarded_SenderIPv4, 25)),
+    Forwarded_SenderIPv6 = array_sort_asc(make_set(Forwarded_SenderIPv6, 25)),
+    Forwarded_Subject = array_sort_asc(make_set(Forwarded_Subject, 25)),
+    Forwarded_InternetMessageId = array_sort_asc(make_set(Forwarded_InternetMessageId, 25)),
+    take_any(Forwarded_RecipientDomain)
+    by Original_RecipientEmailAddress, Forwarded_RecipientEmailAddress
+| where ForwardedCount >= forwarded_threshold
+| join kind=leftanti _ForwardingRule on Original_RecipientEmailAddress, Forwarded_RecipientEmailAddress
+| where EndTime > ago(query_frequency)
+// | where not(array_length(Original_Subject) == 1 and array_length(Forwarded_Subject) == 1)
+// | mv-apply Frequency = FrequenciesList to typeof(int) on (
+//     extend AuxProb = Frequency / toreal(ForwardedCount)
+//     | summarize ForwardingConsistency = -sum(AuxProb*log2(AuxProb))
+//     )
+// | where ForwardingConsistency <= 1
+| extend Original_SenderFromAddressCount = array_length(Original_SenderFromAddress)
+| project
+    StartTime,
+    EndTime,
+    Original_RecipientEmailAddress,
+    Forwarded_RecipientEmailAddress,
+    Forwarded_RecipientDomain,
+    ForwardedCount,
+    ForwardingDelays,
+    MatchingEmailClusterId,
+    Forwarded_DeliveryAction,
+    Forwarded_DeliveryLocation,
+    Forwarded_SenderIPv4,
+    Forwarded_SenderIPv6,
+    Original_SenderFromAddressCount,
+    Original_SenderFromAddress,
+    Original_SenderMailFromAddress,
+    Original_Subject,
+    Forwarded_SenderFromAddress,
+    Forwarded_SenderMailFromAddress,
+    Forwarded_Subject,
+    Original_InternetMessageId,
+    Forwarded_InternetMessageId
