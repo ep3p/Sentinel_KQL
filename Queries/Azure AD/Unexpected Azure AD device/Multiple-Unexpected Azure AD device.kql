@@ -49,11 +49,12 @@ let _AddDeleteDeviceEvents =
     | evaluate bag_unpack(BagToUnpack, columnsConflict = 'replace_source')
     | where not(OperationName == "Add device" and column_ifexists("DeviceTrustType", "") in (_ExpectedTrustTypes))
     | extend
-        AutopilotZTDID = extract(@"ZTDID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AutopilotZTDID = extract(@"ZTDID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         AccountObjectId = extract(@"USER\-GID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        ["USER-HWID"] = extract(@"USER\-HWID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        IntuneOrderId = extract(@"OrderId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        AzureResourceId = extract(@"AzureResourceId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
+        ["USER-GID"] = extract(@"USER\-GID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        ["USER-HWID"] = extract(@"USER\-HWID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        IntuneOrderId = extract(@"OrderId:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AzureResourceId = extract(@"AzureResourceId:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
     | lookup kind=leftouter _UserInfo on AccountObjectId
 ;
 let _AddObjectIds = toscalar(
@@ -86,11 +87,12 @@ let _UpdateDeviceEvents =
     )
     | evaluate bag_unpack(BagToUnpack, columnsConflict = 'replace_source')
     | extend
-        AutopilotZTDID = extract(@"ZTDID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AutopilotZTDID = extract(@"ZTDID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         AccountObjectId = extract(@"USER\-GID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        ["USER-HWID"] = extract(@"USER\-HWID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        IntuneOrderId = extract(@"OrderId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        AzureResourceId = extract(@"AzureResourceId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
+        ["USER-GID"] = extract(@"USER\-GID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        ["USER-HWID"] = extract(@"USER\-HWID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        IntuneOrderId = extract(@"OrderId:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AzureResourceId = extract(@"AzureResourceId:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
     | lookup kind=leftouter _UserInfo on AccountObjectId
 ;
 let _RegisterUserToDeviceEvents =
