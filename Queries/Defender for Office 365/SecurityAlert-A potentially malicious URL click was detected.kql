@@ -12,7 +12,7 @@ SecurityAlert
 | extend Domain = tostring(extract(_URLRegex, 3, URL))
 | extend SLD = strcat_array(array_slice(split(Domain, "."), -2, -1), ".")
 // Clean Entities
-| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\,{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
+| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}\,|\,\{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
 | summarize
     TimeGenerated = min(TimeGenerated),
     StartTime = min(StartTime),
