@@ -6,7 +6,7 @@ SecurityAlert
     IPAddress = tostring(ExtendedProperties["IP Address"]),
     ResourceType = tostring(ExtendedProperties["resourceType"])
 // Clean Entities
-| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\,{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
+| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}\,|\,\{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
 | summarize
     TimeGenerated = min(TimeGenerated),
     StartTime = min(StartTime),
