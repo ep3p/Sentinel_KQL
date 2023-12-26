@@ -22,7 +22,7 @@ let _TorAddressAlerts = materialize(
         AlertName,
         Description,
         AlertSeverity,
-        Status,
+        //Status,
         Tactics,
         Techniques,
         Entities,
@@ -65,6 +65,7 @@ let _TorAddressAlerts = materialize(
             | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
             | extend TimeReceived = _TimeReceived
             )
+        | invoke UnifySignInLogs()
         | summarize
             arg_max(TimeReceived, *),
             MFASuccess_TimeGenerated = minif(TimeGenerated, ConditionalAccessStatus == "success" and AuthenticationRequirement == "multiFactorAuthentication")
@@ -79,6 +80,7 @@ let _TorAddressAlerts = materialize(
             Location,
             ResultType,
             ResultDescription,
+            Status,
             ClientAppUsed,
             AppDisplayName,
             ResourceDisplayName,
@@ -113,7 +115,7 @@ _TorAddressAlerts
 | extend RecentlyConfiguredMFA = UserId in (_UntrustedUserIds)
 | extend BenignAlert = case(
         // Remove cases where Defender for Cloud Apps considers the alert solved and the account had MFA configured long ago
-        RiskDetail == "userPassedMFADrivenByRiskBasedPolicy" and RiskState == "remediated" and not(RecentlyConfiguredMFA), true,
+        RiskDetail == "userPassedMFADrivenByRiskBasedPolicy" and RiskState == "remediated" and not(RecentlyConfiguredMFA) and (isnotempty(Status) and not(todynamic(Status)["additionalDetails"] == "MFA requirement satisfied by claim in the token")), true,
         false
     )
 // | where not(BenignAlert and AlertSeverity != "High")
@@ -140,6 +142,7 @@ _TorAddressAlerts
     Location,
     ResultType,
     ResultDescription,
+    Status,
     ClientAppUsed,
     AppDisplayName,
     ResourceDisplayName,
