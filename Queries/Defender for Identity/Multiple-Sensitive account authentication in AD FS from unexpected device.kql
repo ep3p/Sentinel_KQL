@@ -5,6 +5,12 @@ let _ExpectedDomain = toscalar(
     | where Activity == "DomainJoinedLDAP"
     | summarize make_list(Auxiliar)
 );
+let _ExpectedAuthentications = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "SensitiveAccountUnexpectedDeviceADFSAuth"
+    | summarize RegEx = make_set(strcat(regex_quote(ActorPrincipalName), SourceResource))
+    | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
+);
 let _Identities =
     IdentityInfo
     | where TimeGenerated > ago(query_period)
@@ -30,11 +36,13 @@ IdentityLogonEvents
 | where SourceSystem has "ActiveDirectory"
     or UserAccountControl has "PasswordNeverExpires"
     or (isempty(SourceSystem) and isempty(UserAccountControl))
+| extend DeviceName = iff(array_length(DeviceNamesSample) == 1, tostring(DeviceNamesSample[0]), "")
+| where not(strcat(AccountUpn, DeviceName) matches regex _ExpectedAuthentications)
 | project
     TimeGenerated,
     AccountUpn,
     DeviceNames,
-    DeviceName = iff(array_length(DeviceNamesSample) == 1, tostring(DeviceNamesSample[0]), ""),
+    DeviceName,
     LogonTypes,
     Protocols,
     UserAccountControl,
