@@ -1,0 +1,39 @@
+SecurityAlert
+| where AlertName has "Logon activity from a potentially harmful application" and ProviderName != "ASI Scheduled Alerts"
+| extend ExtendedProperties = todynamic(ExtendedProperties)
+| extend
+    CompromisedEntity = tostring(ExtendedProperties["CompromisedEntity"]),
+    ClientApplication = tostring(ExtendedProperties["Client application"]),
+    ClientPrincipalName = tostring(ExtendedProperties["Client principal name"]),
+    ClientIPAddress = tostring(ExtendedProperties["Client IP address"])
+// Clean Entities
+| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}\,|\,\{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
+| summarize
+    TimeGenerated = min(TimeGenerated),
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
+    CompromisedEntities = make_set(CompromisedEntity, 250),
+    ClientPrincipalNames = make_set(ClientPrincipalName, 250),
+    ClientIPAddresses = make_set(ClientIPAddress, 250),
+    ResourceIds = make_set(tolower(ResourceId), 250),
+    AlertLinks = make_set(AlertLink, 250),
+    Entities = make_set(todynamic(Entities)),
+    take_any(RemediationSteps, Tactics, Techniques)
+    by AlertName, AlertSeverity, Description, ClientApplication
+| project
+    TimeGenerated,
+    AlertName,
+    AlertSeverity,
+    Description,
+    RemediationSteps,
+    ResourceIds,
+    StartTime,
+    EndTime,
+    ClientApplication,
+    ClientIPAddresses,
+    ClientPrincipalNames,
+    CompromisedEntities,
+    AlertLinks,
+    Tactics,
+    Techniques,
+    Entities
