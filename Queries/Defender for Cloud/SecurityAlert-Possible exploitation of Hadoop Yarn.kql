@@ -7,7 +7,7 @@ SecurityAlert
     Process = tostring(ExtendedProperties["Suspicious Process"]),
     CommandLine = tostring(ExtendedProperties["Suspicious Command Line"])
 // Clean Entities
-| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\,{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
+| extend Entities = replace_regex(Entities, @'(\,\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}|\"\w+\"\:\{\"\$ref\"\:\"\d+\"\}\,|\,\{\"\$ref\"\:\"\d+\"\})|\"\$id\"\:\"\d+\"\,', '')
 | summarize
     TimeGenerated = min(TimeGenerated),
     StartTime = min(StartTime),
