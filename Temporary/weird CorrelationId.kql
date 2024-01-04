@@ -1,0 +1,2 @@
+SigninLogs
+| where CorrelationId == "ff000000-0000-0000-0000-000000000000" //AppId == "22098786-6e16-43cc-a27d-191a01a1e3b5" // Microsoft To-Do client
