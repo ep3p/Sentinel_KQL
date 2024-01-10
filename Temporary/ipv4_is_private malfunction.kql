@@ -1,0 +1,14 @@
+DnsEvents
+| extend QueriedIPAddress = extract(strcat(@"((?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$"), 1, Name)
+| where not(isempty(QueriedIPAddress) or QueriedIPAddress == "127.0.0.1")
+| distinct Name, QueriedIPAddress
+| project
+            Name,
+            QueriedIPAddress,
+ Col1 =     parse_ipv4(QueriedIPAddress),
+ Col2 =     isnotempty(parse_ipv4(QueriedIPAddress)),
+ Col3 =     ipv4_is_private(QueriedIPAddress),
+ Col4 =     isnotempty(parse_ipv4(QueriedIPAddress)) and ipv4_is_private(QueriedIPAddress),
+ Col5 = not(isnotempty(parse_ipv4(QueriedIPAddress)) and ipv4_is_private(QueriedIPAddress))
+| where not(isnotempty(parse_ipv4(QueriedIPAddress)) and ipv4_is_private(QueriedIPAddress))
+// | where Col5
