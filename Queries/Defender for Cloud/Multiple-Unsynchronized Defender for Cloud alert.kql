@@ -1,0 +1,47 @@
+AzureActivity
+| where ResourceProviderValue =~ "MICROSOFT.SECURITY" and OperationNameValue =~ "Microsoft.Security/locations/alerts/activate/action"
+| extend PreferenceInteger = case(
+    ResourceProviderValue == "Microsoft.Security", 1,
+    ResourceProviderValue == "MICROSOFT.SECURITY", 0,
+    -1
+    )
+| summarize hint.shufflekey=CorrelationId
+    PropertiesDynamic = make_bag(pack(ResourceProviderValue, todynamic(Properties))),
+    EventDataId = make_bag(pack(ResourceProviderValue, EventDataId)),
+    take_any(TenantId, SourceSystem, CategoryValue, SubscriptionId, Type),
+    arg_min(PreferenceInteger, Properties_d, EventSubmissionTimestamp),
+    arg_max(PreferenceInteger, Level, OperationNameValue, OperationId, ResourceGroup, ResourceProviderValue, ActivityStatusValue, OperationName, ActivityStatus, Category, ResourceId, ResourceProvider, Resource)
+    by CorrelationId, TimeGenerated, _ResourceId
+| project-away PreferenceInteger*
+| join kind=leftanti (
+    SecurityAlert
+    | where ProductName == "Azure Security Center"
+    | distinct VendorOriginalId
+    ) on $left.CorrelationId == $right.VendorOriginalId
+| extend Key = tostring(bag_keys(PropertiesDynamic)[0])
+| extend
+    AlertLink = strcat(
+    @"https://portal.azure.com/#blade/Microsoft_Azure_Security_AzureDefenderForData/AlertBlade/alertId/",
+    CorrelationId,
+    "/subscriptionId/",
+    tolower(tostring(PropertiesDynamic[Key]["subscriptionId"])),
+    "/resourceGroup/",
+    tolower(tostring(PropertiesDynamic[Key]["resourceGroup"])),
+    "/referencedFrom/alertDeepLink/location/",
+    tostring(split(tostring(PropertiesDynamic[Key]["resource"]), "/")[0])
+    ),
+    AlertTitle = tostring(PropertiesDynamic[Key]["eventName"]),
+    AlertSeverity = tostring(todynamic(tostring(PropertiesDynamic[Key]["eventProperties"]))["severity"])
+| project
+    TimeGenerated,
+    ResourceProviderValue,
+    SubscriptionId,
+    ResourceGroup,
+    OperationNameValue,
+    AlertTitle,
+    AlertSeverity,
+    AlertLink,
+    CorrelationId,
+    PropertiesDynamic,
+    EventDataId,
+    _ResourceId
