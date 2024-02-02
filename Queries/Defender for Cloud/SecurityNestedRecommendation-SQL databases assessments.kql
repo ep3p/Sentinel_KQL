@@ -1,0 +1,51 @@
+let query_period = 120d;
+SecurityNestedRecommendation
+| where TimeGenerated > ago(query_period) and ParentRecommendationId in ("82e20e14-edc5-4373-bfc4-f13121257c37", "f97aa83c-9b63-4f9a-99f6-b22c4398f936")
+| summarize hint.strategy=shuffle
+    StartSubAssessment = min(SubAssessmentTimeGeneration),
+    EndSubAssessment = arg_max(SubAssessmentTimeGeneration, *)
+    by AssessedResourceId, VulnerabilityId
+| extend UpperCamelCase = isnotempty(AdditionalData["AssessedResourceType"])
+| extend
+    Keys = iff(UpperCamelCase, dynamic(null), extract_all(@'(\"[^\"]+\"\:)', tostring(AdditionalData))),
+    Initials = iff(UpperCamelCase, dynamic(null), extract_all(@'(\".)[^\"]*\"\:', tostring(AdditionalData)))
+| extend AdditionalData = iff(UpperCamelCase,
+    AdditionalData,
+    todynamic(replace_strings(
+        tostring(AdditionalData),
+        Keys,
+        todynamic(replace_strings(
+            tostring(Keys),
+            Initials,
+            todynamic(toupper(Initials))
+            ))
+        ))
+    )
+| join hint.remote=local kind=leftouter (
+    arg("").ResourceContainers
+    | where type == "microsoft.resources/subscriptions"
+    | project RecommendationSubscriptionId = subscriptionId, RecommendationSubscriptionName = name
+    ) on RecommendationSubscriptionId
+| project
+    StartSubAssessment,
+    EndSubAssessment,
+    Assessment_Age = bin(EndSubAssessment - StartSubAssessment, 1d)/1d,
+    IsSnapshot,
+    ParentRecommendationId,
+    RecommendationState,
+    Cause,
+    RecommendationSeverity,
+    Category,
+    RecommendationName,
+    Description,
+    Impact,
+    RecommendationSubscriptionId = coalesce(RecommendationSubscriptionName, RecommendationSubscriptionId),
+    ResourceGroup,
+    ResourceName = tostring(split(AssessedResourceId, "/")[-3]),
+    DatabaseName = tostring(split(AssessedResourceId, "/")[-1]),
+    AssessedResourceId,
+    VulnerabilityId,
+    Benchmarks = todynamic(replace_string(tostring(AdditionalData["Benchmarks"]), '"$type":"additionalData/benchmark",', "")),
+    Query = tostring(AdditionalData["Query"]),
+    ResourceType = tostring(AdditionalData["Type"]),
+    ResourceLocation = tostring(coalesce(ResourceDetails["Source"], ResourceDetails["source"]))
