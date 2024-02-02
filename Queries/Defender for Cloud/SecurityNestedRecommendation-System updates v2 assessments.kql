@@ -1,0 +1,33 @@
+let query_period = 120d;
+SecurityNestedRecommendation
+| where TimeGenerated > ago(query_period) and ParentRecommendationId in ("e1145ab1-eb4f-43d8-911b-36ddf771d13f")
+| summarize hint.strategy=shuffle
+    StartSubAssessment = min(SubAssessmentTimeGeneration),
+    EndSubAssessment = arg_max(SubAssessmentTimeGeneration, *)
+    by AssessedResourceId, VulnerabilityId
+| join hint.remote=local kind=leftouter (
+    arg("").ResourceContainers
+    | where type == "microsoft.resources/subscriptions"
+    | project RecommendationSubscriptionId = subscriptionId, RecommendationSubscriptionName = name
+    ) on RecommendationSubscriptionId
+| project
+    StartSubAssessment,
+    EndSubAssessment,
+    Assessment_Age = bin(EndSubAssessment - StartSubAssessment, 1d)/1d,
+    IsSnapshot,
+    ParentRecommendationId,
+    RecommendationState,
+    Cause,
+    RecommendationSeverity,
+    Category,
+    RecommendationName,
+    Description,
+    Impact,
+    RecommendationSubscriptionId = coalesce(RecommendationSubscriptionName, RecommendationSubscriptionId),
+    ResourceGroup,
+    ResourceName = tostring(split(AssessedResourceId, "/")[-1]),
+    AssessedResourceId,
+    VulnerabilityId,
+    OsType = tostring(AdditionalData["Data"]["OsType"]),
+    OsVersion = tostring(AdditionalData["Data"]["Version"]),
+    ResourceLocation = tostring(coalesce(ResourceDetails["Source"], ResourceDetails["source"]))
