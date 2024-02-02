@@ -1,0 +1,53 @@
+let query_period = 120d;
+SecurityNestedRecommendation
+| where TimeGenerated > ago(query_period) and ParentRecommendationId in ("c476dc48-8110-4139-91af-c8d940896b98")
+| summarize hint.strategy=shuffle
+    StartSubAssessment = min(SubAssessmentTimeGeneration),
+    EndSubAssessment = arg_max(SubAssessmentTimeGeneration, *)
+    by AssessedResourceId, VulnerabilityId
+| extend UpperCamelCase = isnotempty(AdditionalData["AssessedResourceType"])
+| extend
+    Keys = iff(UpperCamelCase, dynamic(null), extract_all(@'(\"[^\"]+\"\:)', tostring(AdditionalData))),
+    Initials = iff(UpperCamelCase, dynamic(null), extract_all(@'(\".)[^\"]*\"\:', tostring(AdditionalData)))
+| extend AdditionalData = iff(UpperCamelCase,
+    AdditionalData,
+    todynamic(replace_strings(
+        tostring(AdditionalData),
+        Keys,
+        todynamic(replace_strings(
+            tostring(Keys),
+            Initials,
+            todynamic(toupper(Initials))
+            ))
+        ))
+    )
+| join hint.remote=local kind=leftouter (
+    arg("").ResourceContainers
+    | where type == "microsoft.resources/subscriptions"
+    | project RecommendationSubscriptionId = subscriptionId, RecommendationSubscriptionName = name
+    ) on RecommendationSubscriptionId
+| project
+    StartSubAssessment,
+    EndSubAssessment,
+    Assessment_Age = bin(EndSubAssessment - StartSubAssessment, 1d)/1d,
+    IsSnapshot,
+    ParentRecommendationId,
+    RecommendationState,
+    Cause,
+    RecommendationSeverity,
+    Category,
+    RecommendationName,
+    Description,
+    Impact,
+    RecommendationSubscriptionId = coalesce(RecommendationSubscriptionName, RecommendationSubscriptionId),
+    ResourceGroup,
+    ResourceName = tostring(coalesce(split(AssessedResourceId, "/")[-1], ResourceDetails["MachineName"], ResourceDetails["machineName"])),
+    AssessedResourceId,
+    VulnerabilityId,
+    RuleType = tostring(AdditionalData["Data"]["RuleType"]),
+    ConfigurationBaselineId = tostring(coalesce(AdditionalData["Data"]["Azid"], AdditionalData["Data"]["AZID"])),
+    VulnerabilityDescription = tostring(AdditionalData["Data"]["Vulnerability"]),
+    DataSourceType = tostring(AdditionalData["Data"]["DataSourceType"]),
+    DataSourceKey = tostring(AdditionalData["Data"]["DataSourceKey"]),
+    OsType = tostring(AdditionalData["Data"]["OsName"]),
+    ResourceLocation = tostring(coalesce(ResourceDetails["Source"], ResourceDetails["source"]))
