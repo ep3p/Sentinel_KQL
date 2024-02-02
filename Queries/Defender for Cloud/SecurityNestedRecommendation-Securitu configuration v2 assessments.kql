@@ -1,0 +1,33 @@
+let query_period = 120d;
+SecurityNestedRecommendation
+| where TimeGenerated > ago(query_period) and ParentRecommendationId in ("1f655fb7-63ca-4980-91a3-56dbc2b715c6", "8c3d9ad0-3639-4686-9cd2-2b2ab2609bda")
+| summarize hint.strategy=shuffle
+    StartSubAssessment = min(SubAssessmentTimeGeneration),
+    EndSubAssessment = arg_max(SubAssessmentTimeGeneration, *)
+    by Auxiliar = tolower(AssessedResourceId), VulnerabilityId
+| join hint.remote=local kind=leftouter (
+    arg("").ResourceContainers
+    | where type == "microsoft.resources/subscriptions"
+    | project RecommendationSubscriptionId = subscriptionId, RecommendationSubscriptionName = name
+    ) on RecommendationSubscriptionId
+| project
+    StartSubAssessment,
+    EndSubAssessment,
+    Assessment_Age = bin(EndSubAssessment - StartSubAssessment, 1d)/1d,
+    IsSnapshot,
+    ParentRecommendationId,
+    AssessmentDescription = "Vulnerabilities in security configuration on your machines should be remediated (powered by Guest Configuration) - Remediate vulnerabilities in security configuration on your machines to protect them from attacks.",
+    RecommendationState,
+    Cause,
+    RecommendationSeverity,
+    Category,
+    RecommendationName,
+    Description,
+    Impact,
+    RecommendationSubscriptionId = coalesce(RecommendationSubscriptionName, RecommendationSubscriptionId),
+    ResourceGroup,
+    ResourceName = tostring(split(AssessedResourceId, "/")[-1]),
+    AssessedResourceId,
+    VulnerabilityId,
+    Reason = tostring(AdditionalData["Data"]["Reason"]),
+    ResourceLocation = tostring(coalesce(ResourceDetails["Source"], ResourceDetails["source"]))
