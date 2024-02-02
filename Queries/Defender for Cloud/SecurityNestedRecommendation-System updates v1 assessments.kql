@@ -1,0 +1,56 @@
+let query_period = 120d;
+SecurityNestedRecommendation
+| where TimeGenerated > ago(query_period) and ParentRecommendationId in ("4ab6e3c5-74dd-8b35-9ab9-f61b30875b27")
+| summarize hint.strategy=shuffle
+    StartSubAssessment = min(SubAssessmentTimeGeneration),
+    EndSubAssessment = arg_max(SubAssessmentTimeGeneration, *)
+    by AssessedResourceId, VulnerabilityId
+| extend UpperCamelCase = isnotempty(AdditionalData["AssessedResourceType"])
+| extend
+    Keys = iff(UpperCamelCase, dynamic(null), extract_all(@'(\"[^\"]+\"\:)', tostring(AdditionalData))),
+    Initials = iff(UpperCamelCase, dynamic(null), extract_all(@'(\".)[^\"]*\"\:', tostring(AdditionalData)))
+| extend AdditionalData = iff(UpperCamelCase,
+    AdditionalData,
+    todynamic(replace_strings(
+        tostring(AdditionalData),
+        Keys,
+        todynamic(replace_strings(
+            tostring(Keys),
+            Initials,
+            todynamic(toupper(Initials))
+            ))
+        ))
+    )
+| join hint.remote=local kind=leftouter (
+    arg("").ResourceContainers
+    | where type == "microsoft.resources/subscriptions"
+    | project RecommendationSubscriptionId = subscriptionId, RecommendationSubscriptionName = name
+    ) on RecommendationSubscriptionId
+| project
+    StartSubAssessment,
+    EndSubAssessment,
+    Assessment_Age = bin(EndSubAssessment - StartSubAssessment, 1d)/1d,
+    IsSnapshot,
+    ParentRecommendationId,
+    RecommendationState,
+    Cause,
+    RecommendationSeverity,
+    Category,
+    RecommendationName,
+    Description,
+    Impact,
+    RecommendationSubscriptionId = coalesce(RecommendationSubscriptionName, RecommendationSubscriptionId),
+    ResourceGroup,
+    ResourceName = tostring(coalesce(split(AssessedResourceId, "/")[-1], ResourceDetails["MachineName"], ResourceDetails["machineName"])),
+    AssessedResourceId,
+    VulnerabilityId,
+    OsType = tostring(AdditionalData["Data"]["OsType"]),
+    OsVersion = tostring(AdditionalData["Data"]["OperatingSystem"]),
+    WindowsUpdateKBID = tostring(coalesce(AdditionalData["Data"]["Kbid"], AdditionalData["Data"]["KBID"])),
+    PublishedDate = todatetime(AdditionalData["Data"]["PublishedDate"]),
+    Product = tostring(AdditionalData["Data"]["Product"]),
+    PackageRepository = tostring(AdditionalData["Data"]["PackageRepository"]),
+    BulletinUrl = tostring(AdditionalData["Data"]["BulletinUrl"]),
+    CveNumbers = split(tostring(AdditionalData["Data"]["CVENumbers"]), ";"),
+    RebootBehaviour = tostring(AdditionalData["Data"]["RebootBehaviour"]),
+    ResourceLocation = tostring(coalesce(ResourceDetails["Source"], ResourceDetails["source"]))
