@@ -3,7 +3,8 @@ let _BenignFiles =
     | project SubscriptionId = tostring(SubscriptionId), GroupName, FilePath
 ;
 SecurityAlert
-| where AlertName has "Adaptive application control policy violation was audited" and ProviderName != "ASI Scheduled Alerts"
+| where AlertName has "Adaptive application control policy violation was audited" and ProviderName == "Azure Security Center"
+| summarize arg_min(TimeGenerated, *) by SystemAlertId
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend
     FileProperties = extract_all(@"(Path: .*)", tostring(ExtendedProperties.File)),
