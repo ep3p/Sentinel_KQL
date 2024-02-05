@@ -1,5 +1,6 @@
 SecurityAlert
-| where AlertName has "Possible attack tool detected" and ProviderName != "ASI Scheduled Alerts"
+| where AlertName has "Possible attack tool detected" and ProviderName == "Azure Security Center"
+| summarize arg_min(TimeGenerated, *) by SystemAlertId
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend
     Computer = tostring(ExtendedProperties["Compromised Host"]),
