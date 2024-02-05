@@ -1,5 +1,6 @@
 SecurityAlert
 | where AlertName has "Unusual number of failed sign-in attempts" and ProviderName == "Azure Security Center"
+| summarize arg_min(TimeGenerated, *) by SystemAlertId
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend
     MachineName = tostring(ExtendedProperties["Machine Name"]),
