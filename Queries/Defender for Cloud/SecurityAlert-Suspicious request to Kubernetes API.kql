@@ -1,5 +1,6 @@
 SecurityAlert
-| where AlertName has "Suspicious request to Kubernetes API" and ProviderName != "ASI Scheduled Alerts"
+| where AlertName has "Suspicious request to Kubernetes API" and ProviderName == "Azure Security Center"
+| summarize arg_min(TimeGenerated, *) by SystemAlertId
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend
     APIRequest = tostring(ExtendedProperties["API Request"]),
