@@ -1,5 +1,6 @@
 SecurityAlert
-| where AlertName has "Logon activity from a potentially harmful application" and ProviderName != "ASI Scheduled Alerts"
+| where AlertName has "Logon activity from a potentially harmful application" and ProviderName == "Azure Security Center"
+| summarize arg_min(TimeGenerated, *) by SystemAlertId
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend
     CompromisedEntity = tostring(ExtendedProperties["CompromisedEntity"]),
