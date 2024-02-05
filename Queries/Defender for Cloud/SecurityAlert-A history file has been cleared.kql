@@ -5,7 +5,8 @@ let _ExpectedCommandLinesRegex = toscalar(
     | project RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
 );
 SecurityAlert
-| where AlertName has "A history file has been cleared" and ProviderName != "ASI Scheduled Alerts"
+| where AlertName has "A history file has been cleared" and ProviderName == "Azure Security Center"
+| summarize arg_min(TimeGenerated, *) by SystemAlertId
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend
     Computer = tostring(ExtendedProperties["Compromised Host"]),
