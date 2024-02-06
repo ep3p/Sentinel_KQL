@@ -1,11 +1,6 @@
 // Alternatively use here: https://portal.azure.com/#view/HubsExtension/ArgQueryBlade
 arg("").Resources
-| where type in~ (
-    "microsoft.compute/virtualmachines",
-    "microsoft.scvmm/virtualmachines",
-    "microsoft.connectedvmwarevsphere/virtualmachines",
-    "microsoft.azurestackhci/virtualmachines"
-    )
+| where type has "/virtualmachines" and not(type has "/virtualmachines/")
 | extend
     ProvisioningState = tostring(properties["provisioningState"]),
     TimeCreated = todatetime(properties["timeCreated"]),
