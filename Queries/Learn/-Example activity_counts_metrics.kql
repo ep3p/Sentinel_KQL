@@ -2,6 +2,8 @@ let query_frequency = 15m;
 let query_period = 30m;
 let threshold = 5;
 ...
+| where TimeGenerated > ago(query_period)
+...
 | as _Events
 | join kind=leftsemi (
     _Events
