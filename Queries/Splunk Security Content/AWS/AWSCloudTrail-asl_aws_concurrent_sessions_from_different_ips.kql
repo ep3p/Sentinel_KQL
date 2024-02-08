@@ -1,0 +1,48 @@
+let query_frequency = 5m;
+let query_period = 10m;
+let threshold = 1;
+AWSCloudTrail
+| where TimeGenerated > ago(query_period)
+| where EventName has "DescribeEventAggregates" and not(SourceIpAddress has "health.amazonaws.com")
+| invoke AWSIdentityRole()
+| summarize arg_min(TimeGenerated, *) by Identity, SourceIpAddress
+| as _Events
+| join kind=leftsemi (
+    _Events
+    // query_period should be 2 * query_frequency
+    | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, Identity)
+    | summarize
+        arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
+        arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
+        by Identity
+    | where CurrentTimeGenerated > ago(query_period)
+    | extend PreviousCount = iff(PreviousTimeGenerated == CurrentTimeGenerated, 0, PreviousCount)
+    | where (not(PreviousCount > threshold) and CurrentCount > threshold)
+        or ((CurrentCount - PreviousCount) > threshold)
+    ) on Identity
+| project-reorder
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
