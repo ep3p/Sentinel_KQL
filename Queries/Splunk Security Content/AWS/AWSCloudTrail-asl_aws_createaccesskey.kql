@@ -1,0 +1,40 @@
+let query_frequency = 1h;
+let query_period = 2h;
+AWSCloudTrail
+| where TimeGenerated > ago(query_frequency)
+| where EventName in ("CreateAccessKey", "DeleteAccessKey")
+| extend UserName = tostring(todynamic(ResponseElements)["accessKey"]["userName"])
+| join kind=leftanti (
+    AWSCloudTrail
+    | where TimeGenerated > ago(query_period)
+    | where EventName == "CreateUser" and not(EventSource == "sso-directory.amazonaws.com")// and EventSource == "iam.amazonaws.com"
+    | extend CreatedUserName = tostring(todynamic(RequestParameters)["userName"])
+    ) on $left.UserName == $right.CreatedUserName, RecipientAccountId
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    UserName,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
