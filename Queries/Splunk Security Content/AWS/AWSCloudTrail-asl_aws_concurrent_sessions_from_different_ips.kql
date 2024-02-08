@@ -20,7 +20,7 @@ AWSCloudTrail
     | where (not(PreviousCount > threshold) and CurrentCount > threshold)
         or ((CurrentCount - PreviousCount) > threshold)
     ) on Identity
-| project-reorder
+| project
     TimeGenerated,
     UserIdentityType,
     Identity,
