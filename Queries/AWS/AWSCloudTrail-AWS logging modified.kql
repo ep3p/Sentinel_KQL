@@ -10,8 +10,10 @@ let event_list = dynamic([
     "PutInsightSelectors",
     "DeleteEventBus",
     "DeactivateEventSource",
+    "DeleteArchive",
     "DeleteLogStream",
-    "DeleteLogGroup"
+    "DeleteLogGroup",
+    "DeleteLoggingConfiguration"
 ]);
 AWSCloudTrail
 | where EventName in (event_list)
