@@ -1,0 +1,32 @@
+AWSCloudTrail
+| where EventName in ("ModifyDBClusterSnapshotAttribute", "ModifyDBSnapshotAttribute")
+| where todynamic(RequestParameters)["attributeName"] == "restore"
+| mv-expand Item = todynamic(RequestParameters)["valuesToAdd"] to typeof(string)
+| where Item == "all"
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
