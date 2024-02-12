@@ -1,0 +1,34 @@
+AWSCloudTrail
+| where EventName in ("DeleteVirtualMFADevice", "DeactivateMFADevice")
+| extend
+    UserName = tostring(todynamic(RequestParameters)["userName"]),
+    Device = tostring(todynamic(RequestParameters)["serialNumber"])
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    UserName,
+    Device,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
