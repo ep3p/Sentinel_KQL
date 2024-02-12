@@ -147,11 +147,16 @@ let event_list = dynamic([
     "DeleteEventBus",
     "CreateConnection",
     "DeactivateEventSource",
+    "DeleteArchive",
     // https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_Operations.html
     //"CreateLogStream",
     "DeleteLogStream",
     //"CreateLogGroup",
     "DeleteLogGroup",
+    // https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_Operations.html
+    "DeleteAlarms",
+    "DisableAlarmActions",
+    "DeleteInsightRules",
     // https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Operations.html
     "SetRepositoryPolicy",
     "PutRegistryScanningConfiguration",
@@ -243,7 +248,17 @@ let event_list = dynamic([
     // https://docs.aws.amazon.com/workspaces/latest/api/API_Operations.html
     "ModifyAccount",
     "ModifyBilling",
-    "ModifyPaymentMethods"
+    "ModifyPaymentMethods",
+    // https://docs.aws.amazon.com/waf/latest/APIReference/API_Operations_AWS_WAFV2.html
+    "CreateWebACL",
+    "UpdateWebACL",
+    "DeleteWebACL",
+    "CreateIPSet",
+    "UpdateIPSet",
+    "DeleteIPSet",
+    "UpdateRuleGroup",
+    "DeleteRuleGroup",
+    "DeleteLoggingConfiguration"
     ]);
 let version_event_list = dynamic([
     "CreatePolicy",
