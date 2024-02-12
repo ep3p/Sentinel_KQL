@@ -1,0 +1,32 @@
+// https://github.com/FalconForceTeam/FalconFriday/blob/master/Collection/0xFF-0236-Resource_Shared_with_Unknown_External_Account-AWS.md
+AWSCloudTrail
+| where EventName matches regex "ModifySnapshotAttribute"
+| mv-expand Item = todynamic(RequestParameters)["createVolumePermission"]["add"]["items"]
+| where Item["userId"] contains "*" or Item["group"] has "all"
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
