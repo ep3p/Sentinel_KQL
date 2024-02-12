@@ -1,0 +1,31 @@
+AWSCloudTrail
+| where EventName matches regex "ModifyImageAttribute"
+| mv-expand Item = todynamic(RequestParameters)["launchPermission"]["add"]["items"]
+| where Item["userId"] contains "*" or Item["group"] has "all"
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
