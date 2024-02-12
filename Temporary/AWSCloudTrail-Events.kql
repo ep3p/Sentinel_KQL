@@ -63,6 +63,8 @@ let event_list = dynamic([
     "CreateSAMLProvider",
     "UpdateSAMLProvider",
     "GetAccountAuthorizationDetails",
+    "UpdateAccountPasswordPolicy",
+    "DeleteAccountPasswordPolicy",
     // https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Operations.html
     "AllocateAddress",
     "CreateRoute",
