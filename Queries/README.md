@@ -4,6 +4,8 @@ Some of these queries are intended to be used in Analytics rules. If a ```query_
 
 In the folder [Azure-Sentinel](https://github.com/ep3p/Sentinel_KQL/tree/main/Queries/Azure-Sentinel) you may find ***upgraded*** Microsoft content from [their repository](https://github.com/Azure/Azure-Sentinel/tree/master/Detections), which might not be worthy to commit in that repository, where I have contributed [several pull requests](https://github.com/Azure/Azure-Sentinel/pulls?q=is%3Apr+author%3Aep3p) and appeared in their [Threat Hunters leaderboard](https://github.com/Azure/Azure-Sentinel/blob/master/Tools/stats/stats.md) (the scores might not be updated for several months).
 
+In the folder [Splunk Security Content](https://github.com/ep3p/Sentinel_KQL/tree/main/Queries/Splunk Security Content) you may find Splunk content from [their repository](https://github.com/splunk/security_content/tree/develop/detections), modified so it can be applied to KQL. Each detection might not be equivalent to the original one, because it might consider more event types than originally intended.
+
 ### Tips
 
 Currently NRT rules don't allow multiple data types (tables) to be used in the same query. The *Analytics rule wizard* does not allow in the query two or more distinct strings that could be one of the table names. If, for example, ```Operation``` and ```OfficeActivity``` are the names of tables, you won't be able to use this query in a NRT rule:
