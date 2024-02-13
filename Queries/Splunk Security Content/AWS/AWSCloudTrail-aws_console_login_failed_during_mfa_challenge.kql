@@ -1,0 +1,50 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _SuccessResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has_all ("[Success]", "[Complete]") and isnotempty(ResultDescription)
+    | summarize make_list(ResultType)
+);
+AWSCloudTrail
+| where TimeGenerated > ago(query_frequency)
+| where EventName == "ConsoleLogin" and isnotempty(ErrorMessage)
+| extend MFAUsed = tostring(coalesce(todynamic(AdditionalEventData)["MFAUsed"], todynamic(AdditionalEventData)["AFAUsed"]))
+// | where MFAUsed == "Yes"
+| summarize arg_min(TimeGenerated, *) by UserIdentityType, UserIdentityAccountId, SourceIpAddress, ErrorMessage, MFAUsed
+| extend Location = geo_info_from_ip_address(SourceIpAddress)
+| join kind=leftouter (
+    SignInLogsTables
+    | where TimeGenerated > ago(query_period)
+    | where ResultType in (_SuccessResultTypes)
+    | summarize IPAddressUserPrincipalNames = make_set(UserPrincipalName) by IPAddress
+    ) on $left.SourceIpAddress == $right.IPAddress
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    Location,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    MFAUsed,
+    IPAddressUserPrincipalNames,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
