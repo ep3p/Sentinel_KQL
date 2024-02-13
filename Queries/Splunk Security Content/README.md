@@ -1,0 +1,1 @@
+In this folder you may find Splunk content from [their repository](https://github.com/splunk/security_content/tree/develop/detections), modified so it can be applied to KQL. Each detection might not be equivalent to the original one, because it might consider different event types than originally intended.
