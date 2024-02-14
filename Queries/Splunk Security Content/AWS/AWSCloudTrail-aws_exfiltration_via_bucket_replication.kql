@@ -1,0 +1,44 @@
+// let _ReplicationAWSAccounts = toscalar(
+//     _GetWatchlist("AccountId-AuditAWSAccounts")
+//     | where Notes has "[BucketReplication]"
+//     | summarize make_list(AccountId)
+// );
+AWSCloudTrail
+| where EventName == "PutBucketReplication"
+// | extend RequestParameters = todynamic(RequestParameters)
+// | mv-expand Rule = iff(isempty(array_length(RequestParameters["ReplicationConfiguration"]["Rule"])), pack_array(RequestParameters["ReplicationConfiguration"]["Rule"]), RequestParameters["ReplicationConfiguration"]["Rule"])
+// | extend
+//     DestinationBucket = tostring(Rule["Destination"]["Bucket"]),
+//     AccessControlTranslation = tostring(Rule["Destination"]["AccessControlTranslation"]),
+//     ReplicaOwner = tostring(Rule["Destination"]["Account"])
+// | where not(DestionationBucket has_any (_ReplicationAWSAccounts))
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    // DestinationBucket,
+    // AccessControlTranslation,
+    // ReplicaOwner,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
