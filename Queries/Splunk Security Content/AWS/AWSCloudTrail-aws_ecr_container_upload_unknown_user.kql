@@ -1,7 +1,7 @@
-let _EventNames = dynamic(["PutImage"]);
+let _ExpectedEventNames = dynamic(["PutImage"]);
 let _ExpectedUsers = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
-    | where Activity == "AWSIAMUser" and Auxiliar has_any (_EventNames)
+    | where Activity == "AWSIAMUser" and Auxiliar has_any (_ExpectedEventNames)
     | summarize make_list(ActorPrincipalName)
 );
 AWSCloudTrail
