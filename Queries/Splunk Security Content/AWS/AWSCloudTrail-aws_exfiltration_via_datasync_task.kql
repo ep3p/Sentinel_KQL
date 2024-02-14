@@ -1,0 +1,37 @@
+// let _TransferAWSAccounts = toscalar(
+//     _GetWatchlist("AccountId-AuditAWSAccounts")
+//     | where Notes has "[TransferTask]"
+//     | summarize make_list(AccountId)
+// );
+AWSCloudTrail
+| where EventName == "CreateTask"
+| extend DestinationLocationArn = tostring(todynamic(RequestParameters)["DestinationLocationArn"])
+// | where not(DestinationLocationArn has_any (_TransferAWSAccounts))
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    // DestinationLocationArn,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
