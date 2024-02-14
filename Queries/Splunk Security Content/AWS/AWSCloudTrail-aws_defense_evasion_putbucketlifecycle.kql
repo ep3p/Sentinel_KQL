@@ -1,15 +1,15 @@
 let threshold_days = 7;
-let _ExcludedEventNames = dynamic(["PutBucketLifecycle"]);
-let _ExcludedRoleIdentityRegex = toscalar(
+let _ExpectedEventNames = dynamic(["PutBucketLifecycle"]);
+let _ExpectedRoleIdentityRegex = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
-    | where Activity == "AWSAssumedRoleIdentityEventName_Regex" and Auxiliar has_any (_ExcludedEventNames)
+    | where Activity == "AWSAssumedRoleIdentityEventName_Regex" and Auxiliar has_any (_ExpectedEventNames)
     | summarize RegEx = make_set(strcat(SourceResource, ActorPrincipalName))
     | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
 );
 AWSCloudTrail
 | where EventName == "PutBucketLifecycle"
 | extend UserIdentityUserName = tostring(split(UserIdentityPrincipalid, ":")[1])
-| where not(EventName in (_ExcludedEventNames) and strcat(SessionIssuerUserName, UserIdentityUserName) matches regex _ExcludedRoleIdentityRegex)
+| where not(EventName in (_ExpectedEventNames) and strcat(SessionIssuerUserName, UserIdentityUserName) matches regex _ExpectedRoleIdentityRegex)
 | extend RequestParameters = todynamic(RequestParameters)
 | mv-expand Rule = iff(isempty(array_length(RequestParameters["LifecycleConfiguration"]["Rule"])), pack_array(RequestParameters["LifecycleConfiguration"]["Rule"]), RequestParameters["LifecycleConfiguration"]["Rule"])
 | extend ExpirationDays = toint(Rule["Expiration"]["Days"])
