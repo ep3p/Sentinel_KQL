@@ -1,5 +1,5 @@
 AWSCloudTrail
-| where EventName in ("DeleteVirtualMFADevice", "DeactivateMFADevice")
+| where EventName in ("CreateVirtualMFADevice", "EnableMFADevice", "DeleteVirtualMFADevice", "DeactivateMFADevice")
 | extend
     UserName = tostring(todynamic(RequestParameters)["userName"]),
     Device = tostring(todynamic(RequestParameters)["serialNumber"])
