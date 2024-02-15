@@ -1,0 +1,66 @@
+let query_frequency = 1h;
+let query_period = 2h;
+let threshold = 5;
+let _ExpectedErrorCodes = dynamic(["AccessDenied", "MalformedPolicyDocumentException", "NoSuchEntityException"]);
+let _ExpectedRoleIdentityRegex = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "AWSAssumedRoleIdentityEventName_Regex" and Auxiliar has_any (_ExpectedErrorCodes)
+    | summarize RegEx = make_set(strcat(SourceResource, ActorPrincipalName))
+    | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
+);
+let _ExpectedUsers = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "AWSIAMUser" and Auxiliar has_any (_ExpectedErrorCodes)
+    | summarize make_list(ActorPrincipalName)
+);
+AWSCloudTrail
+| where TimeGenerated > ago(query_period)
+| where ErrorCode has_any ("MalformedPolicyDocumentException", "NoSuchEntityException") or ErrorMessage matches regex @"not authorized to perform:.*AssumeRole.* on resource"
+| where not(ErrorCode == "NoSuchEntityException" and not(ErrorMessage has "role with"))
+| where not(UserIdentityInvokedBy has ".amazonaws.com" and SourceIpAddress has ".amazonaws.com" and UserAgent has ".amazonaws.com")
+| where not(UserIdentityArn in (_ExpectedUsers))
+| extend UserIdentityUserName = tostring(split(UserIdentityPrincipalid, ":")[1])
+| where not(ErrorCode in (_ExpectedErrorCodes) and strcat(SessionIssuerUserName, UserIdentityUserName) matches regex _ExpectedRoleIdentityRegex)
+| summarize arg_min(TimeGenerated, *) by UserIdentityArn, EventName, ErrorCode, ErrorMessage
+| extend AuxiliarKey = ""
+| as _Events
+| join kind=leftsemi (
+    _Events
+    // query_period should be 2 * query_frequency
+    | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency)
+    | summarize
+        arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
+        arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
+    | where CurrentTimeGenerated > ago(query_period)
+    | extend PreviousCount = iff(PreviousTimeGenerated == CurrentTimeGenerated, 0, PreviousCount)
+    | where (not(PreviousCount > threshold) and CurrentCount > threshold)
+        or ((CurrentCount - PreviousCount) > threshold)
+    | extend AuxiliarKey = ""
+    ) on AuxiliarKey
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
