@@ -1,0 +1,49 @@
+let _AzureIPRanges = externaldata(changeNumber: string, cloud: string, values: dynamic)
+    ["https://raw.githubusercontent.com/microsoft/mstic/master/PublicFeeds/MSFTIPRanges/ServiceTags_Public.json"] with(format='multijson')
+    | mv-expand values
+    | mv-expand IPAddress = values["properties"]["addressPrefixes"] to typeof(string)
+    | distinct IPAddress
+    | extend IPAddressType = case(
+        isnotempty(parse_ipv4(IPAddress)), "v4",
+        (isempty(parse_ipv4(IPAddress)) and isnotempty(parse_ipv6(IPAddress))), "v6",
+        ""
+        )
+    | summarize IPAddressList = make_list(IPAddress) by IPAddressType
+;
+SigninLogs
+| where AppDisplayName has "Azure Portal" and ResultType == 0
+| where HomeTenantId != ResourceTenantId and ResourceTenantId == AADTenantId
+| extend IPAddressType = case(
+    isnotempty(parse_ipv4(IPAddress)), "v4",
+    (isempty(parse_ipv4(IPAddress)) and isnotempty(parse_ipv6(IPAddress))), "v6",
+    ""
+    )
+| join kind=inner _AzureIPRanges on IPAddressType
+| where case(
+    IPAddressType == "v4", ipv4_is_in_any_range(IPAddress, IPAddressList),
+    IPAddressType == "v6", ipv6_is_in_any_range(IPAddress, IPAddressList),
+    false
+    )
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    take_anyif(UserPrincipalName, not(UserPrincipalName matches regex @"[a-f0-9]{8}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{12}")),
+    take_anyif(Location, isnotempty(Location)),
+    ResultTypes = make_set(ResultType),
+    AppDisplayNames = make_set(AppDisplayName),
+    ResourceDisplayNames = make_set(ResourceDisplayName),
+    UserAgents = make_set(UserAgent)
+    by IPAddress, HomeTenantId, ResourceTenantId, UserId
+| project
+    StartTime,
+    EndTime,
+    UserPrincipalName,
+    IPAddress,
+    Location,
+    ResultTypes,
+    AppDisplayNames,
+    ResourceDisplayNames,
+    UserAgents,
+    HomeTenantId,
+    ResourceTenantId,
+    UserId
