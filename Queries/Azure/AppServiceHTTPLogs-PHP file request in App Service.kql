@@ -1,0 +1,26 @@
+AppServiceHTTPLogs
+| where (CsUriStem has "php" or CsUriQuery has "php" or Referer has "php") and ScStatus != "404"
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    CsUriStem = array_sort_asc(make_set(CsUriStem)),
+    CsUriQuery = array_sort_asc(make_set_if(CsUriQuery, isnotempty(CsUriQuery))),
+    SPort = array_sort_asc(make_set(SPort)),
+    ScStatus = array_sort_asc(make_set(ScStatus)),
+    Referer = array_sort_asc(make_set_if(Referer, isnotempty(Referer))),
+    UserAgents = array_sort_asc(make_set(UserAgent))
+    by CsHost, CsMethod, CIp, Result, _ResourceId
+| project
+    StartTime,
+    EndTime,
+    CsHost,
+    Result,
+    CsMethod,
+    ScStatus,
+    SPort,
+    CIp,
+    CsUriStem,
+    CsUriQuery,
+    Referer,
+    UserAgents,
+    _ResourceId
