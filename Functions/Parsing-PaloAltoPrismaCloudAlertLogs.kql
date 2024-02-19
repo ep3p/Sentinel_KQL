@@ -1,3 +1,4 @@
+// This query can help you to parse Prisma Cloud CSPM API events received in PaloAltoPrismaCloudAlert_CL table.
 PaloAltoPrismaCloudAlert_CL
 | extend
     alertAdditionalInfo_scannerVersion_s=column_ifexists('alertAdditionalInfo_scannerVersion_s', ''),
