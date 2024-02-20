@@ -1,4 +1,8 @@
+let query_frequency = 15m;
+let query_wait = 15m;
+let query_period = 1d;
 AzureActivity
+| where ingestion_time() between (ago(query_frequency + query_wait) .. ago(query_wait))
 | where ResourceProviderValue =~ "MICROSOFT.SECURITY" and OperationNameValue =~ "Microsoft.Security/locations/alerts/activate/action"
 | extend PreferenceInteger = case(
     ResourceProviderValue == "Microsoft.Security", 1,
@@ -15,6 +19,7 @@ AzureActivity
 | project-away PreferenceInteger*
 | join kind=leftanti (
     SecurityAlert
+    | where TimeGenerated > ago(query_period)
     | where ProductName == "Azure Security Center"
     | distinct VendorOriginalId
     ) on $left.CorrelationId == $right.VendorOriginalId
