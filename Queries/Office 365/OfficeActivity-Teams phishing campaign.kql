@@ -1,0 +1,85 @@
+let query_frequency = 15m;
+let query_period = 30m;
+let threshold = 5;
+let _ExpectedDomains = toscalar(
+    _GetWatchlist("UUID-AADTenantIds")
+    | where Notes has "[ChatCreated]"
+    | summarize make_list(TenantId)
+);
+OfficeActivity
+| where TimeGenerated > ago(query_period)
+| where Operation == "ChatCreated" and CommunicationType == "OneOnOne"
+| extend
+    SenderOrganizationId = tostring(Members[0]["OrganizationId"]),
+    SenderDisplayName = tostring(Members[0]["DisplayName"]),
+    SenderUPN = tostring(Members[0]["UPN"]),
+    RecipientOrganizationId = tostring(Members[1]["OrganizationId"]),
+    RecipientDisplayName = tostring(Members[1]["DisplayName"]),
+    RecipientUPN = tostring(Members[1]["UPN"])
+| where not(SenderOrganizationId in (_ExpectedDomains))
+| extend SenderOrganizationDomain = tostring(split(SenderUPN, "@")[-1])
+| as _Events
+| join kind=leftsemi (
+    _Events
+    // query_period should be 2 * query_frequency
+    | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, SenderOrganizationId)
+    | summarize
+        arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
+        arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
+        by SenderOrganizationId
+    | where CurrentTimeGenerated > ago(query_period)
+    | extend PreviousCount = iff(PreviousTimeGenerated == CurrentTimeGenerated, 0, PreviousCount)
+    | where (not(PreviousCount > threshold) and CurrentCount > threshold)
+        or ((CurrentCount - PreviousCount) > threshold)
+    ) on SenderOrganizationId
+| join kind=leftouter (
+    OfficeActivity
+    | where TimeGenerated > ago(query_period)
+    | where Operation == "MessageSent"
+    | where UserId in (toscalar(_Events | summarize make_set(UserId)))
+    | summarize SenderIPAddress = make_set(ClientIP) by UserId
+    ) on UserId
+| join kind=leftouter (
+    OfficeActivity
+    | where TimeGenerated > ago(query_period)
+    | where Operation in ("MemberAdded", "MemberRemoved")
+    | summarize
+        MemberAdded = tobool(binary_all_or(tolong(Operation == "MemberAdded"))),
+        MemberRemoved = tobool(binary_all_or(tolong(Operation == "MemberRemoved")))
+        by ChatThreadId, UserId
+    ) on ChatThreadId, $left.RecipientUPN == $right.UserId
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    SenderOrganizationDomain = array_sort_asc(make_set(SenderOrganizationDomain)),
+    SenderDisplayNames = array_sort_asc(make_set(SenderDisplayName)),
+    SenderUPNs = array_sort_asc(make_set(SenderUPN)),
+    UserIds = array_sort_asc(make_set(UserId)),
+    SenderIPAddresses = make_set_if(SenderIPAddress, isnotempty(SenderIPAddress)),
+    RecipientOrganizationIds = array_sort_asc(make_set(RecipientOrganizationId)),
+    RecipientUPNs = array_sort_asc(make_set(RecipientUPN)),
+    RecipientCount = count_distinct(RecipientUPN),
+    RecipientAcceptedChat = array_sort_asc(make_set_if(RecipientUPN, MemberAdded)),
+    RecipientRemovedChat = array_sort_asc(make_set_if(RecipientUPN, MemberRemoved)),
+    ChatNames = array_sort_asc(make_set(ChatName)),
+    take_any(OfficeWorkload, RecordType, Operation)
+    by SenderOrganizationId
+| where RecipientCount > threshold
+| project
+    StartTime,
+    EndTime,
+    OfficeWorkload,
+    RecordType,
+    Operation,
+    ChatNames,
+    SenderOrganizationDomain,
+    SenderUPNs,
+    UserIds,
+    SenderIPAddresses,
+    SenderDisplayNames,
+    SenderOrganizationId,
+    RecipientCount,
+    RecipientUPNs,
+    RecipientAcceptedChat,
+    RecipientRemovedChat,
+    RecipientOrganizationIds
