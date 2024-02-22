@@ -270,12 +270,12 @@ let version_event_list = dynamic([
 let _ExcludedRoles =
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "AWSAssumedRole"
-    | project RoleName = Auxiliar, UserIdentity = ActorPrincipalName
+    | project RoleName = tostring(Auxiliar), UserIdentity = tostring(ActorPrincipalName)
 ;
 let _ExcludedAWSAccountEventNames =
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "AWSAccountIdEventName"
-    | project UserIdentityAccountId = tostring(ActorId), EventName = Auxiliar
+    | project UserIdentityAccountId = tostring(ActorId), EventName = tostring(Auxiliar)
 ;
 AWSCloudTrail
 | where EventName has_any (event_list)
