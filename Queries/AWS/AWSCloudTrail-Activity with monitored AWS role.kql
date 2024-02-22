@@ -3,7 +3,7 @@ let query_wait = 15m;
 let _MonitoredRoles =
     _GetWatchlist("AccountId-AuditAWSAccounts")
     | where Notes has "[RoleActivity]"
-    | project RequestedRole = Auxiliar, Auditors = Auditor, AlertSeverity = Severity
+    | project RequestedRole = tostring(Auxiliar), Auditors = tostring(Auditor), AlertSeverity = tostring(Severity)
 ;
 let _AWSAccounts =
     _GetWatchlist("AccountId-AuditAWSAccounts")
