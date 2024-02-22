@@ -13,8 +13,8 @@ let _ExpectedActivityADGroups =
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "ADGroupEventID"
     | project
-        Activity = Auxiliar,
-        ActorAccount = ActorPrincipalName,
+        Activity = tostring(Auxiliar),
+        ActorAccount = tostring(ActorPrincipalName),
         GroupSid = tostring(DestinationResource)
 ;
 let _ExpectedADGroupDomains = toscalar(
