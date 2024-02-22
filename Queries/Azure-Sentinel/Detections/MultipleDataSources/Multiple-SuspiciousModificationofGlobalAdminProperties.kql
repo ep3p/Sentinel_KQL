@@ -3,7 +3,7 @@ let query_period = 14d;
 let _ExpectedEvents =
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "GlobalAdminUpdate"
-    | project InitiatorId = tostring(ActorId), OperationName = Auxiliar
+    | project InitiatorId = tostring(ActorId), OperationName = tostring(Auxiliar)
 ;
 IdentityInfo
 | where TimeGenerated > ago(query_period)
