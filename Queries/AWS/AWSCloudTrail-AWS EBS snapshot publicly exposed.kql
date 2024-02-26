@@ -7,6 +7,7 @@ let _SharedAWSAccounts = toscalar(
 AWSCloudTrail
 | where EventName == "ModifySnapshotAttribute"
 | mv-expand Item = todynamic(RequestParameters)["createVolumePermission"]["add"]["items"]
+| where isnotempty(Item)
 | where Item["userId"] contains "*" or not(tostring(Item["userId"]) in (_SharedAWSAccounts)) or Item or Item["group"] has "all"
 | invoke AWSIdentityRole()
 | project
