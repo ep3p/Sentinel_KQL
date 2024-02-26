@@ -1,3 +1,4 @@
+// https://learn.microsoft.com/en-us/azure/defender-for-cloud/alerts-reference
 let query_frequency = 15m;
 let query_wait = 15m;
 let query_period = 1d;
@@ -16,6 +17,12 @@ AzureActivity
     arg_min(PreferenceInteger, Properties_d, EventSubmissionTimestamp),
     arg_max(PreferenceInteger, Level, OperationNameValue, OperationId, ResourceGroup, ResourceProviderValue, ActivityStatusValue, OperationName, ActivityStatus, Category, ResourceId, ResourceProvider, Resource)
     by CorrelationId, TimeGenerated, _ResourceId
+| extend Key = tostring(bag_keys(PropertiesDynamic)[0])
+| extend AlertTitle = tostring(PropertiesDynamic[Key]["eventName"])
+| where not((AlertTitle startswith "Security incident" and AlertTitle has "detected")
+    or tostring(todynamic(tostring(PropertiesDynamic[Key]["eventProperties"]))["isincident"]) == "****"
+    or isnotempty(todynamic(tostring(PropertiesDynamic[Key]["eventProperties"]))["relatedAlerts"])
+    )
 | project-away PreferenceInteger*
 | join kind=leftanti (
     SecurityAlert
@@ -23,7 +30,6 @@ AzureActivity
     | where ProductName == "Azure Security Center"
     | distinct VendorOriginalId
     ) on $left.CorrelationId == $right.VendorOriginalId
-| extend Key = tostring(bag_keys(PropertiesDynamic)[0])
 | extend
     AlertLink = strcat(
     @"https://portal.azure.com/#blade/Microsoft_Azure_Security_AzureDefenderForData/AlertBlade/alertId/",
@@ -35,7 +41,6 @@ AzureActivity
     "/referencedFrom/alertDeepLink/location/",
     tostring(split(tostring(PropertiesDynamic[Key]["resource"]), "/")[0])
     ),
-    AlertTitle = tostring(PropertiesDynamic[Key]["eventName"]),
     AlertSeverity = tostring(todynamic(tostring(PropertiesDynamic[Key]["eventProperties"]))["severity"])
 | project
     TimeGenerated,
