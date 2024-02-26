@@ -41,3 +41,16 @@ AzureActivity
     tostring(split(tostring(PropertiesDynamic[Key]["resource"]), "/")[0])
     ),
     AlertSeverity = tostring(todynamic(tostring(PropertiesDynamic[Key]["eventProperties"]))["severity"])
+| project
+    TimeGenerated,
+    ResourceProviderValue,
+    SubscriptionId,
+    ResourceGroup,
+    OperationNameValue,
+    AlertTitle,
+    AlertSeverity,
+    AlertLink,
+    CorrelationId,
+    PropertiesDynamic,
+    EventDataId,
+    _ResourceId
