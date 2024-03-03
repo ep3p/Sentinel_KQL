@@ -1,0 +1,11 @@
+DnsEvents
+| where IPAddresses has "72.5.65.111" and not(Name has "sinkhole.paloaltonetworks.com")
+| project
+    TimeGenerated,
+    Computer,
+    ClientIP,
+    QueryType,
+    SubType,
+    Name,
+    IPAddresses,
+    ResultCode
