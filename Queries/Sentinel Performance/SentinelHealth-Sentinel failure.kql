@@ -13,7 +13,8 @@ SentinelHealth
 | where not(Status == "Success" and isempty(Issue) and isempty(FailureSummary))
 | extend
     IssueCode = tostring(Issue["Code"]),
-    StatusCode = tostring(Failure["StatusCode"])
+    StatusCode = tostring(Failure["StatusCode"]),
+    Auxiliar = iff(SentinelResourceType == "Analytics Rule", SentinelResourceName, tostring(bin(TimeGenerated, 1h)))
 | extend AlertName = case(
     SentinelResourceType == "Analytics Rule" and Status == "Warning" and Reason == "The analytics rule is disabled and was not executed.", "Analytics rule was auto disabled",
     SentinelResourceType == "Analytics Rule" and isnotempty(IssueCode), strcat(alert_name, " - ", SentinelResourceType, " - ", Status, " - ", IssueCode),
@@ -35,4 +36,5 @@ SentinelHealth
     Issues,
     FailureSummary,
     ExtendedProperties,
-    SentinelResourceId
+    SentinelResourceId,
+    Auxiliar
