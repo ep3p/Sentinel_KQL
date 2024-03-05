@@ -1,0 +1,23 @@
+resources
+| where (type has "compute/virtualmachines" or type has "hybridcompute/machines") and not(type has "extensions")
+| project
+    id,
+    subscriptionId,
+    resourceGroup,
+    machinename = name,
+    type,
+    provisioningState = tostring(properties["provisioningState"]),
+    status = tostring(properties["status"]),
+    osType = tostring(properties["osType"]),
+    osName = tostring(properties["osName"]),
+    provider = tostring(properties["cloudMetadata"]["provider"]),
+    LicenseType = tostring(properties["licenseType"]),
+    ExtComputerName = tostring(properties["extended"]["instanceView"]["computerName"]),
+    ExtOsName = tostring(properties["extended"]["instanceView"]["osName"]),
+    DiskOsType = tostring(properties["storageProfile"]["osDisk"]["osType"]),
+    DiskOption = tostring(properties["storageProfile"]["osDisk"]["createOption"]),
+    DiskImagePublisher = tostring(properties["storageProfile"]["imageReference"]["publisher"]),
+    DiskImageOffer = tostring(properties["storageProfile"]["imageReference"]["offer"]),
+    DiskImageSku = tostring(properties["storageProfile"]["imageReference"]["sku"]),
+    OsComputerName = tostring(properties["osProfile"]["computerName"])
+| order by ['type'] asc
