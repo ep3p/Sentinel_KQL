@@ -1,0 +1,63 @@
+let _Headers_PutBucketAcl =
+    AWSCloudTrail
+    | where EventName in ("PutBucketAcl")
+    | extend RequestParameters = todynamic(RequestParameters)
+    | where tostring(RequestParameters["accessControlList"]["x-amz-grant-full-control"]) has_any ("AuthenticatedUsers", "AllUsers", "emailAddress=", "id=")
+        or tostring(RequestParameters["accessControlList"]["x-amz-grant-read"]) has_any ("AuthenticatedUsers", "AllUsers", "emailAddress=", "id=")
+        or tostring(RequestParameters["accessControlList"]["x-amz-grant-read-acp"]) has_any ("AuthenticatedUsers", "AllUsers", "emailAddress=", "id=")
+        or tostring(RequestParameters["accessControlList"]["x-amz-grant-write"]) has_any ("AuthenticatedUsers", "AllUsers", "emailAddress=", "id=")
+        or tostring(RequestParameters["accessControlList"]["x-amz-grant-write-acp"]) has_any ("AuthenticatedUsers", "AllUsers", "emailAddress=", "id=")
+;
+let _ACL_PutBucketAcl =
+    AWSCloudTrail
+    | where EventName in ("PutBucketAcl")
+    | extend RequestParameters = todynamic(RequestParameters)
+    | mv-expand Grant = iff(isempty(array_length(RequestParameters["AccessControlPolicy"]["AccessControlList"])), pack_array(RequestParameters["AccessControlPolicy"]["AccessControlList"]), RequestParameters["AccessControlPolicy"]["AccessControlList"])
+    | where Grant has_any ("AuthenticatedUsers", "AllUsers","EmailAddress", "ID")
+;
+let _BucketPolicies =
+    AWSCloudTrail
+    | where EventName in ("PutBucketPolicy", "PutAccessPointPolicy")
+    | extend RequestParameters = todynamic(RequestParameters)
+//     | extend Statement = case(
+//         bag_keys(RequestParameters) has "bucketPolicy", todynamic(tostring(RequestParameters["bucketPolicy"]))["Statement"],
+//         bag_keys(RequestParameters) has "policyDocument", todynamic(tostring(RequestParameters["policyDocument"]))["Statement"],
+//         bag_keys(RequestParameters) has "content", todynamic(tostring(RequestParameters["content"]))["Statement"],
+//         dynamic(null)
+// )
+//     | mv-expand Statement = iff(isnotempty(bag_keys(Statement)), pack_array(Statement), Statement)
+//     | extend
+//         Effect = tostring(Statement["Effect"]),
+//         Action = tostring(Statement["Action"]),
+//         Resource = tostring(Statement["Resource"])
+//     | where Effect == "Allow" and (Resource has "*" or Action has "*")
+//     | summarize take_any(*) by AwsEventId
+;
+union _Headers_PutBucketAcl, _ACL_PutBucketAcl, _BucketPolicies
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
