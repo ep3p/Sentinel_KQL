@@ -5,3 +5,7 @@ OperationName,Field,Value,Translation,Notes
 ,MethodType,5,"Text code authentication phone","OneWaySMS - PhoneNumber"
 ,MethodType,6,"Microsoft authenticator app","PhoneAppNotification"
 ,MethodType,7,"Authenticator app or hardware token","PhoneAppOTP"
+"Add Windows Hello for Business credential",Platform,0,"Windows",
+"Add platform credential",Platform,1,"MacOS",
+"Add passwordless phone sign-in credential",Platform,2,"iOS",
+"Add passwordless phone sign-in credential",Platform,3,"Android",
