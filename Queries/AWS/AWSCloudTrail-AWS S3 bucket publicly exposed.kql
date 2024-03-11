@@ -13,7 +13,7 @@ let _ACL_PutBucketAcl =
     | where EventName in ("PutBucketAcl", "PutObjectAcl")
     | extend RequestParameters = todynamic(RequestParameters)
     | mv-expand Grant = iff(isempty(array_length(RequestParameters["AccessControlPolicy"]["AccessControlList"])), pack_array(RequestParameters["AccessControlPolicy"]["AccessControlList"]), RequestParameters["AccessControlPolicy"]["AccessControlList"])
-    | where Grant has_any ("AuthenticatedUsers", "AllUsers","EmailAddress", "ID")
+    | where Grant has_any ("AuthenticatedUsers", "AllUsers","EmailAddress", "ID", "authenticated-read", "public-read", "public-read-write")
 ;
 let _BucketPolicies =
     AWSCloudTrail
