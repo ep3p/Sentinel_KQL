@@ -37,6 +37,7 @@ AWSCloudTrail
     UserIdentityAccountName,
     RecipientAccountId,
     RecipientAccountName,
+    AWSRegion,
     SessionCreationDate,
     UserIdentityPrincipalid,
     UserIdentityArn,
