@@ -21,7 +21,7 @@ let _BucketPolicies =
     | extend RequestParameters = todynamic(RequestParameters)
 //     | extend Statement = case(
 //         bag_keys(RequestParameters) has "bucketPolicy", todynamic(tostring(RequestParameters["bucketPolicy"]))["Statement"],
-//         bag_keys(RequestParameters) has "PutAccessPointPolicyRequest", todynamic(tostring(RequestParameters["PutAccessPointPolicyRequest"]))["Statement"],
+//         bag_keys(RequestParameters) has "PutAccessPointPolicyRequest", todynamic(tostring(RequestParameters["PutAccessPointPolicyRequest"]))["Policy"]["Statement"],
 //         bag_keys(RequestParameters) has "policyDocument", todynamic(tostring(RequestParameters["policyDocument"]))["Statement"],
 //         bag_keys(RequestParameters) has "content", todynamic(tostring(RequestParameters["content"]))["Statement"],
 //         dynamic(null)
