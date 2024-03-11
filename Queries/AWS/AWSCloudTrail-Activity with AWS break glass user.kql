@@ -23,6 +23,7 @@ AWSCloudTrail
     SourceIpAddress,
     RecipientAccountId,
     RecipientAccountName,
+    AWSRegion,
     EventSource,
     EventTypeName,
     EventName,
