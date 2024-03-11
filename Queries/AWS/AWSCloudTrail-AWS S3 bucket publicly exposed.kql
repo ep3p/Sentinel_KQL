@@ -1,6 +1,6 @@
 let _Headers_PutBucketAcl =
     AWSCloudTrail
-    | where EventName in ("PutBucketAcl")
+    | where EventName in ("PutBucketAcl", "PutObjectAcl")
     | extend RequestParameters = todynamic(RequestParameters)
     | where tostring(RequestParameters["accessControlList"]["x-amz-grant-full-control"]) has_any ("AuthenticatedUsers", "AllUsers", "emailAddress=", "id=")
         or tostring(RequestParameters["accessControlList"]["x-amz-grant-read"]) has_any ("AuthenticatedUsers", "AllUsers", "emailAddress=", "id=")
@@ -10,7 +10,7 @@ let _Headers_PutBucketAcl =
 ;
 let _ACL_PutBucketAcl =
     AWSCloudTrail
-    | where EventName in ("PutBucketAcl")
+    | where EventName in ("PutBucketAcl", "PutObjectAcl")
     | extend RequestParameters = todynamic(RequestParameters)
     | mv-expand Grant = iff(isempty(array_length(RequestParameters["AccessControlPolicy"]["AccessControlList"])), pack_array(RequestParameters["AccessControlPolicy"]["AccessControlList"]), RequestParameters["AccessControlPolicy"]["AccessControlList"])
     | where Grant has_any ("AuthenticatedUsers", "AllUsers","EmailAddress", "ID")
