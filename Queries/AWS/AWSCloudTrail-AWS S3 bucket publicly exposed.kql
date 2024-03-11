@@ -45,6 +45,7 @@ union _Headers_PutBucketAcl, _ACL_PutBucketAcl, _BucketPolicies
     UserIdentityAccountName,
     RecipientAccountId,
     RecipientAccountName,
+    AWSRegion,
     SessionCreationDate,
     UserIdentityPrincipalid,
     UserIdentityArn,
