@@ -1,0 +1,50 @@
+let query_frequency = 1h;
+let query_period = 2h;
+let threshold = 5;
+AWSCloudTrail
+| where TimeGenerated > ago(query_period)
+| where UserAgent has "aws-cli"
+| where EventName matches regex @"Describe|Export|Get|List"
+| invoke AWSIdentityRole()
+| summarize arg_min(TimeGenerated, *) by Identity, EventName, RecipientAccountId
+| as _Events
+| join kind=leftsemi (
+    _Events
+    // query_period should be 2 * query_frequency
+    | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, Identity)
+    | summarize
+        arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
+        arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
+        by Identity
+    | where CurrentTimeGenerated > ago(query_period)
+    | extend PreviousCount = iff(PreviousTimeGenerated == CurrentTimeGenerated, 0, PreviousCount)
+    | where (not(PreviousCount > threshold) and CurrentCount > threshold)
+        or ((CurrentCount - PreviousCount) > threshold)
+    ) on Identity
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    AWSRegion,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
