@@ -13,7 +13,7 @@
 //let query_frequency = 1h;
 //let query_period = 14d; // A CorrelationId can extend over several weeks
 //let Function = (query_frequency:timespan = 1h, query_period:timespan = 14d){
-let mfa_denied_key_strings = dynamic(["MFA denied", "SuspiciousActivityReported"]);
+let mfa_denied_key_strings = dynamic(["MFA denied", "User denied", "SuspiciousActivityReported"]);
 let unreported_denied_message_types = dynamic([
     "MFA denied; user did not respond to mobile app notification",
     "MFA denied; invalid authentication",
