@@ -1,5 +1,5 @@
 DeviceNetworkEvents
-| where (InitiatingProcessParentFileName has "msiexec.exe" or InitiatingProcessCommandLine has "/Install") and RemoteUrl matches regex @"d\d[a-z0-9]{12}\.cloudfront.net"
+| where RemoteUrl matches regex @"d\d[a-z0-9]{12}\.cloudfront.net" and (InitiatingProcessParentFileName has "msiexec.exe" or InitiatingProcessCommandLine has "/Install")
 | project
     TimeGenerated,
     DeviceName,
