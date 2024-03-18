@@ -19,7 +19,7 @@ let _ExpectedActivityADGroups =
 ;
 let _ExpectedADGroupDomains = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
-    | where Activity == "MonitorADGroupFromDomain"
+    | where Activity == "ADDomain" and Notes has "[MonitorADGroupFromDomain]"
     | summarize make_list(Auxiliar)
 );
 let _AccountOperators = toscalar(
