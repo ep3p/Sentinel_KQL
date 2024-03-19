@@ -1,0 +1,30 @@
+let _MonitoredDomains = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ADDomain"
+    | summarize make_list(Auxiliar)
+    );
+let _AccountOperators = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "AccountOperator"
+    | summarize make_list(ActorPrincipalName)
+    );
+let _ExpectedCreatedAccounts = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ADAccountCreation"
+    | summarize RegEx = strcat(@'^(', strcat_array(make_list(Auxiliar), '|'), @')$')
+    );
+SecurityEvent
+| where EventID == 4720
+| where TargetDomainName in (_MonitoredDomains) and not(Account in (_AccountOperators))
+| where not(strcat(SubjectAccount, ",", UserPrincipalName) matches regex _ExpectedCreatedAccounts)
+| project
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    Activity,
+    TargetAccount,
+    DisplayName,
+    UserPrincipalName,
+    SubjectLogonId,
+    EventData
