@@ -99,6 +99,5 @@ union// isfuzzy=true
 | summarize arg_max(PowerAppsActivity_TimeGenerated, *) by IndicatorId, ActorName
 | extend
     timestamp = PowerAppsActivity_TimeGenerated,
-    //AccountCustomEntity = ActorName,
-    //IPCustomEntity = SrcIpAddr,
+    AccountCustomEntity = ActorName,
     IPCustomEntity = TI_IPAddress
