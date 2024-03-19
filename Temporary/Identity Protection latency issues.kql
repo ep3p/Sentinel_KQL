@@ -1,0 +1,22 @@
+AADUserRiskEvents
+| where TimeGenerated > ago(90d)
+| where RiskEventType == "unfamiliarFeatures" and RiskState == "atRisk"
+| summarize arg_min(TimeGenerated, *) by Id
+| project AADUserRiskEvents_TimeGenerated = TimeGenerated, RequestId, RiskState
+| join kind=leftouter hint.shufflekey=RequestId (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(90d)
+    | where RiskEventTypes has "unfamiliarFeatures" or RiskEventTypes_V2 has "unfamiliarFeatures" and RiskState == "atRisk"
+    | summarize arg_min(TimeGenerated, *) by OriginalRequestId
+    | project
+        RequestId = OriginalRequestId,
+        SignInLogs_TimeGenerated = TimeGenerated,
+        RiskState
+) on RequestId, RiskState
+| distinct *
+| extend TimeDifference = case(
+    isnotempty(AADUserRiskEvents_TimeGenerated) and isnotempty(SignInLogs_TimeGenerated), tostring(bin(abs(AADUserRiskEvents_TimeGenerated - SignInLogs_TimeGenerated), 5m)/1m),
+    "60.0"
+    )
+| summarize count() by bin(AADUserRiskEvents_TimeGenerated, 7d), TimeDifference
+| render columnchart kind=stacked
