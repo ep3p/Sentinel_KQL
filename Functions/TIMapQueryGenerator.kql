@@ -648,6 +648,76 @@
                 ``````
         })
         ,
+        'PowerPlatformConnectorActivity',
+        dynamic({
+            "TableQueryWait":
+                '0h'
+            ,
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'PowerPlatformConnectorActivity'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ', ActorName'
+            ,
+            "TableColumns&LookUp":
+                'Workload, EventOriginalType, ActorUserType, ActorName, SrcIpAddr, EventResult, ConnectorId, ActorUserId, AdditionalInfo'
+            ,
+            "TableCustomEntityExtend":
+                ```,
+                //AccountCustomEntity = ActorName,
+                //IPCustomEntity = SrcIpAddr```
+            ,
+            "TableExclusion":
+                ``````
+        })
+        ,
+        'PowerAppsActivity',
+        dynamic({
+            "TableQueryWait":
+                '0h'
+            ,
+            "TableAdditionalLets":
+                ``````
+            ,
+            "TableName":
+                'PowerAppsActivity'
+            ,
+            "TableTimeColumn":
+                'TimeGenerated'
+            ,
+            "PreTableOperators":
+                ``````
+            ,
+            "PostTableOperators":
+                ``````
+            ,
+            "TableGroupByColumn":
+                ', ActorName'
+            ,
+            "TableColumns&LookUp":
+                'Workload, EventOriginalType, ActorUserType, ActorName, SrcIpAddr, EventResult, TargetAppName, ActorUserId, AdditionalInfo'
+            ,
+            "TableCustomEntityExtend":
+                ```,
+                //AccountCustomEntity = ActorName,
+                //IPCustomEntity = SrcIpAddr```
+            ,
+            "TableExclusion":
+                ``````
+        })
+        ,
         'OfficeActivity',
         dynamic({
             "TableQueryWait":
@@ -1775,6 +1845,36 @@
                 //| where not(_IndicatorsPrefilterLength < 10000 and not(Entities has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
                 | mv-expand IPAddress = todynamic(dynamic_to_json(extract_all(strcat("(", _IPv4Regex, "|", _IPv6Regex, ")"), dynamic([1]), Entities))) to typeof(string)
                 | where isnotempty(IPAddress) and not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'PowerPlatformConnectorActivity',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(SrcIpAddr)
+                | extend IPAddress = SrcIpAddr
+                //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
+        })
+        ,
+        'IP', 'PowerAppsActivity',
+        dynamic({
+            "TITableLookback":
+                '14d'
+            ,
+            "TITableAdditionalLets":
+                ``````
+            ,
+            "TITableConditions":
+                ```
+                | where isnotempty(SrcIpAddr)
+                | extend IPAddress = SrcIpAddr
                 //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000```
         })
         ,
