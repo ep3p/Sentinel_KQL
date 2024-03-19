@@ -99,6 +99,5 @@ union// isfuzzy=true
 | summarize arg_max(PowerPlatformConnectorActivity_TimeGenerated, *) by IndicatorId, ActorName
 | extend
     timestamp = PowerPlatformConnectorActivity_TimeGenerated,
-    //AccountCustomEntity = ActorName,
-    //IPCustomEntity = SrcIpAddr,
+    AccountCustomEntity = ActorName,
     IPCustomEntity = TI_IPAddress
