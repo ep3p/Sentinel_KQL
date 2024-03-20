@@ -2,7 +2,8 @@ let query_frequency = 1h;
 let query_period = 14d;
 let _ExpectedDomainsRegex = strcat(@'(', strcat_array(dynamic([
     @"\.officeapps\.live\.com",
-    @"officeclient\.microsoft\.com"
+    @"officeclient\.microsoft\.com",
+    @"ecs\.office\.com"
 ]), '|'), @')$');
 let _PreviousDomains = toscalar(
     DeviceNetworkEvents
@@ -12,10 +13,19 @@ let _PreviousDomains = toscalar(
     | summarize make_set(RemoteUrl)
 );
 let _PreviousIPRanges = toscalar(
-    DeviceNetworkEvents
-    | where ingestion_time() between (ago(query_period) .. ago(query_frequency))
-    | where (InitiatingProcessFileName has "dllhost.exe" or InitiatingProcessVersionInfoOriginalFileName has "dllhost.exe")  and (RemoteIPType == "Public" or (isempty(RemoteIPType) and not(ipv4_is_private(RemoteIP))))
-    | where isempty(RemoteUrl)
+    union 
+        (
+        DeviceNetworkEvents
+        | where ingestion_time() between (ago(query_period) .. ago(query_frequency))
+        | where (InitiatingProcessFileName has "dllhost.exe" or InitiatingProcessVersionInfoOriginalFileName has "dllhost.exe")  and (RemoteIPType == "Public" or (isempty(RemoteIPType) and not(ipv4_is_private(RemoteIP))))
+        | where isempty(RemoteUrl)
+        ),
+        (
+        DeviceNetworkEvents
+        | where ingestion_time() between (ago(query_period) .. ago(query_frequency))
+        | where isnotempty(RemoteUrl) and RemoteUrl matches regex _ExpectedDomainsRegex
+        )
+    | distinct RemoteIP
     | summarize make_set(format_ipv4_mask(RemoteIP, 23))
 );
 DeviceNetworkEvents
