@@ -1,5 +1,6 @@
 let query_frequency = 1h;
 let query_period = 14d;
+let executable_name = "WerFault.exe";
 let _ExpectedDomainsRegex = strcat(@'(', strcat_array(dynamic([
     @"\w{4}\d?watcab\d{2}\.blob\.core\.windows\.net",
     @"watson.*\.events\.data\.microsoft\.com",
@@ -8,7 +9,7 @@ let _ExpectedDomainsRegex = strcat(@'(', strcat_array(dynamic([
 let _PreviousDomains = toscalar(
     DeviceNetworkEvents
     | where ingestion_time() between (ago(query_period) .. ago(query_frequency))
-    | where (InitiatingProcessFileName has "WerFault.exe" or InitiatingProcessVersionInfoOriginalFileName has "WerFault.exe")  and (RemoteIPType == "Public" or (isempty(RemoteIPType) and not(ipv4_is_private(RemoteIP))))
+    | where (InitiatingProcessFileName has executable_name or InitiatingProcessVersionInfoOriginalFileName has executable_name)  and (RemoteIPType == "Public" or (isempty(RemoteIPType) and not(ipv4_is_private(RemoteIP))))
     | where isnotempty(RemoteUrl)
     | summarize make_set(RemoteUrl)
 );
@@ -17,7 +18,7 @@ let _PreviousIPRanges = toscalar(
         (
         DeviceNetworkEvents
         | where ingestion_time() between (ago(query_period) .. ago(query_frequency))
-        | where (InitiatingProcessFileName has "WerFault.exe" or InitiatingProcessVersionInfoOriginalFileName has "WerFault.exe")  and (RemoteIPType == "Public" or (isempty(RemoteIPType) and not(ipv4_is_private(RemoteIP))))
+        | where (InitiatingProcessFileName has executable_name or InitiatingProcessVersionInfoOriginalFileName has executable_name)  and (RemoteIPType == "Public" or (isempty(RemoteIPType) and not(ipv4_is_private(RemoteIP))))
         | where isempty(RemoteUrl)
         ),
         (
@@ -30,7 +31,7 @@ let _PreviousIPRanges = toscalar(
 );
 DeviceNetworkEvents
 | where ingestion_time() > ago(query_frequency)
-| where (InitiatingProcessFileName has "WerFault.exe" or InitiatingProcessVersionInfoOriginalFileName has "WerFault.exe")  and (RemoteIPType == "Public" or (isempty(RemoteIPType) and not(ipv4_is_private(RemoteIP))))
+| where (InitiatingProcessFileName has executable_name or InitiatingProcessVersionInfoOriginalFileName has executable_name)  and (RemoteIPType == "Public" or (isempty(RemoteIPType) and not(ipv4_is_private(RemoteIP))))
 //| where isnotempty(InitiatingProcessAccountUpn) //and RemoteUrl matches regex @"d\d[a-z0-9]{12}\.cloudfront.net"
 | where not(RemoteUrl matches regex _ExpectedDomainsRegex or RemoteUrl in (_PreviousDomains) or ipv4_is_in_any_range(RemoteIP, _PreviousIPRanges))
 | project
