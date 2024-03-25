@@ -94,6 +94,7 @@ MicrosoftGraphActivityLogs
     ServicePrincipalName,
     IPAddresses,
     Apps,
+    AppIds,
     UserAgents,
     PagingCount,
     PagingResourceTypes,
