@@ -15,10 +15,10 @@ let _Users =
     | summarize arg_max(TimeGenerated, *) by AccountObjectId
     | project UserId = AccountObjectId, UserPrincipalName = tolower(AccountUPN)
 ;
-let _ServicePrincipals =
+let _ServicePrincipals = materialize(
     _GetWatchlist("UUID-AADApps")
     | project ServicePrincipalId = tostring(ObjectId), AppId = tostring(AppId), ServicePrincipalName = AppDisplayName
-;
+);
 let _AppIdsDynamic = toscalar(_ServicePrincipals | summarize make_list(AppId));
 let _AppDisplayNamesDynamic = toscalar(_ServicePrincipals | summarize make_list(ServicePrincipalName));
 MicrosoftGraphActivityLogs
