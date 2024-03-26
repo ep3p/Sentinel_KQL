@@ -1,4 +1,4 @@
-let query_frequency = 1d;
+let query_frequency = 15m;
 arg("").ResourceContainerChanges
 | where properties["targetResourceType"] == "microsoft.resources/subscriptions"
 | extend ChangesProperties = coalesce(properties["changes"]["properties.state"], properties["changes"]["properties.provisioningState"])
