@@ -1,0 +1,46 @@
+let query_frequency = 1d;
+arg("").ResourceContainerChanges
+| where properties["targetResourceType"] == "microsoft.resources/subscriptions"
+| extend ChangesProperties = coalesce(properties["changes"]["properties.state"], properties["changes"]["properties.provisioningState"])
+| extend
+    Timestamp = todatetime(properties["changeAttributes"]["timestamp"]),
+    ChangedByType = tostring(properties["changeAttributes"]["changedByType"]),
+    ChangedBy = tostring(properties["changeAttributes"]["changedBy"]),
+    ChangedByClient = tostring(properties["changeAttributes"]["clientType"]),
+    Operation = tostring(properties["changeAttributes"]["operation"]),
+    TargetResourceId = tostring(properties["targetResourceId"]),
+    ChangesCount = toint(properties["changeAttributes"]["changesCount"]),
+    ChangeType = tostring(properties["changeType"]),
+    StateChangeCategory = tostring(ChangesProperties["changeCategory"]),
+    StatePreviousValue = tostring(ChangesProperties["previousValue"]),
+    StateNewValue = tostring(ChangesProperties["newValue"]),
+    CorrelationId = tostring(properties["changeAttributes"]["correlationId"])
+| where Timestamp > ago(query_frequency)
+| join hint.remote=local kind=leftouter (
+    arg("").ResourceContainers
+    | where type == "microsoft.resources/subscriptions"
+    | project subscriptionId, subscriptionName = name
+    ) on subscriptionId
+| extend AlertName = case(
+    ChangeType == "Create", strcat("Azure subscription created", " - ", subscriptionName),
+    ChangeType == "Delete", strcat("Azure subscription deleted", " - ", subscriptionName),
+    ChangeType == "Update", strcat("Azure subscription ", tolower(StateNewValue), " - ", subscriptionName),
+    ""
+    )
+| project
+    Timestamp,
+    ChangedByType,
+    ChangedBy,
+    ChangedByClient,
+    Operation,
+    subscriptionName,
+    //resourceGroup,
+    //location,
+    TargetResourceId,
+    ChangesCount,
+    ChangeType,
+    StateChangeCategory,
+    StatePreviousValue,
+    StateNewValue,
+    CorrelationId,
+    AlertName
