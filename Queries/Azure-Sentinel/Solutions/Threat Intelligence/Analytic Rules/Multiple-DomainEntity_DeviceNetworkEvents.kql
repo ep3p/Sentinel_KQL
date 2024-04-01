@@ -27,7 +27,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         // Take the earliest TimeGenerated and the latest column info
         | summarize hint.strategy=shuffle
             minTimeGenerated = min(TimeGenerated),
-            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation, ExternalIndicatorId)
+            arg_max(TimeGenerated, Active, Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, SourceSystem, Tags, AdditionalInformation, ExternalIndicatorId)
             by IndicatorId
         // Remove inactive or expired indicators
         | where not(not(Active) or ExpirationDateTime < now())
@@ -59,8 +59,11 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         | where ingestion_time() between (table_start .. table_end)
         // Filter events that may contain indicators
         | where isnotempty(RemoteUrl)
+            or isnotempty(AdditionalFields["query"])
+            or (isnotempty(AdditionalFields["uri"]) and isnotempty(AdditionalFields["host"]))
+        | extend Auxiliar = coalesce(RemoteUrl, tostring(AdditionalFields["query"]), tostring(AdditionalFields["uri"]))
         //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteUrl has_any (_IndicatorsPrefilter))) // valid TLD ~1500 , "has_any" limit 10000
-        | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), RemoteUrl)))
+        | extend Domains = todynamic(dynamic_to_json(extract_all(_DomainRegex, dynamic([1]), Auxiliar)))
         | mv-expand Domain = Domains to typeof(string)
         | where isnotempty(Domain)
         | summarize hint.strategy=shuffle take_any(*) by OriginalDomain = Domain
@@ -77,8 +80,30 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
     //| summarize hint.strategy=shuffle take_any(*) by Domain, DeviceName
     | project
         DeviceNetworkEvents_TimeGenerated,
-        Description, ActivityGroupNames, IndicatorId, ThreatType, DomainName, Url, ExpirationDateTime, ConfidenceScore, AdditionalInformation,
-        DeviceName, LocalIP, ActionType, RemoteUrl, RemoteIP, RemotePort, Protocol, LocalPort, InitiatingProcessCommandLine, InitiatingProcessFolderPath, InitiatingProcessAccountName, InitiatingProcessAccountUpn
+        Description,
+        ActivityGroupNames,
+        IndicatorId,
+        ThreatType,
+        DomainName,
+        Url,
+        ExpirationDateTime,
+        ConfidenceScore,
+        SourceSystem,
+        Tags,
+        AdditionalInformation,
+        DeviceName,
+        LocalIP,
+        ActionType,
+        RemoteUrl,
+        RemoteIP,
+        RemotePort,
+        Protocol,
+        LocalPort,
+        AdditionalFields,
+        InitiatingProcessCommandLine,
+        InitiatingProcessFolderPath,
+        InitiatingProcessAccountName,
+        InitiatingProcessAccountUpn
 };
 union// isfuzzy=true
     // Match      current table events                                all indicators available
