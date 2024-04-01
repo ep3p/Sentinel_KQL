@@ -1,0 +1,37 @@
+AWSCloudTrail
+| where EventName == "PutObject" and RequestParameters has_any ("x-amz-server-side-encryption-aws-kms-key-id", "x-amz-server-side-encryption-customer-algorithm")
+| extend
+    BucketName = tostring(todynamic(RequestParameters)["bucketName"]),
+    ObjectName = tostring(todynamic(RequestParameters)["key"]),
+    KmsKeyId = tostring(todynamic(RequestParameters)["x-amz-server-side-encryption-aws-kms-key-id"])
+| where not(isnotempty(KmsKeyId) and KmsKeyId has RecipientAccountId)
+| invoke AWSIdentityRole()
+| project
+    TimeGenerated,
+    UserIdentityType,
+    Identity,
+    ActorRole,
+    UserIdentityAccountId,
+    UserIdentityAccountName,
+    RecipientAccountId,
+    RecipientAccountName,
+    AWSRegion,
+    SessionCreationDate,
+    UserIdentityPrincipalid,
+    UserIdentityArn,
+    SourceIpAddress,
+    EventSource,
+    EventTypeName,
+    EventName,
+    ManagementEvent,
+    ReadOnly,
+    ErrorCode,
+    ErrorMessage,
+    BucketName,
+    ObjectName,
+    RequestParameters,
+    ResponseElements,
+    Resources,
+    SessionMfaAuthenticated,
+    UserAgent,
+    AwsEventId
