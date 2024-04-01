@@ -54,11 +54,17 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         DeviceNetworkEvents
         | where ingestion_time() between (table_start .. table_end)
         // Filter events that may contain indicators
-        | where not(isempty(RemoteIP))
+        | where isnotempty(RemoteIP)
             and not(ActionType == "NetworkSignatureInspected")
-            and not(RemoteIPType in ("Private", "Loopback", "Teredo", "Broadcast"))//Reserved
+            and not(RemoteIPType in ("Private", "Loopback", "Teredo", "Broadcast"))//Reserved)
+            or (isnotempty(AdditionalFields["answers"]) and AdditionalFields["rcode"] == 0 and (AdditionalFields["qtype_name"] in ("", "A", "AAAA")))
         //| where not(_IndicatorsPrefilterLength < 10000 and not(RemoteIP has_any (_IndicatorsPrefilter))) // "has_any" limit 10000
-        | extend IPAddress = iff(RemoteIPType == "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)
+        | mv-expand IPAddress = case(
+                            isnotempty(RemoteIP),
+                            pack_array(iff(RemoteIPType == "FourToSixMapping", trim_start("::ffff:", RemoteIP), RemoteIP)),
+                            AdditionalFields["answers"]
+                        ) to typeof(string)
+        | where isnotempty(parse_ipv4(IPAddress)) or isnotempty(parse_ipv6(IPAddress))
         | where not(isnotempty(parse_ipv4(IPAddress)) and (ipv4_is_private(IPAddress) or ipv4_is_in_any_range(IPAddress, "0.0.0.0/8", "127.0.0.0/8")))
         //| where not(_IndicatorsLength < 1000000 and not(IPAddress in (toscalar(_Indicators | summarize make_list(TI_IPAddress))))) // "in" limit 1.000.000
         | project-rename DeviceNetworkEvents_TimeGenerated = TimeGenerated
@@ -96,6 +102,7 @@ let _TITableMatch = (table_start: datetime, table_end: datetime, only_new_ti: bo
         RemotePort,
         Protocol,
         LocalPort,
+        AdditionalFields,
         InitiatingProcessCommandLine,
         InitiatingProcessFolderPath,
         InitiatingProcessAccountName,
