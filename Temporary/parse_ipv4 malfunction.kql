@@ -7,8 +7,6 @@ DnsEvents
             QueriedIPAddress,
  Col1 =     parse_ipv4(QueriedIPAddress),
  Col2 =     isnotempty(parse_ipv4(QueriedIPAddress)),
- Col3 =     ipv4_is_private(QueriedIPAddress),
- Col4 =     isnotempty(parse_ipv4(QueriedIPAddress)) and ipv4_is_private(QueriedIPAddress),
- Col5 = not(isnotempty(parse_ipv4(QueriedIPAddress)) and ipv4_is_private(QueriedIPAddress))
-| where not(isnotempty(parse_ipv4(QueriedIPAddress)) and ipv4_is_private(QueriedIPAddress))
-// | where Col5
+ Col3 =     isempty(parse_ipv4(QueriedIPAddress)),
+ Auxiliar = gettype(parse_ipv4(QueriedIPAddress))
+| where isempty(parse_ipv4(QueriedIPAddress))
