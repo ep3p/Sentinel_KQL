@@ -4,7 +4,8 @@ let executable_name = "dllhost.exe";
 let _ExpectedDomainsRegex = strcat(@'(', strcat_array(dynamic([
     @"\.officeapps\.live\.com",
     @"officeclient\.microsoft\.com",
-    @"ecs\.office\.com"
+    @"ecs\.office\.com",
+    @"clients\.config\.office\.net"
 ]), '|'), @')$');
 let _PreviousDomains = toscalar(
     DeviceNetworkEvents
