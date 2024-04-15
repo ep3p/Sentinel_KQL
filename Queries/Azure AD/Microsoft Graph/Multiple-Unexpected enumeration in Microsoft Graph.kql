@@ -54,10 +54,10 @@ MicrosoftGraphActivityLogs
             Count = count(),
             ApiVersion = make_set_if(ApiVersion, isnotempty(IPAddress), 50),
             IPAddress = make_set(IPAddress, 50),
-            AppId = make_set(AppId, 100),
+            AppId = make_set(AppId, 50),
             UserAgent = make_set_if(UserAgent, isnotempty(UserAgent), 50),
             UniqueTokenIdentifier = make_set(SignInActivityId, 20),
-            Scopes = make_set(split(Scopes, " "), 100),
+            Scopes = make_set(split(Scopes, " "), 50),
             RoleClaims = make_set_if(split(Wids, " "), isnotempty(Wids), 50),
             take_any(UserId, ServicePrincipalId)
             by Pattern
@@ -66,11 +66,11 @@ MicrosoftGraphActivityLogs
             StartTime = min(StartTime),
             EndTime = max(EndTime),
             IPAddresses = array_sort_asc(make_set(IPAddress, 50)),
-            AppIds = array_sort_asc(make_set(AppId, 100)),
+            AppIds = array_sort_asc(make_set(AppId, 50)),
             ApiVersions = array_sort_asc(make_set(ApiVersion, 50)),
-            RequestUriPatterns = make_list(tostring(pack(Pattern, Count)), 100),
+            RequestUriPatterns = make_list(tostring(pack(Pattern, Count)), 50),
             UserAgents = array_sort_asc(make_set(UserAgent, 50)),
-            Scopes = array_sort_asc(make_set(Scopes, 100)),
+            Scopes = array_sort_asc(make_set(Scopes, 50)),
             RoleClaims = array_sort_asc(make_set(RoleClaims, 50)),
             UniqueTokenIdentifiers = make_set(UniqueTokenIdentifier, 20),
             take_any(UserId, ServicePrincipalId)
