@@ -1,0 +1,7 @@
+AppTraces
+| where SeverityLevel > 1
+| extend
+    Category = tostring(Properties["Category"]),
+    LogLevel = tostring(Properties["LogLevel"])
+| where not(Category == "Microsoft.Azure.WebJobs.Script.WebHost.WebScriptHostExceptionHandler")
+| project TimeGenerated, AppRoleName, OperationName, SeverityLevel, LogLevel, Message, Properties, _ResourceId
