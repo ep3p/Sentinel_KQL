@@ -6,7 +6,8 @@ let _ExpectedDomainsRegex = strcat(@'(', strcat_array(dynamic([
     @"officeclient\.microsoft\.com",
     @"ecs\.office\.com",
     @"clients\.config\.office\.net",
-    @"config\.teams\.microsoft\.com"
+    @"config\.teams\.microsoft\.com",
+    @"fp\.measure\.office\.com"
 ]), '|'), @')$');
 let _PreviousDomains = toscalar(
     DeviceNetworkEvents
