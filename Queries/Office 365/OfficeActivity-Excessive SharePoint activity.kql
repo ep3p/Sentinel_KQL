@@ -3,7 +3,7 @@ let query_frequency = 1h;
 let query_period = 14d;
 let query_lookback_end = 1d;
 let query_window_checks = 6;
-let score_threshold = 10000;
+let score_threshold = 200000;
 let home_tenant_domain = toscalar(
     _GetWatchlist("UUID-AADTenantIds")
     | where Notes has "[HomeTenant]"
@@ -71,7 +71,7 @@ OfficeActivity
 | where DistinctSites > 1
 | where not(array_length(Operations) == 1 and Operations[0] == "FilePreviewed")
 | where EndTime > ago(query_frequency)
-| extend Score = toint(pow(DistinctObjects, 2) * pow(DistinctSites, 2) / tolong(OperationCount))
+| extend Score = toint(pow(DistinctObjects, 2) * pow(DistinctSites, 2) * pow(array_length(FileExtensions), 2) / tolong(OperationCount))
 | where Score > score_threshold
 | summarize
     StartTime = min(StartTime),
