@@ -1,0 +1,38 @@
+AADSignInEventsBeta
+| where AccountUpn != AccountObjectId
+    and (isnotempty(AlternateSignInName) and AccountUpn != AlternateSignInName)
+    and (ApplicationId == "4765445b-32c6-49b0-83e6-1d93765276ca" or ResourceId == "4765445b-32c6-49b0-83e6-1d93765276ca") // OfficeHome
+    and ClientAppUsed == "Browser"
+| where not(NetworkLocationDetails has '"networkType":"trustedNamedLocation"')
+| extend
+    UPNUserName = tostring(split(AccountUpn, "@")[0]),
+    AlternateUserName = tostring(split(AlternateSignInName, "@")[0])
+| where not(UPNUserName startswith AlternateUserName or AlternateUserName startswith UPNUserName)
+| as _Events
+| join kind=leftsemi (
+    AADSignInEventsBeta
+    | where SessionId in (toscalar(_Events | summarize make_set(SessionId)))
+    | summarize AlternateSignInNames = make_set(AlternateSignInName), EndpointCalls = make_set(EndpointCall) by SessionId
+    | where EndpointCalls has "Login:reprocess"
+    ) on SessionId
+| project
+    Timestamp,
+    LogonType,
+    AccountUpn,
+    AlternateSignInName,
+    IPAddress,
+    Country,
+    ErrorCode,
+    EndpointCall,
+    Application,
+    ResourceDisplayName,
+    ClientAppUsed,
+    UserAgent,
+    OSPlatform,
+    ApplicationId,
+    ResourceId,
+    AccountObjectId,
+    SessionId,
+    RequestId,
+    CorrelationId,
+    ReportId
