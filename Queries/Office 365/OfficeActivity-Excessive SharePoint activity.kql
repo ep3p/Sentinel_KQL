@@ -60,7 +60,7 @@ OfficeActivity
     EndTime = max(TimeGenerated),
     DistinctSites = dcount(Site_),
     DistinctObjects = dcount(OfficeObjectId),
-    FileExtensions = make_set_if(SourceFileExtension, isnotempty(SourceFileExtension)),
+    FileExtensions = make_set_if(tolower(SourceFileExtension), isnotempty(SourceFileExtension)),
     OperationCount = count(),
     Site_Urls = make_set(Site_Url, 500),
     SampleOfficeObjectIds = make_set(tostring(pack(Operation, OfficeObjectId)), 250),
