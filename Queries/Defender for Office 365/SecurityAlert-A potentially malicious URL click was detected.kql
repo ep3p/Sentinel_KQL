@@ -1,5 +1,5 @@
 let query_frequency = 15m;
-let query_period = 2d;
+let query_period = 1d;
 let _URLRegex = toscalar(
     _GetWatchlist('RegEx-SingleRegularExpressions')
     | where UseCase == "Threat Intelligence Indicator URL"
