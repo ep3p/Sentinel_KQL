@@ -1,10 +1,15 @@
+let query_frequency = 15m;
+let query_period = 2d;
 let _URLRegex = toscalar(
     _GetWatchlist('RegEx-SingleRegularExpressions')
     | where UseCase == "Threat Intelligence Indicator URL"
     | project RegEx
 );
 SecurityAlert
+| where TimeGenerated > ago(query_period)
 | where AlertName has "A potentially malicious URL click was detected" and ProviderName == "OATP"
+| summarize arg_min(TimeGenerated, *) by SystemAlertId
+| where TimeGenerated > ago(query_frequency)
 | extend ExtendedProperties = todynamic(ExtendedProperties)
 | extend
     InvestigationAction = tostring(ExtendedProperties["InvestigationName"]),
