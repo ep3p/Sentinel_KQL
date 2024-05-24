@@ -1,0 +1,34 @@
+let query_frequency = 1h;
+let query_period = 14d;
+IdentityLogonEvents
+| where TimeGenerated > ago(query_frequency)
+| where LogonType == "Delegated resource access"
+| extend
+    KerberosDelegationType = tostring(AdditionalFields["KerberosDelegationType"]),
+    ActorObjectSid = AccountSid,
+    ActorObjectName = tostring(AdditionalFields["ACTOR.DEVICE"]),
+    TargetServicePrincipalNames = tostring(AdditionalFields["Spns"])
+| join kind=leftanti (
+    IdentityLogonEvents
+    | where TimeGenerated between (ago(query_period) .. ago(query_frequency))
+    | extend
+        KerberosDelegationType = tostring(AdditionalFields["KerberosDelegationType"]),
+        ActorObjectSid = AccountSid,
+        ActorObjectName = tostring(AdditionalFields["ACTOR.DEVICE"]),
+        TargetServicePrincipalNames = tostring(AdditionalFields["Spns"])
+    ) on KerberosDelegationType, ActorObjectSid, ActorObjectName, IPAddress, TargetServicePrincipalNames, TargetDeviceName, TargetAccountDisplayName
+| summarize arg_min(TimeGenerated, *) by KerberosDelegationType, ActorObjectSid, ActorObjectName, IPAddress, TargetServicePrincipalNames, TargetDeviceName, TargetAccountDisplayName
+| project
+    TimeGenerated,
+    Application,
+    ActionType,
+    LogonType,
+    Protocol,
+    KerberosDelegationType,
+    ActorObjectSid,
+    ActorObjectName,
+    IPAddress,
+    TargetServicePrincipalNames,
+    TargetDeviceName,
+    TargetAccountDisplayName,
+    AdditionalFields
