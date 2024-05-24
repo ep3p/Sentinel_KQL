@@ -1,0 +1,9 @@
+let suspicious_device_name = dynamic([
+    "kali"
+]);
+union isfuzzy=true
+    IdentityLogonEvents,
+    IdentityQueryEvents,
+    IdentityDirectoryEvents,
+    SecurityEvent
+| where DeviceName has_any (suspicious_device_name) or WorkstationName has_any (suspicious_device_name)
