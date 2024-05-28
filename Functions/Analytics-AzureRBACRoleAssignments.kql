@@ -35,7 +35,8 @@ let _AzureRBACRoles = _GetWatchlist("UUID-AzureRBACRoles");
 let _ResourceManagementPIM = materialize(
     AuditLogs
     | where TimeGenerated > ago(query_frequency)
-    | where Category == "ResourceManagement" and LoggedByService == "PIM" and AADOperationType matches regex "Role" and not(AADOperationType == "CreateRoleUpdateRequest")
+    | where Category == "ResourceManagement" and LoggedByService == "PIM" and OperationName has "member" //and AADOperationType matches regex "Role" and not(AADOperationType == "CreateRoleUpdateRequest")
+    // Microsoft performed changes on 11/04 to "AADOperationType" and "Id" columns format, and changed type "managementgroup" to "Other" and the available information worsened... TargetManagementGroup columns will be empty
     | mv-apply AdditionalDetail = AdditionalDetails on (
         summarize ParsedAdditionalDetails = make_bag(pack(tostring(AdditionalDetail["key"]), tostring(AdditionalDetail["value"])))
     )
