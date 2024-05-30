@@ -5,7 +5,7 @@ let device_threshold = 10;
 let excluded_department_jobtitle = dynamic([]);
 let excluded_accountnames = dynamic([]);
 DeviceEvents
-| where Timestamp > ago(query_frequency)
+| where Timestamp > ago(query_period)
 | where ActionType == "NamedPipeEvent"// and InitiatingProcessVersionInfoFileDescription == "NT Kernel & System"
 | extend AdditionalFields = todynamic(AdditionalFields)
 | where AdditionalFields["FileOperation"] == "File opened"
@@ -13,20 +13,12 @@ DeviceEvents
     and AdditionalFields["RemoteClientsAccess"] == "AcceptRemote"
     and AdditionalFields["ShareName"] == "IPC$"
 | extend PipeName = tostring(AdditionalFields["PipeName"])
-| join kind=leftanti (
-    DeviceEvents
-    | where Timestamp between (ago(query_period) .. ago(query_frequency))
-    | where ActionType == "NamedPipeEvent"// and InitiatingProcessVersionInfoFileDescription == "NT Kernel & System"
-    | extend AdditionalFields = todynamic(AdditionalFields)
-    | where AdditionalFields["FileOperation"] == "File opened"
-        and AdditionalFields["NamedPipeEnd"] == "Client"
-        and AdditionalFields["RemoteClientsAccess"] == "AcceptRemote"
-        and AdditionalFields["ShareName"] == "IPC$"
-    | extend PipeName = tostring(AdditionalFields["PipeName"])
-    ) on DeviceId, RemoteIP, AccountSid, PipeName
+| summarize Timestamp = arg_min(Timestamp, *) by DeviceId, RemoteIP, AccountSid, PipeName
+| where Timestamp > ago(query_frequency)
 | extend BinTimestamp = bin(Timestamp, query_frequency)
 | join hint.strategy=shuffle kind=leftouter (
     DeviceLogonEvents
+    | where Timestamp > ago(query_frequency)
     | where ActionType == "LogonSuccess" //and Protocol == "NTLM"
     | summarize LogonProtocols = make_set(Protocol) by BinTimestamp = bin(Timestamp, query_frequency), DeviceId, RemoteIP, AccountSid
     ) on BinTimestamp, DeviceId, RemoteIP, AccountSid
@@ -73,6 +65,4 @@ DeviceEvents
     TargetDevicesCount,
     TargetDevices,
     Department,
-    JobTitle,
-    Timestamp = StartTime,
-    ReportId
+    JobTitle
