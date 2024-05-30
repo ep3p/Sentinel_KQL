@@ -1,28 +1,23 @@
 let query_frequency = 1h;
 let query_period = 14d;
 SecurityEvent
-| where TimeGenerated > ago(query_frequency)
+| where TimeGenerated > ago(query_period)
 | where EventID == 4688
 | where NewProcessName has_any (@"Policies\{6AC1786C-016F-11D2-945F-00C04fB984F9}", @"Policies\{31B2F340-016D-11D2-945F-00C04FB984F9}")
-| join kind=leftanti (
-    SecurityEvent
-    | where TimeGenerated between(ago(query_period) .. ago(query_frequency))
-    | where EventID == 4688
-    | where NewProcessName has_any (@"Policies\{6AC1786C-016F-11D2-945F-00C04fB984F9}", @"Policies\{31B2F340-016D-11D2-945F-00C04FB984F9}")
-    | distinct Process
-) on Process
 | summarize
-    minTimeGenerated = arg_min(TimeGenerated, *),
-    maxTimeGenerated = max(TimeGenerated)
-    by Computer, Account
+    StartTime = arg_min(TimeGenerated, *),
+    EndTime = max(TimeGenerated),
+    Computers = make_set(Computer),
+    Accounts = make_set(Account)
+    by Process
+| where StartTime > ago(query_frequency)
 | project
-  minTimeGenerated,
-  maxTimeGenerated,
-  Computer,
-  Account,
-  AccountType,
-  Activity,
-  CommandLine,
-  Process,
-  NewProcessName,
-  ParentProcessName
+    StartTime,
+    EndTime,
+    Computers,
+    Accounts,
+    Activity,
+    CommandLine,
+    Process,
+    NewProcessName,
+    ParentProcessName
