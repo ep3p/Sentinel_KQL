@@ -2,15 +2,10 @@ let query_frequency = 1h;
 let query_period = 14d;
 let synchronization_wait = 1h;
 ADFSSignInLogs
-| where TimeGenerated between (ago(query_frequency + synchronization_wait) .. ago(synchronization_wait))
+| where TimeGenerated between (ago(query_period) .. ago(synchronization_wait))
 | where UserId == "00000000-0000-0000-0000-000000000000"
-| join kind=leftanti (
-    ADFSSignInLogs
-    | where TimeGenerated between (ago(query_period) .. ago(query_frequency + synchronization_wait))
-    | where UserId == "00000000-0000-0000-0000-000000000000"
-    | distinct UserPrincipalName
-) on UserPrincipalName
 | summarize arg_min(TimeGenerated, *) by UserPrincipalName
+| where TimeGenerated > ago(query_frequency + synchronization_wait)
 | lookup kind=leftouter (
     AuditLogs
     | where TimeGenerated > ago(query_frequency + synchronization_wait)
