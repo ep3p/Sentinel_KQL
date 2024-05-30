@@ -1,3 +1,4 @@
+// Related to https://github.com/ep3p/Sentinel_KQL/edit/main/Queries/Defender%20for%20Endpoint/Multiple-Unexpected%20named%20pipes%20on%20multiple%20devices.kql
 let query_frequency = 1h;
 let query_period = 14d;
 let device_threshold = 15;
