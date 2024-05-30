@@ -1,3 +1,4 @@
+// Related to https://github.com/ep3p/Sentinel_KQL/blob/main/Queries/Defender%20for%20Identity/IdentityLogonEvents-Unexpected%20access%20to%20multiple%20devices.kql
 let query_frequency = 1h;
 let query_period = 14d;
 let device_threshold = 10;
