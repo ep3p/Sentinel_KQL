@@ -1,5 +1,6 @@
 let suspicious_device_name = dynamic([
-    "kali"
+    "kali",
+    "parrot"
 ]);
 union isfuzzy=true
     IdentityLogonEvents,
