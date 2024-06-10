@@ -1,0 +1,11 @@
+SecurityEvent
+| where EventData has "Malformed Security Descriptor"
+| project
+    TimeGenerated,
+    Account,
+    AccountType,
+    Computer,
+    SubjectLogonId, // Search the 4624 event for this SubjectLogonId
+    Activity,
+    OperationType,
+    EventData
