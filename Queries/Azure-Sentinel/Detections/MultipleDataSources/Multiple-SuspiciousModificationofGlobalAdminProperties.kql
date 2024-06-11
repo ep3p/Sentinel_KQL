@@ -19,6 +19,7 @@ IdentityInfo
     | mv-expand TargetResource = TargetResources
     | where TargetResource["type"] == "User"
     | extend AccountObjectId = tostring(TargetResource["id"])
+    | where not(LoggedByService == "Self-service Password Management" and OperationName == "Self-service password reset flow activity progress" and (Result == "failure" or ResultDescription == "User submitted their user ID"))
     | where not(LoggedByService == "Core Directory" and OperationName has "update" and tostring(TargetResource["modifiedProperties"]) == "[]")
     | mv-apply modifiedProperty = TargetResource["modifiedProperties"] on (
         summarize modifiedProperties = make_bag(
