@@ -14,7 +14,7 @@ let _ExpectedTargetDevices = toscalar(
 );
 IdentityLogonEvents
 | where TimeGenerated > ago(query_frequency)
-| where LogonType == "Resource access" and not(Protocol == "Kerberos")// and Application == "Active Directory" and ActionType == "LogonSuccess"
+| where LogonType == "Resource access"// and not(Protocol == "Kerberos")// and Application == "Active Directory" and ActionType == "LogonSuccess"
 | where not(tostring(AdditionalFields["ACTOR.DEVICE"]) == tostring(AdditionalFields["TARGET_OBJECT.DEVICE"]))
 | where not(AccountUpn in (_ExpectedAccounts))
 | where not(TargetDeviceName has_any (_ExpectedTargetDevices))
@@ -29,7 +29,7 @@ IdentityLogonEvents
 | join kind=leftanti (
     IdentityLogonEvents
     | where TimeGenerated between (ago(query_period) .. ago(query_frequency))
-    | where LogonType == "Resource access" and not(Protocol == "Kerberos")// and Application == "Active Directory" and ActionType == "LogonSuccess"
+    | where LogonType == "Resource access"// and not(Protocol == "Kerberos")// and Application == "Active Directory" and ActionType == "LogonSuccess"
     | where not(tostring(AdditionalFields["ACTOR.DEVICE"]) == tostring(AdditionalFields["TARGET_OBJECT.DEVICE"]))
     | where not(AccountUpn in (_ExpectedAccounts))
     | where not(TargetDeviceName has_any (_ExpectedTargetDevices))
