@@ -1,0 +1,13 @@
+// Based on https://github.com/0xAnalyst/DefenderATPQueries/blob/main/C2/MaliciousJA3Fingerprint.kql
+let ja3_list = toscalar(
+    externaldata(Line: string, FirstSeen:datetime)[@"https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv"] with (format="txt")
+    | where not(Line startswith "#")
+    | parse Line with JA3:string "," FirstSeen:datetime "," LastSeen:datetime "," ListingReason:string
+    | summarize make_list(JA3)
+);
+DeviceNetworkEvents
+| where ActionType == "SslConnectionInspected"
+| extend JA3 = tostring(AdditionalFields["ja3"])
+| where JA3 in (ja3_list)
+// | where not(JA3 has "e62a5f4d538cbf169c2af71bec2399b4" and AdditionalFields has_any("CN=HP", "O=HP", "CN=Canon Imaging Product"))
+// | summarize DeviceNames = make_set(DeviceName), RemoteIPs = make_set(RemoteIP), take_any(*) by JA3, ActionType
