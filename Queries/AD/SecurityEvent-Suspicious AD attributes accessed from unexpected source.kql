@@ -17,7 +17,7 @@ let _ExpectedGroups = toscalar(
 let _Identities =
     IdentityInfo
     | where TimeGenerated > ago(query_period) and isnotempty(AccountDomain)
-    | summarize arg_max(TimeGenerated, *) by AccountObjectId
+    | summarize arg_max(TimeGenerated, *) by AccountObjectId, AccountSID
     | project
         SubjectUserName = coalesce(extract(@"(?i:CN\=)([^,]+)", 1, OnPremisesDistinguishedName), AccountName),
         GroupMembership = array_sort_asc(GroupMembership)
