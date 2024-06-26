@@ -8,3 +8,7 @@ union isfuzzy=true
     IdentityDirectoryEvents,
     SecurityEvent
 | where DeviceName has_any (suspicious_device_name) or WorkstationName has_any (suspicious_device_name)
+| extend
+    SourceAccount = coalesce(AccountUpn, Account),
+    SourceIPAddress = coalesce(IPAddress, IpAddress),
+    SuspiciousDeviceName = coalesce(DeviceName, WorkstationName)
