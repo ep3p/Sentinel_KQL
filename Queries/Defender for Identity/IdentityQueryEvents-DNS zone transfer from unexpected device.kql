@@ -1,5 +1,5 @@
 let _ExpectedIPAddresses = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "AxfrDNSQuery"
     | summarize make_list(SourceAddress)
 );
