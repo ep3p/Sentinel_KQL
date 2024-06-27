@@ -1,0 +1,34 @@
+let expected_dlls = dynamic([]);
+let expected_services = dynamic([]);
+union
+    (
+    DeviceRegistryEvents
+    | where RegistryKey has_all (@"HKEY_LOCAL_MACHINE\SYSTEM\", @"\Control\NetworkProvider\Order") and RegistryValueName has "ProviderOrder"
+    | extend NewNetworkProviderService = set_difference(split(RegistryValueData, ","), split(PreviousRegistryValueData, ","))
+    | where array_length(NewNetworkProviderService) > 0 // A Network Provider was added instead of deleted
+    | where not(array_length(NewNetworkProviderService) == 1 and NewNetworkProviderService[0] in (expected_services))
+    )
+    ,
+    (
+    DeviceRegistryEvents
+    | where RegistryKey has_all (@"HKEY_LOCAL_MACHINE\SYSTEM\", @"\Services\", @"\NetworkProvider") and RegistryValueName has "ProviderPath"
+    | where not(RegistryValueData in (expected_dlls))
+    | extend NewNetworkProviderDLL = RegistryValueData
+    )
+| project
+    TimeGenerated,
+    DeviceName,
+    ActionType,
+    RegistryKey,
+    RegistryValueName,
+    RegistryValueData,
+    PreviousRegistryValueData,
+    NewNetworkProviderService,
+    NewNetworkProviderDLL,
+    InitiatingProcessAccountName,
+    InitiatingProcessAccountSid,
+    InitiatingProcessFolderPath,
+    InitiatingProcessSHA256,
+    InitiatingProcessCommandLine,
+    InitiatingProcessRemoteSessionDeviceName,
+    InitiatingProcessRemoteSessionIP
