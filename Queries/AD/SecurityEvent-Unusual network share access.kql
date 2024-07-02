@@ -1,0 +1,27 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let files_threshold = 5;
+SecurityEvent
+| where TimeGenerated > ago(query_period)
+| where EventID == 5140
+| summarize arg_min(TimeGenerated, *) by IpAddress, Account, Computer, ShareLocalPath
+| where TimeGenerated > ago(query_frequency)
+| summarize hint.strategy=shuffle
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Accounts = array_sort_asc(make_set(Account, 50)),
+    Computers = array_sort_asc(make_set(Computer, 50)),
+    ShareLocalPaths = array_sort_asc(make_set_if(ShareLocalPath, isnotempty(ShareLocalPath), 50)),
+    ShareLocalPathCount = count_distinct(ShareLocalPath),
+    take_any(Activity)
+    by IpAddress
+| where ShareLocalPathCount > files_threshold
+| project
+    StartTime,
+    EndTime,
+    IpAddress,
+    Accounts,
+    Activity,
+    Computers,
+    ShareLocalPathCount,
+    ShareLocalPaths
