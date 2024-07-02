@@ -1,0 +1,32 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let computer_threshold = 3;
+let expected_computers = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Notes has "[PipeShare]"
+    | summarize make_list(HostName)
+);
+SecurityEvent
+| where TimeGenerated > ago(query_period)
+| where EventID == 5140 and ShareName has @"\\*\IPC$"
+| where not(Computer has_any (expected_computers))
+| summarize arg_min(TimeGenerated, *) by IpAddress, Account, Computer
+| where TimeGenerated > ago(query_frequency)
+| summarize hint.strategy=shuffle
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Accounts = array_sort_asc(make_set(Account, 50)),
+    Computers = array_sort_asc(make_set(Computer, 50)),
+    ComputerCount = count_distinct(Computer),
+    take_any(ShareName, Activity)
+    by IpAddress
+| where ComputerCount >= computer_threshold
+| project
+    StartTime,
+    EndTime,
+    IpAddress,
+    Accounts,
+    Activity,
+    ComputerCount,
+    Computers,
+    ShareName
