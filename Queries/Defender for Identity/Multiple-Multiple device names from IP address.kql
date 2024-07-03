@@ -1,0 +1,32 @@
+let query_frequency = 1h;
+let query_period = 3h;
+let repeated_device_threshold = 2;
+let new_device_threshold = 3;
+union IdentityLogonEvents, IdentityQueryEvents
+| where TimeGenerated > ago(query_period)
+| where isnotempty(IPAddress) and isnotempty(DeviceName) and not(DeviceName == IPAddress)
+| where not(isnotempty(parse_ipv4(IPAddress)) and not(ipv4_is_private(IPAddress)))
+| as _Events
+| join kind=leftsemi (
+    _Events
+    | evaluate activity_counts_metrics(DeviceName, TimeGenerated, ago(query_period), now(), query_frequency, IPAddress)
+    | where (dcount - new_dcount) >= repeated_device_threshold or new_dcount >= new_device_threshold
+    | where TimeGenerated > ago(2 * query_frequency)
+    ) on IPAddress
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    EventCount = count(),
+    take_any(*)
+    by IPAddress, DeviceName, AccountSid, Application, ActionType, LogonType, Protocol
+| project-reorder
+    StartTime,
+    EndTime,
+    EventCount,
+    IPAddress,
+    DeviceName,
+    Application,
+    AccountUpn,
+    AccountSid,
+    ActionType,
+    Protocol
