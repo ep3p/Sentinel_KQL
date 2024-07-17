@@ -1,0 +1,70 @@
+let query_frequency = 1h;
+let query_period = 14d;
+SecurityEvent
+| where TimeGenerated > ago(14d)
+| where EventID == 4768 and Status == "0x0"
+| parse EventData with * '<Data Name="TicketOptions">'        TicketOptions:long          '</Data>' *
+| parse EventData with * '<Data Name="TicketEncryptionType">' TicketEncryptionType:string '</Data>' *
+| parse EventData with * '<Data Name="PreAuthType">'          PreAuthType:int             '</Data>' *
+| parse EventData with * '<Data Name="CertIssuerName">'       CertIssuerName:string       '</Data>' *
+| parse EventData with * '<Data Name="CertSerialNumber">'     CertSerialNumber:string     '</Data>' *
+| parse EventData with * '<Data Name="CertThumbprint">'       CertThumbprint:string       '</Data>' *
+| extend MachineTargetUserName = TargetUserName endswith "$"
+| summarize
+    count(),
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    take_any(Activity, ServiceName),
+    TargetUserNames = array_sort_asc(make_set(TargetUserName, 25)),
+    IpAddresses = array_sort_asc(make_set(trim_start(@"::ffff:", IpAddress), 25)),
+    take_any(CertIssuerName, CertSerialNumber, CertThumbprint),
+    EventDataSample = take_any(EventData, EventOriginId)
+    by MachineTargetUserName, TicketOptions, TicketEncryptionType, PreAuthType, Status
+| where StartTime > ago(query_frequency)
+// https://github.com/dotnet/Kerberos.NET/blob/develop/Kerberos.NET/Entities/Krb/KdcOptions.cs
+| extend TicketOptionsTranslated = array_concat(
+    iff(binary_and(TicketOptions, 1073741824) != 0, dynamic(["Forwardable"]),               dynamic(null)), // bit  1 - 30
+    iff(binary_and(TicketOptions,  536870912) != 0, dynamic(["Forwarded"]),                 dynamic(null)), // bit  2 - 29
+    iff(binary_and(TicketOptions,  268435456) != 0, dynamic(["Proxiable"]),                 dynamic(null)), // bit  3 - 28
+    iff(binary_and(TicketOptions,  134217728) != 0, dynamic(["Proxy"]),                     dynamic(null)), // bit  4 - 27
+    iff(binary_and(TicketOptions,   67108864) != 0, dynamic(["Allow-postdate"]),            dynamic(null)), // bit  5 - 26
+    iff(binary_and(TicketOptions,   33554432) != 0, dynamic(["Postdated"]),                 dynamic(null)), // bit  6 - 25
+    iff(binary_and(TicketOptions,   16777216) != 0, dynamic(["Invalid"]),                   dynamic(null)), // bit  7 - 24
+    iff(binary_and(TicketOptions,    8388608) != 0, dynamic(["Renewable"]),                 dynamic(null)), // bit  8 - 23
+    iff(binary_and(TicketOptions,    4194304) != 0, dynamic(["Initial"]),                   dynamic(null)), // bit  9 - 22
+    iff(binary_and(TicketOptions,    2097152) != 0, dynamic(["Pre-authent"]),               dynamic(null)), // bit 10 - 21
+    iff(binary_and(TicketOptions,    1048576) != 0, dynamic(["Opt-hardware-auth"]),         dynamic(null)), // bit 11 - 20
+    iff(binary_and(TicketOptions,     524288) != 0, dynamic(["Transited-policy-checked"]),  dynamic(null)), // bit 12 - 19
+    iff(binary_and(TicketOptions,     262144) != 0, dynamic(["Ok-as-delegate"]),            dynamic(null)), // bit 13 - 18
+    iff(binary_and(TicketOptions,     131072) != 0, dynamic(["Request-anonymous"]),         dynamic(null)), // bit 14 - 17
+    iff(binary_and(TicketOptions,      65536) != 0, dynamic(["Name-canonicalize"]),         dynamic(null)), // bit 15 - 16
+    iff(binary_and(TicketOptions,         32) != 0, dynamic(["Disable-transited-check"]),   dynamic(null)), // bit 26 -  5
+    iff(binary_and(TicketOptions,         16) != 0, dynamic(["Renewable-ok"]),              dynamic(null)), // bit 27 -  4
+    iff(binary_and(TicketOptions,          8) != 0, dynamic(["Enc-tkt-in-skey"]),           dynamic(null)), // bit 28 -  3
+    iff(binary_and(TicketOptions,          2) != 0, dynamic(["Renew"]),                     dynamic(null)), // bit 30 -  1
+    iff(binary_and(TicketOptions,          1) != 0, dynamic(["Validate"]),                  dynamic(null))  // bit 31 -  0
+    )
+| mv-expand TicketOptionTranslated = iff(array_length(TicketOptionsTranslated) > 0, TicketOptionsTranslated, dynamic([""])) to typeof(string)
+// Remove expected ticket options
+| where not(TicketOptionTranslated in ("Forwardable", "Renewable", "Name-canonicalize", "Renewable-ok"))
+| summarize take_any(*) by EventOriginId
+| extend TicketOptions = tohex(TicketOptions, 8)
+| project
+    StartTime,
+    EndTime,
+    Activity,
+    ServiceName,
+    Status,
+    TargetUserNames,
+    IpAddresses,
+    MachineTargetUserName,
+    TicketOptionsTranslated,
+    TicketOptions,
+    TicketEncryptionType,
+    PreAuthType,
+    CertIssuerName,
+    CertSerialNumber,
+    CertThumbprint,
+    EventDataSample,
+    TargetUserName = iff(array_length(TargetUserNames) == 1, tostring(TargetUserNames[0]), ""),
+    IpAddress = iff(array_length(IpAddresses) == 1, tostring(IpAddresses[0]), "")
