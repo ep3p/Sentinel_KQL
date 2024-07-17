@@ -1,7 +1,7 @@
 let query_frequency = 1h;
 let query_period = 14d;
 SecurityEvent
-| where TimeGenerated > ago(14d)
+| where TimeGenerated > ago(query_period)
 | where EventID == 4768 and Status == "0x0"
 | parse EventData with * '<Data Name="TicketOptions">'        TicketOptions:long          '</Data>' *
 | parse EventData with * '<Data Name="TicketEncryptionType">' TicketEncryptionType:string '</Data>' *
