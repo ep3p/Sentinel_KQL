@@ -1,0 +1,10 @@
+// ClientIP is starting to show private IP addresses for OfficeWorkloads OneDrive and SharePoint, information is being lost.
+OfficeActivity
+| where TimeGenerated between (ago(90d) .. now())
+| where isnotempty(ClientIP)
+| extend
+    IsPrivateRange = isnotempty(parse_ipv4(ClientIP)) and ipv4_is_private(ClientIP),
+    IsTenSixtyRange = isnotempty(parse_ipv4(ClientIP)) and ipv4_is_in_any_range(ClientIP, "10.60.0.0/16")
+| where IsPrivateRange
+| summarize log(count()) by bin(TimeGenerated, 1d), OfficeWorkload
+| render columnchart
