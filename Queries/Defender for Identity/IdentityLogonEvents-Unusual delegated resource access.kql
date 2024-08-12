@@ -16,6 +16,7 @@ IdentityLogonEvents
     ActionType,
     LogonType,
     Protocol,
+    DeviceName,
     KerberosDelegationType,
     ActorObjectSid,
     ActorObjectName,
