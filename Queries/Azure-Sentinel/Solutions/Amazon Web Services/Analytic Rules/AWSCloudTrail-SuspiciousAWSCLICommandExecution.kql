@@ -1,9 +1,17 @@
 let query_frequency = 1h;
 let query_period = 2h;
 let threshold = 5;
+let _ExpectedRoleIdentityRegex = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "AWSAssumedRoleIdentityEventName_Regex" and Auxiliar has "AWS-CLI"
+    | summarize RegEx = make_set(strcat(SourceResource, ActorPrincipalName))
+    | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
+);
 AWSCloudTrail
 | where TimeGenerated > ago(query_period)
 | where UserAgent has "aws-cli"
+| extend UserIdentityUserName = tostring(split(UserIdentityPrincipalid, ":")[1])
+| where not(strcat(SessionIssuerUserName, UserIdentityUserName) matches regex _ExpectedRoleIdentityRegex)
 | where EventName matches regex @"Describe|Export|Get|List"
 | invoke AWSIdentityRole()
 | summarize arg_min(TimeGenerated, *) by Identity, EventName, RecipientAccountId
