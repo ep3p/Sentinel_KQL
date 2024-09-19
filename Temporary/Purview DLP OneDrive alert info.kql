@@ -1,0 +1,214 @@
+let alert_id = "<<<>>>";
+let query_period = 1d;
+let _FilePaths =
+    AlertEvidence
+    | where Timestamp > ago(query_period)
+    | where EntityType == "File" and AlertId == strcat("dl", alert_id)
+    | extend AdditionalFields = todynamic(AdditionalFields)
+    | distinct SourceFilePath = strcat(AdditionalFields["Directory"], "/", AdditionalFields["Name"]), ObjectName = url_decode(tostring(AdditionalFields["Name"]))
+;
+CloudAppEvents
+| where Timestamp > ago(query_period)
+| where ActionType == "AlertTriggered" and tostring(RawEventData["AlertId"]) == alert_id
+| extend
+    AlertId = tostring(RawEventData["AlertId"]),
+    Data = todynamic(tostring(RawEventData["Data"]))
+| extend
+    UserPrincipalName = tolower(tostring(Data["f3u"])),
+    Severity = tostring(Data["sev"]),
+    Workload = tostring(Data["wl"]),
+    SensitiveInformationContentType = split(tostring(Data["sict"]), ";"),
+    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";")
+| where Workload == "OneDrive" and tostring(RawEventData["Category"]) == "DataLossPrevention"
+| project
+    Timestamp,
+    Application,
+    ActionType,
+    AlertId,
+    UserPrincipalName,
+    Severity,
+    Workload,
+    SensitiveInformationContentType,
+    SensitiveInformationTypeMatchInfo,
+    AlertTriggered_RawEventData = RawEventData,
+    AlertTriggered_ReportId = ReportId
+| lookup kind=leftouter (
+    CloudAppEvents
+    | where Timestamp > ago(query_period)
+    | where ActionType == "AlertEntityGenerated" and tostring(RawEventData["AlertId"]) == alert_id
+    | extend
+        AlertId = tostring(RawEventData["AlertId"]),
+        EntityType = tostring(RawEventData["EntityType"]),
+        Data = todynamic(tostring(RawEventData["Data"]))
+    | where EntityType == "DlpRuleMatch"
+    | extend
+        CreationTime = todatetime(Data["at"]),
+        PolicyId = coalesce(tostring(Data["cid"]), tostring(Data["dpid"])),
+        PolicyName = tostring(Data["dpn"]),
+        ManagementRuleId = tostring(Data["dmrid"]),
+        RuleId = tostring(Data["drid"]),
+        RuleName = tostring(Data["drn"]),
+        ProtectionActions = split(tostring(Data["dact"]), ", "),
+        ObjectName = tostring(Data["von"]),
+        DMC = split(tostring(Data["dmc"]), ","),
+        FileOwnerName = tolower(tostring(Data["flmb"])), // It might not the same as f3u - UserPrincipalName
+        FileOwnerDisplayName = tostring(Data["fo"]),
+        USI = tostring(Data["usi"])
+    | lookup kind=leftouter _FilePaths on ObjectName
+    | project
+        AlertId,
+        PolicyId,
+        PolicyName,
+        ManagementRuleId,
+        RuleId,
+        RuleName,
+        DMC,
+        ProtectionActions,
+        ObjectName,
+        SourceFilePath,
+        CreationTime,
+        FileOwnerName,
+        FileOwnerDisplayName,
+        USI,
+        AlertEntityGenerated_DlpRuleMatch_RawEventData = RawEventData,
+        AlertEntityGenerated_DlpRuleMatch_ReportId = ReportId
+    ) on AlertId
+| summarize arg_max(CreationTime, *) by Timestamp, ObjectName, ManagementRuleId
+| join hint.strategy=shuffle kind=leftouter (
+    CloudAppEvents
+    | where Timestamp > ago(query_period)
+    | where ActionType in ("DLPRuleMatch", "DLPRuleUndo") and Application == "Microsoft OneDrive for Business"
+    | mv-expand PolicyDetail = iff(array_length(RawEventData["PolicyDetails"]) > 0, RawEventData["PolicyDetails"], dynamic([""]))
+    | mv-expand Rule = iff(array_length(PolicyDetail["Rules"]) > 0, PolicyDetail["Rules"], dynamic([""]))
+    | mv-apply SensitiveInformationItem = Rule["ConditionsMatched"]["SensitiveInformation"] on (
+        summarize SensitiveInformation = make_list(bag_remove_keys(SensitiveInformationItem, dynamic(["SensitiveInformationDetailedClassificationAttributes"])))
+    )
+    | project
+        CreationTime = todatetime(RawEventData["CreationTime"]),
+        ManagementRuleId = tostring(Rule["ManagementRuleId"]),
+        ObjectName,
+        //IncidentId = tostring(RawEventData["IncidentId"]),
+        SensitiveInformation,
+        ActionType,
+        Reason = tostring(RawEventData["ExceptionInfo"]["Reason"]),
+        //SharePointMetaData = RawEventData["SharePointMetaData"],
+        SiteCollectionUrl = tostring(RawEventData["SharePointMetaData"]["SiteCollectionUrl"]),
+        //IsViewableByExternalUsers = tostring(RawEventData["SharePointMetaData"]["IsViewableByExternalUsers"]),
+        //ItemLastSharedTime = todatetime(RawEventData["SharePointMetaData"]["ItemLastSharedTime"]),
+        //SharedBy = todatetime(RawEventData["SharePointMetaData"]["SharedBy"]),
+        DLPRuleMatch_RawEventData = RawEventData,
+        DLPRuleMatch_ReportId = ReportId
+    // The same file can be updated, and suffer several "DLPRuleMatch" and "DLPRuleUndo" actions
+    | summarize
+        EvaluationEventCount = count(),
+        arg_min(CreationTime, SensitiveInformation, SiteCollectionUrl, DLPRuleMatch_RawEventData, DLPRuleMatch_ReportId),
+        (LastEvaluationTime, LastActionType, LastReason, LastSensitiveInformation) = arg_max(CreationTime, ActionType, Reason, SensitiveInformation)
+        by ObjectName, ManagementRuleId
+    | extend
+        LastEvaluationTime = iff(EvaluationEventCount == 1, datetime(null), LastEvaluationTime),
+        LastActionType = iff(EvaluationEventCount == 1, "", LastActionType),
+        LastReason = iff(EvaluationEventCount == 1, "", LastReason),
+        LastSensitiveInformation = iff(EvaluationEventCount == 1, dynamic(null), LastSensitiveInformation)
+    ) on $left.SourceFilePath == $right.ObjectName, ManagementRuleId //, CreationTime does not always match
+| project-away ObjectName1, ManagementRuleId1, CreationTime1
+// Add info about the sharing targets
+// Did not have any example to work with, where a DLP alert happened and the file had ActionType in ("AddedToGroup", "AddedToSecureLink", "AddedToSharingLink")
+| as hint.materialized=true _Events
+| join kind=leftouter (
+    CloudAppEvents
+    | where Timestamp > ago(query_period)
+    | where Application == "Microsoft OneDrive for Business" and ActionType in ("AddedToGroup", "AddedToSecureLink", "AddedToSharingLink") // "GroupAdded", "SecureLinkCreated", "SharingLinkCreated", "SharingSet", "SharingInheritanceBroken"
+    | extend
+        UserId = tostring(RawEventData["UserId"]),
+        CreationTime = todatetime(RawEventData["CreationTime"]),
+        SharingOperation = tostring(RawEventData["Operation"]),
+        SiteUrl = tostring(RawEventData["SiteUrl"]),
+        ListId = tostring(RawEventData["ListId"]),
+        ListItemUniqueId = tostring(RawEventData["ListItemUniqueId"]),
+        ObjectName = tostring(RawEventData["ObjectId"]),
+        ItemType = tostring(RawEventData["ItemType"]),
+        Permission = tostring(RawEventData["Permission"]),
+        SharingLinkScope = tostring(RawEventData["SharingLinkScope"]),
+        EventData = tostring(RawEventData["EventData"]),
+        ModifiedProperties = tostring(RawEventData["ModifiedProperties"]),
+        TargetUserOrGroupName = tostring(RawEventData["TargetUserOrGroupName"]),
+        TargetUserOrGroupType = tostring(RawEventData["TargetUserOrGroupType"]),
+        UniqueSharingId = tostring(RawEventData["UniqueSharingId"]),
+        CorrelationId = tostring(RawEventData["CorrelationId"]),
+        SharingEvent_RawEventData = RawEventData,
+        SharingEvent_ReportId = ReportId
+    | where tostring(toscalar(_Events | summarize make_set_if(url_decode(SourceFilePath), isnotempty(SourceFilePath)))) has ObjectName
+    | summarize
+        CreationTime = min(CreationTime),
+        TargetUserOrGroupName = array_sort_asc(make_set_if(TargetUserOrGroupName, isnotempty(TargetUserOrGroupName)))
+        by CorrelationId, SiteUrl, UserId, SharingOperation, UniqueSharingId, ObjectName, ItemType, Permission, SharingLinkScope, EventData, TargetUserOrGroupType
+    | summarize
+        CreationTime = min(CreationTime),
+        TargetUserOrGroup = make_bag(bag_pack(TargetUserOrGroupType, TargetUserOrGroupName))
+        by CorrelationId, SiteUrl, UserId, SharingOperation, UniqueSharingId, ObjectName, ItemType, Permission, SharingLinkScope, EventData
+    | extend EmptyColumns = array_concat(
+        iff(isnotempty(Permission), dynamic(null), dynamic(["Permission"])),
+        iff(isnotempty(SharingLinkScope), dynamic(null), dynamic(["SharingLinkScope"])),
+        iff(isnotempty(EventData), dynamic(null), dynamic(["EventData"]))
+        )
+    | summarize
+        CreationTime = min(CreationTime),
+        Operations = make_bag(bag_pack(SharingOperation, bag_remove_keys(bag_pack_columns(Permission, SharingLinkScope, EventData), EmptyColumns))),
+        take_any(TargetUserOrGroup)
+        by CorrelationId, SiteUrl, UserId, UniqueSharingId, ObjectName, ItemType, Auxiliar = tostring(TargetUserOrGroup)
+    | summarize
+        CreationTime = min(CreationTime),
+        Objects = make_list(bag_pack_columns(ObjectName, ItemType, Operations)),
+        take_any(TargetUserOrGroup)
+        by CorrelationId, SiteUrl, UserId, Auxiliar
+    | summarize
+        SharingTime = min(CreationTime),
+        SharingTargets = make_list(bag_pack_columns(TargetUserOrGroup, Objects))
+        by CorrelationId, SiteUrl, UserId
+    | sort by SharingTime asc
+    | summarize
+        SharingEvents = make_list(bag_pack_columns(SharingTime, CorrelationId, SharingTargets))
+        by SiteUrl, UserId
+    | project
+        SiteCollectionUrl = SiteUrl,
+        UserPrincipalName = UserId,
+        SharingEvents
+    ) on SiteCollectionUrl, UserPrincipalName
+| project-away SiteCollectionUrl1, UserPrincipalName1
+| project-reorder
+    Timestamp,
+    Application,
+    ActionType,
+    AlertId,
+    UserPrincipalName,
+    Severity,
+    Workload,
+    SensitiveInformationContentType,
+    SensitiveInformationTypeMatchInfo,
+    AlertTriggered_RawEventData,
+    AlertTriggered_ReportId,
+    PolicyId,
+    PolicyName,
+    ManagementRuleId,
+    RuleId,
+    RuleName,
+    DMC,
+    ProtectionActions,
+    ObjectName,
+    SourceFilePath,
+    CreationTime,
+    FileOwnerName,
+    FileOwnerDisplayName,
+    USI,
+    AlertEntityGenerated_DlpRuleMatch_RawEventData,
+    AlertEntityGenerated_DlpRuleMatch_ReportId,
+    SensitiveInformation,
+    EvaluationEventCount,
+    LastEvaluationTime,
+    LastActionType,
+    LastReason,
+    LastSensitiveInformation,
+    SiteCollectionUrl,
+    DLPRuleMatch_RawEventData,
+    DLPRuleMatch_ReportId,
+    SharingEvents
