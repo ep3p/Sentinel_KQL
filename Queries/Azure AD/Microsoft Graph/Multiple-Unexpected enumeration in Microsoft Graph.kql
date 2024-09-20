@@ -4,6 +4,7 @@ let query_period = 1d; // 14d in rule parameters for IdentityInfo
 let paging_threshold = 100;
 let paging_resource_types = dynamic(["applications", "devices", "groups", "members", "servicePrincipals", "users"]);
 let paging_resource_types_threshold = 2;
+let paging_total_threshold = 1000;
 let _ExpectedPagingAccountIds =
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "MicrosoftGraphPaging"
@@ -34,7 +35,8 @@ MicrosoftGraphActivityLogs
     //PagingEndpoints = array_sort_asc(make_set(Endpoint, 200))
     by UserId, ServicePrincipalId
 | where EndTime > ago(query_frequency)
-| where PagingCount > paging_threshold and array_length(set_intersect(paging_resource_types, PagingResourceTypes)) >= paging_resource_types_threshold
+| where (PagingCount > paging_threshold and array_length(set_intersect(paging_resource_types, PagingResourceTypes)) >= paging_resource_types_threshold)
+    or (PagingCount > paging_total_threshold and array_length(set_intersect(paging_resource_types, PagingResourceTypes)) >= 1)
 | project UserId, ServicePrincipalId, PagingCount, PagingResourceTypes//, PagingEndpoints
 | as hint.materialized=true _Events
 | join kind=leftouter (
