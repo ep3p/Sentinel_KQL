@@ -1,15 +1,35 @@
 let query_frequency = 1h;
-let query_period = 3h;
+let query_period = 6h;
 let repeated_device_threshold = 2;
 let new_device_threshold = 3;
-union IdentityLogonEvents, IdentityQueryEvents
-| where TimeGenerated > ago(query_period)
-| where isnotempty(IPAddress) and isnotempty(DeviceName) and not(DeviceName == IPAddress)
-| where not(isnotempty(parse_ipv4(IPAddress)) and not(ipv4_is_private(IPAddress)))
+let _ExcludedIPAddresses = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Notes has_any ("[AuthenticationProxyAddress]", "[MultipleDeviceNames]")
+    | summarize make_list(IPAddress)
+);
+let _DefenderForIdentity =
+    union IdentityLogonEvents, IdentityQueryEvents
+    | where TimeGenerated > ago(query_period)
+    | where isnotempty(IPAddress) and isnotempty(DeviceName) and not(DeviceName == IPAddress)
+    | where not(isnotempty(parse_ipv4(IPAddress)) and not(ipv4_is_private(IPAddress)))
+;
+let _SecurityEvents =
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID in (4624, 4625)
+    | where not(IpAddress in ("-", "")) and not(WorkstationName in ("-", "")) and not(toupper(tostring(split(Computer, ".")[0])) == toupper(WorkstationName))
+    | extend
+        IPAddress = IpAddress,
+        DeviceName = WorkstationName,
+        LogonType = tostring(LogonType)
+;
+union isfuzzy=true _DefenderForIdentity, _SecurityEvents
+| where not(IPAddress in (_ExcludedIPAddresses))
+| extend ParsedDeviceName = toupper(tostring(split(DeviceName, ".")[0]))
 | as _Events
 | join kind=leftsemi (
     _Events
-    | evaluate activity_counts_metrics(DeviceName, TimeGenerated, ago(query_period), now(), query_frequency, IPAddress)
+    | evaluate activity_counts_metrics(ParsedDeviceName, TimeGenerated, ago(query_period), now(), query_frequency, IPAddress)
     | where (dcount - new_dcount) >= repeated_device_threshold or new_dcount >= new_device_threshold
     | where TimeGenerated > ago(2 * query_frequency)
     ) on IPAddress
@@ -18,10 +38,11 @@ union IdentityLogonEvents, IdentityQueryEvents
     EndTime = max(TimeGenerated),
     EventCount = count(),
     take_any(*)
-    by IPAddress, DeviceName, AccountSid, Application, ActionType, LogonType, Protocol
+    by Type, IPAddress, DeviceName, AccountSid, Application, ActionType, LogonType, Protocol
 | project-reorder
     StartTime,
     EndTime,
+    ParsedDeviceName,
     EventCount,
     IPAddress,
     DeviceName,
