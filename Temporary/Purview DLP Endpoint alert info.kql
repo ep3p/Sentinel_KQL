@@ -1,0 +1,130 @@
+let alert_id = "<<<>>>";
+let query_period = 1d;
+CloudAppEvents
+| where Timestamp > ago(query_period)
+| where ActionType == "AlertTriggered" and tostring(RawEventData["AlertId"]) == alert_id
+| extend
+    AlertId = tostring(RawEventData["AlertId"]),
+    Data = todynamic(tostring(RawEventData["Data"]))
+| extend
+    UserPrincipalName = tolower(tostring(Data["f3u"])),
+    Severity = tostring(Data["sev"]),
+    Workload = tostring(Data["wl"]),
+    SensitiveInformationContentType = split(tostring(Data["sict"]), ";"),
+    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";")
+| where Workload == "Endpoint" and tostring(RawEventData["Category"]) == "DataLossPrevention"
+| project
+    Timestamp,
+    Application,
+    ActionType,
+    AlertId,
+    UserPrincipalName,
+    Severity,
+    Workload,
+    SensitiveInformationContentType,
+    SensitiveInformationTypeMatchInfo,
+    AlertTriggered_RawEventData = RawEventData,
+    AlertTriggered_ReportId = ReportId
+| lookup kind=leftouter (
+    CloudAppEvents
+    | where Timestamp > ago(query_period)
+    | where ActionType == "AlertEntityGenerated" and tostring(RawEventData["AlertId"]) == alert_id
+    | extend
+        AlertId = tostring(RawEventData["AlertId"]),
+        EntityType = tostring(RawEventData["EntityType"]),
+        Data = todynamic(tostring(RawEventData["Data"]))
+    | where EntityType == "DlpRuleMatch"
+    | extend
+        CreationTime = todatetime(Data["at"]),
+        PolicyId = coalesce(tostring(Data["cid"]), tostring(Data["dpid"])),
+        PolicyName = tostring(Data["dpn"]),
+        ManagementRuleId = tostring(Data["dmrid"]),
+        RuleId = tostring(Data["drid"]),
+        RuleName = tostring(Data["drn"]),
+        ProtectionMode = tostring(Data["enmd"]),
+        ProtectionActions = split(tostring(Data["dact"]), ", "),
+        ObjectName = tostring(Data["von"]),
+        DMC = split(tostring(Data["dmc"]), ","),
+        MDT = tostring(Data["mdt"]),
+        TDC = toint(Data["tdc"]),
+        Operation = tostring(Data["eop"]),
+        OperationApp = tostring(Data["app"]),
+        ObjectFilePath = tostring(Data["ofph"]),
+        FileSize = tostring(Data["efs"]),
+        TargetFilePath = tostring(Data["tfph"]),
+        TargetDomain = tostring(Data["tdmn"]),
+        RemovableMassStorageSerialNumber = tostring(Data["rmsn"]),
+        RemovableMassStorageEncrypted = tobool(Data["rmse"]),
+        TargetPrinterName = tostring(Data["pn"]),
+        DeviceId = tostring(Data["mddid"]),
+        DUOP = tostring(Data["duop"]),
+        DeviceName = tostring(Data["dn"]),
+        ClientIP = tostring(Data["ecip"])
+    | project
+        AlertId,
+        PolicyId,
+        PolicyName,
+        ManagementRuleId,
+        RuleId,
+        RuleName,
+        DMC,
+        ProtectionActions,
+        ProtectionMode,
+        MDT,
+        TDC,
+        Operation,
+        OperationApp,
+        ObjectName,
+        ObjectFilePath,
+        CreationTime,
+        FileSize,
+        TargetFilePath,
+        TargetDomain,
+        DUOP,
+        TargetPrinterName,
+        RemovableMassStorageSerialNumber,
+        RemovableMassStorageEncrypted,
+        DeviceId,
+        DeviceName,
+        ClientIP,
+        AlertEntityGenerated_DlpRuleMatch_RawEventData = RawEventData,
+        AlertEntityGenerated_DlpRuleMatch_ReportId = ReportId
+    ) on AlertId
+| join hint.strategy=shuffle kind=leftouter (
+    CloudAppEvents
+    | where Timestamp > ago(query_period)
+    | where Application == "Microsoft 365" and RawEventData["Workload"] == "Endpoint" and RawEventData has_all ("PolicyMatchInfo", "PolicyId", "RuleId")
+    | project
+        CreationTime = todatetime(RawEventData["CreationTime"]),
+        DeviceId = tostring(RawEventData["MDATPDeviceId"]),
+        Operation = tostring(RawEventData["Operation"]),
+        OperationApp = tostring(RawEventData["Application"]),
+        MatchedPolicies = RawEventData["MatchedPolicies"],
+        ObjectFilePath = tostring(RawEventData["ObjectId"]),
+        DlpOriginalFilePath = tostring(RawEventData["DlpOriginalFilePath"]),
+        OriginatingDomain = tostring(RawEventData["OriginatingDomain"]),
+        Justification = tostring(RawEventData["Justification"]),
+        RemovableMediaDeviceAttributes = RawEventData["RemovableMediaDeviceAttributes"],
+        ParentArchiveHash = tostring(RawEventData["ParentArchiveHash"]),
+        PreviousFileName = tostring(RawEventData["PreviousFileName"]),
+        FileType = tostring(RawEventData["FileType"]),
+        FileExtension = tostring(RawEventData["FileExtension"]),
+        Sha1 = tostring(RawEventData["Sha1"]),
+        Sha256 = tostring(RawEventData["Sha256"]),
+        SourceLocationType = toint(RawEventData["SourceLocationType"]),
+        DestinationLocationType = toint(RawEventData["DestinationLocationType"]),
+        //Hidden = tostring(RawEventData["Hidden"]),
+        UserType = toint(RawEventData["UserType"]),
+        EndpointOperation_RawEventData = RawEventData,
+        EndpointOperation_ReportId = ReportId
+    | mv-expand MatchedPolicy = iff(array_length(MatchedPolicies) > 0, MatchedPolicies, pack_array(EndpointOperation_RawEventData["PolicyMatchInfo"]))
+    | extend
+        DlpOriginalFilePath = iff(DlpOriginalFilePath == ObjectFilePath, "", DlpOriginalFilePath),
+        PolicyId = tostring(MatchedPolicy["PolicyId"]),
+        RuleId = tostring(MatchedPolicy["RuleId"])
+    | project-away MatchedPolicies, MatchedPolicy
+    ) on CreationTime, DeviceId, Operation, OperationApp, ObjectFilePath, PolicyId, RuleId
+| project-away CreationTime1, DeviceId1, Operation1, OperationApp1, ObjectFilePath1, PolicyId1, RuleId1
+// | mv-apply SensitiveInfoTypeData = EndpointOperation_RawEventData["SensitiveInfoTypeData"] on (
+//     summarize SensitiveInformation = make_list(bag_remove_keys(SensitiveInfoTypeData, dynamic(["SensitiveInformationDetailedClassificationAttributes"])))
+//     )
