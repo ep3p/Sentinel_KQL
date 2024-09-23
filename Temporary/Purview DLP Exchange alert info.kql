@@ -42,6 +42,13 @@ CloudAppEvents
     InternetMessageId = tostring(internet_message_ids[0]),
     NetworkMessageId = tostring(network_message_ids[0])
 | lookup kind=leftouter (
+    EmailEvents
+    | where Timestamp > ago(query_period)
+    | where NetworkMessageId == tostring(network_message_ids[0])
+    | summarize FinalRecipientEmailAddress = array_sort_asc(make_list(RecipientEmailAddress)) by NetworkMessageId, DeliveryAction
+    | summarize FinalRecipientEmailAddress = make_bag(bag_pack(DeliveryAction, FinalRecipientEmailAddress)) by NetworkMessageId, DeliveryAction
+    ) on NetworkMessageId
+| lookup kind=leftouter (
     EmailUrlInfo
     | where Timestamp > ago(query_period)
     | where NetworkMessageId == tostring(network_message_ids[0])
