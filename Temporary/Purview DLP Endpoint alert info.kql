@@ -125,6 +125,6 @@ CloudAppEvents
     | project-away MatchedPolicies, MatchedPolicy
     ) on CreationTime, DeviceId, Operation, OperationApp, ObjectFilePath, PolicyId, RuleId
 | project-away CreationTime1, DeviceId1, Operation1, OperationApp1, ObjectFilePath1, PolicyId1, RuleId1
-// | mv-apply SensitiveInfoTypeData = EndpointOperation_RawEventData["SensitiveInfoTypeData"] on (
-//     summarize SensitiveInformation = make_list(bag_remove_keys(SensitiveInfoTypeData, dynamic(["SensitiveInformationDetailedClassificationAttributes"])))
-//     )
+| mv-apply SensitiveInfoTypeData = EndpointOperation_RawEventData["SensitiveInfoTypeData"] on (
+    summarize SensitiveInformation = make_list(bag_remove_keys(SensitiveInfoTypeData, dynamic(["SensitiveInformationDetailedClassificationAttributes"])))
+    )
