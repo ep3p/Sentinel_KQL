@@ -1,0 +1,133 @@
+let malicious_link = "<<<>>>";
+let internet_message_id = "<<<>>>";
+let query_period = 1d;
+let network_message_ids = toscalar(
+    EmailEvents
+    | where Timestamp > ago(query_period)
+    | where InternetMessageId == strcat("<", internet_message_id, ">") or InternetMessageId == internet_message_id
+    | summarize make_set(NetworkMessageId)
+);
+let parsed_malicious_link = parse_url(malicious_link);
+let is_valid_link = isnotempty(tostring(parsed_malicious_link["Host"]));
+let is_valid_internet_message_id = isnotempty(internet_message_id);
+let link_to_search = strcat(parsed_malicious_link["Host"], parsed_malicious_link["Path"]);
+let proxy_ranges = dynamic([]);
+let corporate_egress = dynamic([]);
+// UrlClickEvents Url column will always end with "/" if there isn't a path after the host
+UrlClickEvents
+| where Timestamp > ago(query_period)
+| where is_valid_link and (Url has link_to_search or UrlChain has link_to_search)
+| sort by Timestamp asc
+| extend IPAddressType = case(
+    ipv4_is_in_any_range(IPAddress, proxy_ranges), "Proxy",
+    ipv4_is_in_any_range(IPAddress, corporate_egress), "Corporate",
+    "Other"
+)
+| summarize
+    ClickCount = count(),
+    Workloads = array_sort_asc(make_set(Workload)),
+    IPAddresses = array_sort_asc(make_set(IPAddress)),
+    IPAddressTypes = array_sort_asc(make_set(IPAddressType)),
+    EmailNetworkMessageIds = make_set_if(NetworkMessageId, Workload == "Email"),
+    ClickEvents = make_list(bag_pack_columns(Timestamp, Workload, AccountUpn, IPAddress, IPAddressType, IsClickedThrough), 250),
+    take_anyif(ThreatTypes, isnotempty(ThreatTypes)),
+    take_anyif(DetectionMethods, isnotempty(DetectionMethods))
+    by Url, UrlChain, ActionType
+| sort by ActionType asc
+| summarize
+    ClickCount = sum(ClickCount),
+    AllowedWorkloads = array_sort_asc(make_set_if(Workloads, not(ActionType == "ClickBlocked"))),
+    //AllowedIPAddresses = array_sort_asc(make_set_if(IPAddresses, not(ActionType == "ClickBlocked"))),
+    AllowedIPAddressTypes = array_sort_asc(make_set_if(IPAddressTypes, not(ActionType == "ClickBlocked"))),
+    ClickInfo = make_bag(bag_pack(ActionType, bag_pack_columns(ClickCount, Workloads, IPAddressTypes, IPAddresses, EmailNetworkMessageIds, ClickEvents))),
+    take_anyif(ThreatTypes, isnotempty(ThreatTypes)),
+    take_anyif(DetectionMethods, isnotempty(DetectionMethods))
+    by Url, UrlChain
+| extend AuxiliarKey = true
+| join kind=fullouter (
+    EmailEvents
+    | where Timestamp > ago(query_period)
+    | where array_length(network_message_ids) > 0 and NetworkMessageId in (network_message_ids)
+    | summarize
+        IMI_DeliveryActions = array_sort_asc(make_set(DeliveryAction)),
+        IMI_DeliveryLocations = array_sort_asc(make_set(DeliveryLocation)),
+        IMI_LatestDeliveryActions = array_sort_asc(make_set(LatestDeliveryAction)),
+        IMI_LatestDeliveryLocations = array_sort_asc(make_set(LatestDeliveryLocation))
+    | extend AuxiliarKey = true
+    ) on AuxiliarKey
+| project-away AuxiliarKey, AuxiliarKey1
+| extend AuxiliarKey = true
+| join kind=fullouter (
+    EmailUrlInfo
+    | where Timestamp > ago(query_period)
+    | where array_length(network_message_ids) > 0 and NetworkMessageId in (network_message_ids) and is_valid_link and Url has link_to_search
+    | summarize UrlLocations = array_sort_asc(make_set(UrlLocation))
+    | extend AuxiliarKey = true
+    ) on AuxiliarKey
+| project-away AuxiliarKey, AuxiliarKey1
+| extend AuxiliarKey = array_length(IMI_DeliveryActions) > 0
+| join kind=leftouter (
+    EmailAttachmentInfo
+    | where Timestamp > ago(query_period)
+    | where array_length(network_message_ids) > 0 and NetworkMessageId in (network_message_ids)
+    | sort by FileType asc, FileName asc
+    | summarize AttachmentInfo = make_set(bag_pack_columns(FileType, FileName, FileSize, SHA256))
+    | extend AuxiliarKey = true
+    ) on AuxiliarKey
+| project-away AuxiliarKey, AuxiliarKey1
+| extend AuxiliarKey = array_length(AttachmentInfo) > 0
+| join kind=leftouter (
+    union DeviceEvents, DeviceFileEvents, DeviceImageLoadEvents, DeviceProcessEvents
+    | where Timestamp > ago(query_period)
+    | where array_length(network_message_ids) > 0 and isnotempty(SHA256) and SHA256 in (toscalar(
+        EmailAttachmentInfo
+        | where Timestamp > ago(query_period)
+        | where array_length(network_message_ids) > 0 and NetworkMessageId in (network_message_ids)
+        | summarize make_set(SHA256)
+        ))
+    | summarize
+        AttachmentCorporateDeviceActionTypes = array_sort_asc(make_set(ActionType)),
+        AttachmentCorporateDeviceNames = array_sort_asc(make_set(DeviceName, 100))
+    | extend AuxiliarKey = true
+    ) on AuxiliarKey
+| project-away AuxiliarKey, AuxiliarKey1
+| extend
+    IsValidLink = is_valid_link,
+    IsValidInternetMessageId = is_valid_internet_message_id,
+    ClickActionTypes = bag_keys(ClickInfo),
+    HasAllowedClick = iff(array_length(bag_keys(ClickInfo)) > 0, tostring(bag_keys(ClickInfo)) has_any ("ClickAllowed", "UrlErrorPage"), bool(null)),
+    EmailWasProcessed = array_length(IMI_DeliveryActions) > 0,
+    EmailWasDelivered = array_length(IMI_DeliveryActions) > 0
+        and not(array_length(IMI_DeliveryActions) == 1 and IMI_DeliveryActions[0] == "Blocked" and array_length(IMI_LatestDeliveryActions) == 1 and IMI_LatestDeliveryActions[0] == "Blocked"),
+    EmailAttachmentsInCorporateDevices = iff(array_length(AttachmentInfo) > 0, array_length(AttachmentCorporateDeviceActionTypes) > 0, dynamic(null)),
+    LinkWasFoundInEmail = array_length(UrlLocations) > 0,
+    // Possible UrlLocation == Attachment Body CloudAttachment Header QRCode Subject
+    AllClicksWereProtected = iff(array_length(UrlLocations) > 0, array_length(UrlLocations) == 1 and tostring(UrlLocations[0]) == "Body", bool(null)),
+    ClickWasDetected = iff(array_length(bag_keys(ClickInfo)) > 0, isnotempty(Url) and isnotempty(ClickCount) and ClickCount > 0, bool(null))
+| project-reorder
+    IsValidLink,
+    IsValidInternetMessageId,
+    EmailWasProcessed,
+    EmailWasDelivered,
+    EmailAttachmentsInCorporateDevices,
+    LinkWasFoundInEmail,
+    AllClicksWereProtected,
+    ClickWasDetected,
+    HasAllowedClick,
+    Url,
+    UrlLocations,
+    ClickCount,
+    ClickActionTypes,
+    AllowedWorkloads,
+    AllowedIPAddressTypes,
+    UrlChain,
+    ThreatTypes,
+    DetectionMethods,
+    ClickInfo,
+    IMI_DeliveryActions,
+    IMI_DeliveryLocations,
+    IMI_LatestDeliveryActions,
+    IMI_LatestDeliveryLocations,
+    AttachmentInfo,
+    AttachmentCorporateDeviceActionTypes,
+    AttachmentCorporateDeviceNames
