@@ -73,7 +73,7 @@ CloudAppEvents
         AlertEntityGenerated_DlpRuleMatch_RawEventData = RawEventData,
         AlertEntityGenerated_DlpRuleMatch_ReportId = ReportId
     ) on AlertId
-| summarize arg_max(CreationTime, *) by Timestamp, SourceFilePath, ManagementRuleId
+| summarize arg_max(CreationTime, *) by Timestamp, SourceFilePath, ObjectName, ManagementRuleId
 | join hint.strategy=shuffle kind=leftouter (
     CloudAppEvents
     | where Timestamp > ago(query_period)
