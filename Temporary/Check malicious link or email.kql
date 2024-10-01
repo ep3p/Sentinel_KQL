@@ -103,7 +103,7 @@ UrlClickEvents
     LinkWasFoundInEmail = array_length(UrlLocations) > 0,
     // Possible UrlLocation == Attachment Body CloudAttachment Header QRCode Subject
     AllClicksWereProtected = iff(array_length(UrlLocations) > 0, array_length(UrlLocations) == 1 and tostring(UrlLocations[0]) == "Body", bool(null)),
-    ClickWasDetected = iff(array_length(bag_keys(ClickInfo)) > 0, isnotempty(Url) and isnotempty(ClickCount) and ClickCount > 0, bool(null))
+    ClickWasDetected = iff(array_length(bag_keys(ClickInfo)) > 0 or array_length(UrlLocations) > 0, isnotempty(Url) and isnotempty(ClickCount) and ClickCount > 0, bool(null))
 | project-reorder
     IsValidLink,
     IsValidInternetMessageId,
