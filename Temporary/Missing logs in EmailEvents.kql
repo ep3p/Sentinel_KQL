@@ -1,0 +1,16 @@
+let query_start = ago(30d);
+let query_end = ago(1h);
+union
+    (EmailUrlInfo
+    | where Timestamp between (query_start .. query_end)
+    ),
+    (EmailAttachmentInfo
+    | where Timestamp between (query_start .. query_end)
+    )
+| join kind=leftanti (
+    EmailEvents
+    | where Timestamp between (query_start .. query_end)
+    ) on NetworkMessageId
+| summarize arg_min(Timestamp, *) by NetworkMessageId
+| summarize count() by bin(Timestamp, 5m)
+| render columnchart
