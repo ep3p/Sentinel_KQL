@@ -99,7 +99,7 @@ UrlClickEvents
     EmailWasProcessed = array_length(IMI_DeliveryActions) > 0,
     EmailWasDelivered = array_length(IMI_DeliveryActions) > 0
         and not(array_length(IMI_DeliveryActions) == 1 and IMI_DeliveryActions[0] == "Blocked" and array_length(IMI_LatestDeliveryActions) == 1 and IMI_LatestDeliveryActions[0] == "Blocked"),
-    EmailAttachmentsInCorporateDevices = iff(array_length(AttachmentInfo) > 0, array_length(AttachmentCorporateDeviceActionTypes) > 0, dynamic(null)),
+    EmailAttachmentsInCorporateDevices = iff(array_length(AttachmentInfo) > 0, array_length(AttachmentCorporateDeviceActionTypes) > 0, bool(null)),
     LinkWasFoundInEmail = array_length(UrlLocations) > 0,
     // Possible UrlLocation == Attachment Body CloudAttachment Header QRCode Subject
     AllClicksWereProtected = iff(array_length(UrlLocations) > 0, array_length(UrlLocations) == 1 and tostring(UrlLocations[0]) == "Body", bool(null)),
