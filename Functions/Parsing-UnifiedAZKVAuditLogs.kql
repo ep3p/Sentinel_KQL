@@ -1,0 +1,100 @@
+union
+    AZKVAuditLogs,
+    (
+    AzureDiagnostics
+    | where ResourceProvider == "MICROSOFT.KEYVAULT"
+    | extend Packed = pack_all(true)
+    | extend Packed = bag_remove_keys(Packed, todynamic(replace_string(replace_regex(tostring(bag_keys(Packed)), @'(\"[^\"]+\_[a-z]\"\,?)', ""), ",]", "]")))
+    | extend PropertiesPacked = bag_remove_keys(Packed, todynamic(replace_string(replace_regex(tostring(bag_keys(Packed)), @'(\"properties_[^\"]+\"\,?)', ""), ",]", "]")))
+    | extend Packed = todynamic(replace_regex(tostring(bag_merge(todynamic(replace_regex(tostring(Packed), @'(\")properties\_([^\"]+\"\:)', @"\1\2")), PropertiesPacked)), @'(\"[^\"]+)\_[a-z](\"\:)', @"\1\2"))
+    | project-away PropertiesPacked
+    | extend
+        Keys = extract_all(@'(\"[^\"]+\"\:)', tostring(Packed)),
+        Initials = extract_all(@'(\".)[^\"]*\"\:', tostring(Packed))
+    | extend Packed = todynamic(replace_strings(tostring(Packed), Keys, todynamic(replace_strings(tostring(Keys), Initials, todynamic(toupper(Initials))))))
+    | project-away Keys, Initials
+    | extend
+        PackedToDict = bag_remove_keys(Packed, todynamic(replace_string(replace_regex(tostring(bag_keys(Packed)), @'(\"[^\"]+\_[^\"]+\"\,?)', ""), ",]", "]"))),
+        PackedToUnpack = bag_remove_keys(Packed, todynamic(replace_string(replace_regex(tostring(bag_keys(Packed)), @'(\"[0-9A-Za-z]+\"\,?)', ""), ",]", "]")))
+    | project-away Packed
+    | extend
+        Identity = bag_remove_keys(PackedToDict, todynamic(replace_string(replace_regex(tostring(bag_keys(PackedToDict)), @'(\"Identity\_claim\_[^\"]+\"\,?)', ""), ",]", "]")))
+    | extend
+        PackedToDict = bag_remove_keys(PackedToDict, bag_keys(Identity)),
+        Identity = todynamic(replace_strings(replace_regex(tostring(Identity), @'(\")Identity\_(claim\_[^\"]+\"\:)', @"\1\2"),
+            dynamic([
+                "http_schemas_microsoft_com_identity_claims_",
+                "http_schemas_microsoft_com_claims_",
+                "http_schemas_xmlsoap_org_ws_2005_05_identity_claims_"
+            ]),
+            dynamic([
+                "http://schemas.microsoft.com/identity/claims/",
+                "http://schemas.microsoft.com/claims/",
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/"
+            ])))
+    | mv-expand bagexpansion=array AuxiliarArray = iff(array_length(bag_keys(Identity)) > 0, Identity, dynamic({"":""}))
+    | extend
+        SecondKey = extract(@"^claim\_(.+)", 1, tostring(AuxiliarArray[0])),
+        FirstKey = extract(@"^(claim|.+)", 1, tostring(AuxiliarArray[0]))
+    // We will assume a max bag depth of 1 with "claim_"
+    | summarize
+        AuxiliarBag = make_bag_if(bag_pack(SecondKey, AuxiliarArray[1]), isnotempty(SecondKey)),
+        take_any(*)
+        by CorrelationId, _ResourceId, OperationName, ResultType, TimeGenerated, FirstKey
+    | summarize
+        Identity = make_bag_if(bag_pack(FirstKey, iff(array_length(bag_keys(AuxiliarBag)) == 0, AuxiliarArray[1], AuxiliarBag)), isnotempty(FirstKey)),
+        take_any(*)
+        by CorrelationId, _ResourceId, OperationName, ResultType, TimeGenerated
+    | project-away AuxiliarBag*, AuxiliarArray, FirstKey, SecondKey
+    | evaluate bag_unpack(PackedToUnpack) : (TenantId:string, TimeGenerated:datetime, ResultType:string, OperationName:string, ResultDescription:string, CorrelationId:string, CallerIPAddress:string, OperationVersion:string, Identity:dynamic, Properties:dynamic, Nsp:dynamic, KeyProperties:dynamic, SecretProperties:dynamic, CertificateProperties:dynamic, CertificatePolicyProperties:dynamic, CertificateIssuerProperties:dynamic, CertificateRequestProperties:dynamic, StorageAccountProperties:dynamic, StorageSasDefinitionProperties:dynamic, Id:string, Algorithm:string, ClientInfo:string, SubnetId:string, HttpStatusCode:int, RequestUri:string, IsAddressAuthorized:bool, AddressAuthorizationType:string, IsAccessPolicyMatch:bool, IsRbacAuthorized:bool, AppliedAssignmentId:string, TrustedService:string, TlsVersion:string, VaultProperties:dynamic, Sku:dynamic, NetworkAcls:dynamic, EnabledForDeployment:bool, EnabledForDiskEncryption:bool, EnabledForTemplateDeployment:bool, EnableSoftDelete:bool, SoftDeleteRetentionInDays:int, EnableRbacAuthorization:bool, EnablePurgeProtection:bool, HsmPoolResourceId:string, ResultSignature:string, DurationMs:int, SourceSystem:string, Type:string, _ResourceId:string, PackedToDict:dynamic)
+    | project-rename //This is a mistake by Microsoft
+        CallerIpAddress = CallerIPAddress,
+        Tlsversion = TlsVersion
+    | mv-expand bagexpansion=array AuxiliarArray = iff(array_length(bag_keys(PackedToDict)) > 0, PackedToDict, dynamic({"":""}))
+    | extend
+        //FourthKey = extract(@"^[A-Z][A-Za-z0-9]+\_[A-Za-z0-9]+\_[A-Za-z0-9]+\_([A-Za-z0-9]+)", 1, tostring(AuxiliarArray[0])),
+        ThirdKey = extract(@"^[A-Z][A-Za-z0-9]+\_[A-Za-z0-9]+\_([A-Za-z0-9]+)", 1, tostring(AuxiliarArray[0])),
+        SecondKey = extract(@"^[A-Z][A-Za-z0-9]+\_([A-Za-z0-9]+)", 1, tostring(AuxiliarArray[0])),
+        FirstKey = extract(@"^([A-Z][A-Za-z0-9]+)", 1, tostring(AuxiliarArray[0]))
+    // We will assume a max bag depth of 3
+    | summarize
+        AuxiliarBag = make_bag_if(bag_pack(ThirdKey, AuxiliarArray[1]), isnotempty(ThirdKey)),
+        take_any(*)
+        by CorrelationId, _ResourceId, OperationName, ResultType, TimeGenerated, FirstKey, SecondKey
+    | summarize
+        AuxiliarBag = make_bag_if(bag_pack(SecondKey, iff(array_length(bag_keys(AuxiliarBag)) == 0, AuxiliarArray[1], AuxiliarBag)), isnotempty(SecondKey)),
+        take_any(*)
+        by CorrelationId, _ResourceId, OperationName, ResultType, TimeGenerated, FirstKey
+    | summarize
+        BagToUnpack = make_bag_if(bag_pack(FirstKey, iff(array_length(bag_keys(AuxiliarBag)) == 0, AuxiliarArray[1], AuxiliarBag)), isnotempty(FirstKey)),
+        take_any(*)
+        by CorrelationId, _ResourceId, OperationName, ResultType, TimeGenerated
+    | project-away PackedToDict, AuxiliarBag*, AuxiliarArray, FirstKey, SecondKey, ThirdKey//, FourthKey
+    | evaluate bag_unpack(BagToUnpack, columnsConflict='replace_source')
+    | extend VaultProperties = bag_remove_keys(bag_pack(
+        "sku", Sku,
+        "tenantId", TenantId,
+        "networkAcls", NetworkAcls,
+        "enabledForDeployment", EnabledForDeployment,
+        "enabledForDiskEncryption", EnabledForDiskEncryption,
+        "enabledForTemplateDeployment", EnabledForTemplateDeployment,
+        "enableSoftDelete", EnableSoftDelete,
+        "softDeleteRetentionInDays", SoftDeleteRetentionInDays,
+        "enableRbacAuthorization", EnableRbacAuthorization,
+        "enablePurgeProtection", EnablePurgeProtection
+        ),
+        array_concat(
+            iff(isnotempty(Sku), dynamic(null), dynamic(["sku"])),
+            iff(isnotempty(TenantId) and isnotempty(Sku), dynamic(null), dynamic(["tenantId"])),
+            iff(isnotempty(NetworkAcls), dynamic(null), dynamic(["networkAcls"])),
+            iff(isnotempty(EnabledForDeployment), dynamic(null), dynamic(["enabledForDeployment"])),
+            iff(isnotempty(EnabledForDiskEncryption), dynamic(null), dynamic(["enabledForDiskEncryption"])),
+            iff(isnotempty(EnabledForTemplateDeployment), dynamic(null), dynamic(["enabledForTemplateDeployment"])),
+            iff(isnotempty(EnableSoftDelete), dynamic(null), dynamic(["enableSoftDelete"])),
+            iff(isnotempty(SoftDeleteRetentionInDays), dynamic(null), dynamic(["softDeleteRetentionInDays"])),
+            iff(isnotempty(EnableRbacAuthorization), dynamic(null), dynamic(["enableRbacAuthorization"])),
+            iff(isnotempty(EnablePurgeProtection), dynamic(null), dynamic(["enablePurgeProtection"]))
+            )
+        )
+    | extend VaultProperties = iff(array_length(bag_keys(VaultProperties)) > 0, VaultProperties, dynamic(null))
+    )
