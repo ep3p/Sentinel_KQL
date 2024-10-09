@@ -9,11 +9,6 @@ IdentityDirectoryEvents
 | project-reorder
     TimeGenerated,
     Application,
-    AccountName,
-    AccountDomain,
-    AccountUpn,
-    AccountDisplayName,
-    DeviceName,
     ActionType,
     FromSidHistory,
     ToSidHistory,
