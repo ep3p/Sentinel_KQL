@@ -1,0 +1,21 @@
+// These events should generate an alert by default
+IdentityDirectoryEvents
+| where ActionType == "ADFS DKM property read"
+| extend
+    DeviceName = tostring(AdditionalFields["ACTOR.DEVICE"]),
+    DeviceSid = tostring(AdditionalFields["SourceComputerSid"]),
+    AdfsObjectId = tostring(AdditionalFields["AdfsObjectId"])
+| project-reorder
+    TimeGenerated,
+    Application,
+    AccountName,
+    AccountDomain,
+    AccountUpn,
+    AccountDisplayName,
+    DeviceName,
+    ActionType,
+    AdfsObjectId,
+    AccountSid,
+    DeviceSid,
+    AdditionalFields,
+    ReportId
