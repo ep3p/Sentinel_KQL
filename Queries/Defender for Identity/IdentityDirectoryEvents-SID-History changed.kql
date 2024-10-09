@@ -1,0 +1,26 @@
+IdentityDirectoryEvents
+| where ActionType == "SID-History changed"
+| extend
+    FromSidHistory = tostring(AdditionalFields["FROM SID-History"]),
+    ToSidHistory = tostring(AdditionalFields["TO SID-History"]),
+    TargetAccountSid = tostring(AdditionalFields["TargetAccountSid"]),
+    TargetObjectGroup = tostring(AdditionalFields["TARGET_OBJECT.GROUP"]),
+    TargetObjectGroupSid = tostring(AdditionalFields["TARGET_OBJECT.GROUP_SID"])
+| project-reorder
+    TimeGenerated,
+    Application,
+    AccountName,
+    AccountDomain,
+    AccountUpn,
+    AccountDisplayName,
+    DeviceName,
+    ActionType,
+    FromSidHistory,
+    ToSidHistory,
+    TargetAccountUpn,
+    TargetAccountDisplayName,
+    TargetAccountSid,
+    TargetObjectGroup,
+    TargetObjectGroupSid,
+    AdditionalFields,
+    ReportId
