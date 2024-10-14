@@ -3,26 +3,60 @@ let _BreakGlassUserId = toscalar(
     | where Activity == "EntraIDBreakGlass"
     | summarize make_list(ActorId)
 );
-union SigninLogs, AADNonInteractiveUserSignInLogs
-| where UserId in (_BreakGlassUserId)
-| summarize
-    StartTime = min(TimeGenerated),
-    EndTime = max(TimeGenerated),
-    ResultTypes = array_sort_asc(make_set(ResultType, 100)),
-    AppDisplayNames = array_sort_asc(make_set(AppDisplayName, 100)),
-    ResourcesDisplayNames = array_sort_asc(make_set(ResourceDisplayName, 100)),
-    UserAgents = make_set(UserAgent, 100),
-    take_any(UserPrincipalName, UserDisplayName, AlternateSignInName)
-    by IPAddress, UserId
-| project
-    StartTime,
-    EndTime,
-    UserPrincipalName,
-    UserDisplayName,
-    AlternateSignInName,
-    IPAddress,
-    ResultTypes,
-    AppDisplayNames,
-    ResourcesDisplayNames,
-    UserAgents,
-    UserId
+union
+    (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where UserId in (_BreakGlassUserId)
+    | summarize
+        StartTime = min(TimeGenerated),
+        EndTime = max(TimeGenerated),
+        ResultTypes = array_sort_asc(make_set(ResultType, 100)),
+        AppDisplayNames = array_sort_asc(make_set(AppDisplayName, 100)),
+        ResourcesDisplayNames = array_sort_asc(make_set(ResourceDisplayName, 100)),
+        UserAgents = make_set(UserAgent, 100),
+        take_any(UserPrincipalName, UserDisplayName, AlternateSignInName, Location)
+        by IPAddress, UserId
+    | project
+        StartTime,
+        EndTime,
+        UserPrincipalName,
+        UserDisplayName,
+        AlternateSignInName,
+        IPAddress,
+        Location,
+        ResultTypes,
+        AppDisplayNames,
+        ResourcesDisplayNames,
+        UserAgents,
+        UserId
+    ),
+    (
+    AuditLogs
+    | mv-expand TargetResource = TargetResources
+    | where TargetResource["type"] == "User"
+    | extend AccountObjectId = tostring(TargetResource["id"])
+    | where AccountObjectId in (_BreakGlassUserId)
+    | extend
+        Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+        InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+        IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"]),
+        TargetUserPrincipalName = tostring(TargetResource["userPrincipalName"])
+    | project
+        TimeGenerated,
+        Category,
+        LoggedByService,
+        AADOperationType,
+        Initiator,
+        IPAddress,
+        OperationName,
+        ActivityDisplayName,
+        Result,
+        ResultDescription,
+        TargetUserPrincipalName,
+        AccountObjectId,
+        InitiatorId,
+        InitiatedBy,
+        AdditionalDetails,
+        TargetResources,
+        CorrelationId
+    )
