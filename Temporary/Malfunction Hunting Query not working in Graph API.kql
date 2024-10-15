@@ -1,0 +1,6 @@
+// This query in https://graph.microsoft.com/v1.0/security/runHuntingQuery does NOT work when Application == "Microsoft OneDrive for Business" or "Microsoft SharePoint Online", with other workloads it works
+CloudAppEvents
+| where Timestamp > ago(30d)
+| where Application in ("Microsoft OneDrive for Business", "Microsoft SharePoint Online")
+| where ActionType has "DLPRuleMatch"
+| limit 1
