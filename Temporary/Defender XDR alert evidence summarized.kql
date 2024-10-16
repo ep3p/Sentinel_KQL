@@ -1,0 +1,23 @@
+AlertEvidence
+| where Timestamp > ago(1d)
+| where AlertId == "<<<>>>"
+| extend AdditionalFields = bag_remove_keys(todynamic(AdditionalFields), dynamic(["MergeByKey", "MergeByKeyHex"]))
+| extend AdditionalFieldsType = iff(EntityType == "GenericEntity", tostring(AdditionalFields["Type"]), "")
+| extend AllInfo = bag_remove_keys(pack_all(true), dynamic(["Timestamp", "Title", "Severity", "Categories", "AttackTechniques", "ServiceSource", "DetectionSource", "AlertId","EntityType"]))
+| extend Packed = bag_remove_keys(AllInfo, dynamic(["EvidenceRole", "EvidenceDirection", "AdditionalFields", "AdditionalFieldsType"]))
+| extend PackedKeys = bag_keys(Packed)
+| summarize
+    AllInfo = make_list(AllInfo),
+    EntityList = make_list_if(Packed, array_length(PackedKeys) > 0),
+    EntityKeys = make_set_if(PackedKeys, array_length(PackedKeys) > 0),
+    take_any(Timestamp, Title, Severity, Categories, AttackTechniques, ServiceSource, DetectionSource)
+    by AlertId, EntityType
+| summarize
+    AllInfo = make_bag(bag_pack(EntityType, AllInfo)),
+    BagToUnpack = make_bag_if(bag_pack(EntityType, EntityList), array_length(EntityKeys) > 0),
+    ColumnKeys = make_bag_if(bag_pack(EntityType, EntityKeys), array_length(EntityKeys) > 0),
+    take_any(Timestamp, Title, Severity, Categories, AttackTechniques, ServiceSource, DetectionSource)
+    by AlertId
+| extend EntityColumns = bag_keys(BagToUnpack)
+| evaluate bag_unpack(BagToUnpack)
+| project-reorder Timestamp, AlertId, ServiceSource, DetectionSource, Title, Severity, Categories, AttackTechniques, EntityColumns, ColumnKeys
