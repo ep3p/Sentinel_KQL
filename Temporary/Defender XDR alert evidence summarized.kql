@@ -7,8 +7,8 @@ AlertEvidence
 | extend Packed = bag_remove_keys(AllInfo, dynamic(["EvidenceRole", "EvidenceDirection", "AdditionalFields", "AdditionalFieldsType"]))
 | extend PackedKeys = bag_keys(Packed)
 | summarize
-    AllInfo = make_list(AllInfo),
-    EntityList = make_list_if(Packed, array_length(PackedKeys) > 0),
+    AllInfo = make_set(AllInfo),
+    EntityList = make_set_if(Packed, array_length(PackedKeys) > 0),
     EntityKeys = make_set_if(PackedKeys, array_length(PackedKeys) > 0),
     take_any(Timestamp, Title, Severity, Categories, AttackTechniques, ServiceSource, DetectionSource)
     by AlertId, EntityType
