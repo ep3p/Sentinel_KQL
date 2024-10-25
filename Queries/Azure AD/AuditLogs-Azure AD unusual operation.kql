@@ -2,7 +2,7 @@ AuditLogs
 | where case(
     OperationName has_any ("domain"), true,
     LoggedByService == "AAD Management UX" and Category == "Policy", true,
-    LoggedByService == "Authentication Methods" and Category == "ApplicationManagement", true,
+    LoggedByService == "Authentication Methods" and Category == "ApplicationManagement" and not(OperationName in ("PATCH UserAuthMethod.PatchSignInPreferencesAsync", "POST UserAuthMethod.SecurityInfoRegistrationCallback")), true,
     false
     )
 | extend
