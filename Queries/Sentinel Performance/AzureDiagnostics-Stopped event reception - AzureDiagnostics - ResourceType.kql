@@ -1,7 +1,7 @@
 let query_frequency = 1h;
 let query_period = 3d;
 let _ExpectedFrequencies =
-    _GetWatchlist('DataType-IngestedTables')
+    _GetWatchlist("DataType-IngestedTables")
     | where Type == "AzureDiagnostics"
     | mv-expand ResourceType = split(Auxiliar, " & ") to typeof(string)
     | project Type, ResourceType, Critical, ExpectedIngestionFrequency = totimespan(Frequency)
