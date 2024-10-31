@@ -2,7 +2,7 @@ let query_frequency = 1h;
 let query_period = 1d;
 let percentile_threshold = 90;
 let _ExpectedDelays =
-    _GetWatchlist('DataType-IngestedTables')
+    _GetWatchlist("DataType-IngestedTables")
     | project Type, Critical, ExpectedIngestionDelay = totimespan(IngestionDelay), DelayType, Notes
 ;
 union withsource=_Type
