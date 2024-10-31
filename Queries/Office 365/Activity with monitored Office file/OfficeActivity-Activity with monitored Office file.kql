@@ -36,7 +36,7 @@ OfficeActivity
     ClientIPs = make_set(ClientIP, 250),
     Operations = make_set(Operation, 250),
     Files = make_set(OfficeObjectId, 250),
-    FileNames = make_set(strcat(SourceRelativeUrl, SourceFileName), 250),
+    FileNames = make_set(strcat(SourceRelativeUrl, "/", SourceFileName), 250),
     UserAgents = make_set(UserAgent, 250),
     MachineIds = make_set(MachineId, 250),
     take_any(Site_Url)
