@@ -17,7 +17,7 @@ let _SecurityAlertTimeSeries = (start_time: datetime, end_time: datetime) {
             1)
         | summarize Period = take_any(toint(series_periods_detect_Count_periods[0]))
         );
-    let _PeriodStep = scan_step * coalesce(_Auxiliar, 1);
+    let _PeriodStep = scan_step * abs(coalesce(_Auxiliar, 1));
     SecurityAlert
     | where TimeGenerated between (start_time .. end_time)
     // _PeriodStep cannot be used with make-series, so summarize has to be used instead
