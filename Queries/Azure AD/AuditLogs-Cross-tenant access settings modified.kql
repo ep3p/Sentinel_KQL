@@ -7,10 +7,12 @@ AuditLogs
 | project
     TimeGenerated,
     Category,
+    AADOperationType,
     Initiator,
     IPAddress,
     OperationName,
     Result,
+    ResultDescription,
     InitiatedBy,
     AdditionalDetails,
     TargetResources,
