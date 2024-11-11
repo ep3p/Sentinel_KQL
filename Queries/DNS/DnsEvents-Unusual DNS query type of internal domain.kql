@@ -1,0 +1,31 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _InternalDomains = toscalar(
+    _GetWatchlist("Domain-PrivDomains")
+    | where Notes has "[HomeTenant]"
+    | summarize make_list(Domain)
+);
+DnsEvents
+| where TimeGenerated > ago(query_period)
+| where Name has_any (_InternalDomains)
+| summarize arg_min(TimeGenerated, *) by SubType, EventId, QueryType, ResultCode
+| where TimeGenerated > ago(query_frequency)
+| join kind=rightsemi (
+    DnsEvents
+    | where TimeGenerated > ago(query_frequency)
+    | where Name has_any (_InternalDomains)
+    ) on SubType, EventId, QueryType, Result, ResultCode
+| summarize arg_min(TimeGenerated, *) by SubType, EventId, QueryType, ResultCode, Name
+| sort by TimeGenerated asc
+| project
+    TimeGenerated,
+    SubType,
+    EventId,
+    Computer,
+    ClientIP,
+    QueryType,
+    Name,
+    Result,
+    ResultCode,
+    IPAddresses,
+    MaliciousIP
