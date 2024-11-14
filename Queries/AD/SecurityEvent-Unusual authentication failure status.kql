@@ -1,0 +1,24 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _ExcludedComputers = dynamic();
+SecurityEvent
+| where TimeGenerated > ago(query_period)
+| where EventID == 4625 and not(IpAddress in ("", "-"))
+| summarize arg_min(TimeGenerated, *) by Computer, EventID, AuthenticationPackageName, FailureReason, Status, SubStatus, LogonType
+| where TimeGenerated > ago(query_frequency)
+| where not(Computer has_any (_ExcludedComputers))
+| project-reorder
+    TimeGenerated,
+    Computer,
+    EventID,
+    Activity,
+    AccountType,
+    Account,
+    IpAddress,
+    LogonType,
+    LogonTypeName,
+    AuthenticationPackageName,
+    FailureReason,
+    Status,
+    SubStatus,
+    WorkstationName
