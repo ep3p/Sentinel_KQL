@@ -1,0 +1,13 @@
+// https://salsa.debian.org/pkg-security-team/dnsrecon/-/blob/debian/master/dnsrecon/cli.py#L196
+// dnsrecon command might check a NXDOMAIN hijack and uses a specific domain name in this test
+DnsEvents
+| where Name matches regex @"^[a-zA-Z0-9]{20}\.com$" and Name matches regex "[A-Z]" and QueryType in ("A", "AAAA")
+| project
+    TimeGenerated,
+    Computer,
+    EventId,
+    SubType,
+    ClientIP,
+    Name,
+    QueryType,
+    ResultCode 

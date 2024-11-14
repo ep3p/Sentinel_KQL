@@ -1,3 +1,0 @@
-DnsEvents
-| where Name matches regex @"^[a-zA-Z0-9]{20}\.com$" and Name matches regex "[A-Z]" and QueryType in ("A", "AAAA")
-// unexpectedly this activity is matching PTR o reverse lookup queries from a pentester
