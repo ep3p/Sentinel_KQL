@@ -1,3 +1,4 @@
+// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/1bc92ddf-b79e-413c-bbaa-99a5281a6c90
 let query_frequency = 1h;
 let query_period = 14d;
 let _ExcludedComputers = dynamic();
