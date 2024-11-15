@@ -1,0 +1,26 @@
+// Previously there were DlpRuleMatch and User entities in AlertEntityGenerated events for each DLP alert
+let query_period = 30d;
+CloudAppEvents
+| where Timestamp > ago(query_period)
+| where ActionType == "AlertTriggered"
+| where tostring(RawEventData["Category"]) == "DataLossPrevention"
+| extend
+    AlertId = tostring(RawEventData["AlertId"]),
+    Data = todynamic(tostring(RawEventData["Data"]))
+| extend
+    Workload = tostring(Data["wl"])
+| project
+    Timestamp,
+    AlertId,
+    Workload
+| lookup kind=leftouter (
+    CloudAppEvents
+    | where Timestamp > ago(query_period)
+    | where ActionType == "AlertEntityGenerated"
+    | extend
+        AlertId = tostring(RawEventData["AlertId"]),
+        EntityType = tostring(RawEventData["EntityType"])
+    | summarize Entities = tostring(array_sort_asc(make_set(EntityType))) by AlertId
+    ) on AlertId
+| summarize count() by bin(Timestamp, 1h), Entities, Workload
+| sort by Timestamp desc
