@@ -1,4 +1,4 @@
-// Previously there were DlpRuleMatch and User entities in AlertEntityGenerated events for each DLP alert
+// Previously there were DlpRuleMatch and User entities in AlertEntityGenerated events for each DLP alert, this happened when the Microsoft Purview classic portal was retired
 let query_period = 30d;
 CloudAppEvents
 | where Timestamp > ago(query_period)
