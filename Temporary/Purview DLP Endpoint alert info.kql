@@ -128,3 +128,12 @@ CloudAppEvents
 | mv-apply SensitiveInfoTypeData = EndpointOperation_RawEventData["SensitiveInfoTypeData"] on (
     summarize SensitiveInformation = make_list(bag_remove_keys(SensitiveInfoTypeData, dynamic(["SensitiveInformationDetailedClassificationAttributes"])))
     )
+// | summarize
+//     take_any(Timestamp, Application, ActionType, AlertId, UserPrincipalName, Severity, Workload, SensitiveInformationContentType, SensitiveInformationTypeMatchInfo, AlertTriggered_RawEventData),
+//     SummarizedInfo = make_list_if(bag_pack_columns(PolicyId, PolicyName, ManagementRuleId, RuleId, RuleName, DMC, ProtectionActions, ProtectionMode, MDT, TDC, Operation, OperationApp, ObjectName, ObjectFilePath, CreationTime, FileSize, TargetFilePath, TargetDomain, DUOP, TargetPrinterName, RemovableMassStorageSerialNumber, RemovableMassStorageEncrypted, DeviceId, DeviceName, ClientIP, AlertEntityGenerated_DlpRuleMatch_RawEventData, AlertEntityGenerated_DlpRuleMatch_ReportId, DlpOriginalFilePath, OriginatingDomain, Justification, RemovableMediaDeviceAttributes, ParentArchiveHash, PreviousFileName, FileType, FileExtension, Sha1, Sha256, SourceLocationType, DestinationLocationType, UserType, EndpointOperation_RawEventData, EndpointOperation_ReportId, SensitiveInformation), isnotempty(PolicyId)),
+//     FileInfo = make_list_if(bag_pack_columns(ObjectName,FileType,FileExtension,ObjectFilePath,FileSize,Sha1,Sha256,TargetFilePath,TargetDomain,TargetPrinterName,RemovableMassStorageSerialNumber,RemovableMassStorageEncrypted), isnotempty(PolicyId) and isnotempty(ObjectFilePath)),
+//     take_any(PolicyName,RuleName,Operation,ProtectionMode,OperationApp,DeviceName,ClientIP,TargetDomain)
+//     by AlertTriggered_ReportId
+// | extend
+//     SummarizedInfo = iff(array_length(SummarizedInfo) == 0, dynamic(null), SummarizedInfo),
+//     FileInfo = iff(array_length(FileInfo) == 0, dynamic(null), FileInfo)
