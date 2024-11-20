@@ -1,3 +1,4 @@
+// This will have to be updated after 13th January 2025 - https://aws.amazon.com/es/blogs/security/modifications-to-aws-cloudtrail-event-data-of-iam-identity-center/
 let _AWSAccounts = _GetWatchlist("AccountId-AuditAWSAccounts");
 T
 | extend
