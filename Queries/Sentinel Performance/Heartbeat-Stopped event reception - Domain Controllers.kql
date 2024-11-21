@@ -1,14 +1,14 @@
 let query_frequency = 15m;
 let query_wait = 1h;
 let _DomainControllers = toscalar(
-    _GetWatchlist('Service-PrivateCorporateServices')
+    _GetWatchlist("Service-PrivateCorporateServices")
     | where Service == "DomainController"
     | summarize make_list(HostName)
 );
 Heartbeat
 | where TimeGenerated > ago(query_wait + query_frequency)
 | extend TimeReceived = _TimeReceived
-| summarize arg_max(TimeReceived, *) by Category, VMUUID, SourceComputerId
+| summarize arg_max(TimeReceived, *) by Category, VMUUID, Computer, _ResourceId
 | where Computer has_any (_DomainControllers)
 | where TimeReceived between (ago(query_frequency + query_wait) .. ago(query_wait))
 | project TimeReceived, Computer, OSType, Version, ComputerEnvironment, Type, Solutions
