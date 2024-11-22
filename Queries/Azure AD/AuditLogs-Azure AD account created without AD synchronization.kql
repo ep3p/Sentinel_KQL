@@ -1,28 +1,40 @@
-let _AADADSyncAccounts = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
-    | where Activity == "AADADSync"
-    | summarize make_list(ActorPrincipalName)
+let _EntraConnectSyncAccounts = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "EntraConnectSync"
+    | summarize make_list(ActorId)
 );
 AuditLogs
 | where OperationName == "Add user" and Result == "success"
 | extend
-    UserPrincipalName = tostring(TargetResources[0].userPrincipalName),
-    InitiatedByUser = tostring(InitiatedBy.user.userPrincipalName),
-    InitiatedByApp = tostring(InitiatedBy.app.displayName)
-| where not(InitiatedByUser in (_AADADSyncAccounts))
-| mv-apply ModifiedProperty = TargetResources[0].modifiedProperties on (
-    summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperty.displayName), tostring(ModifiedProperty.newValue)))
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| where not(InitiatorId in (_EntraConnectSyncAccounts))
+| mv-apply ModifiedProperty = TargetResources[0]["modifiedProperties"] on (
+    extend NewValue = todynamic(tostring(ModifiedProperty["newValue"]))
+    | summarize TargetUserProperties = make_bag(pack(tostring(ModifiedProperty["displayName"]), iff(array_length(NewValue) == 1, tostring(NewValue[0]), NewValue)))
     )
-| evaluate bag_unpack(BagToUnpack, OutputColumnPrefix = "TargetResources_", columnsConflict = 'replace_source')
-| where todynamic(column_ifexists("TargetResources_UserType", ""))[0] != "Guest"
+| extend
+    TargetUserType = tostring(TargetUserProperties["UserType"]),
+    TargetUserPrincipalName = tostring(TargetResources[0]["userPrincipalName"]),
+    TargetId = tostring(TargetResources[0]["id"])
+| where not(TargetUserType == "Guest")
 | project
     TimeGenerated,
-    InitiatedByUser,
-    InitiatedByApp,
+    LoggedByService,
+    Category,
+    AADOperationType,
+    Initiator,
+    IPAddress,
     OperationName,
     Result,
-    UserPrincipalName,
-    InitiatedBy,
+    ResultDescription,
+    TargetUserType,
+    TargetUserPrincipalName,
+    TargetId,
+    TargetUserProperties,
     AdditionalDetails,
+    InitiatorId,
+    InitiatedBy,
     TargetResources,
     CorrelationId
