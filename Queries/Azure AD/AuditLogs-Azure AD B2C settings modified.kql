@@ -6,14 +6,16 @@ AuditLogs
     IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
 | project
     TimeGenerated,
+    LoggedByService,
     Category,
+    AADOperationType,
     Initiator,
     IPAddress,
     OperationName,
     Result,
-    InitiatedBy,
+    ResultDescription,
     AdditionalDetails,
-    TargetResources,
-    LoggedByService,
     InitiatorId,
+    InitiatedBy,
+    TargetResources,
     CorrelationId
