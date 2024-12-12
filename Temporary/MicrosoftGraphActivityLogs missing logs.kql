@@ -1,0 +1,4 @@
+// Microsoft might be not registering all logs since 2024-11-22 06:00 UTC
+MicrosoftGraphActivityLogs
+| where TimeGenerated between (make_datetime(2024, 11, 1) .. make_datetime(2024, 12, 1))
+| summarize count() by bin(TimeGenerated, 1d)//,  bin(ResponseSizeBytes, 10000)
