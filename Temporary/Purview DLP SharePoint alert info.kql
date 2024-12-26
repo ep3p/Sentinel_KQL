@@ -123,11 +123,11 @@ CloudAppEvents
     | where tostring(toscalar(_Events | summarize make_set_if(url_decode(SourceFilePath), isnotempty(SourceFilePath)))) has ObjectName
     | summarize
         CreationTime = min(CreationTime),
-        TargetUserOrGroupName = array_sort_asc(make_set_if(TargetUserOrGroupName, isnotempty(TargetUserOrGroupName)))
+        TargetUserOrGroupName = array_sort_asc(make_set_if(TargetUserOrGroupName, isnotempty(TargetUserOrGroupName))) // You could exclude targets from the same tenant
         by CorrelationId, SiteUrl, UserId, SharingOperation, UniqueSharingId, ObjectName, ItemType, Permission, SharingLinkScope, EventData, TargetUserOrGroupType
     | summarize
         CreationTime = min(CreationTime),
-        TargetUserOrGroup = make_bag(bag_pack(TargetUserOrGroupType, TargetUserOrGroupName)) // You could exclude targets from the same tenant
+        TargetUserOrGroup = make_bag(bag_pack(TargetUserOrGroupType, TargetUserOrGroupName))
         by CorrelationId, SiteUrl, UserId, SharingOperation, UniqueSharingId, ObjectName, ItemType, Permission, SharingLinkScope, EventData
     | extend EmptyColumns = array_concat(
         iff(isnotempty(Permission), dynamic(null), dynamic(["Permission"])),
