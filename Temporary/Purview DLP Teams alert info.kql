@@ -18,7 +18,14 @@ CloudAppEvents
     Severity = tostring(Data["sev"]),
     Workload = tostring(Data["wl"]),
     SensitiveInformationContentType = split(tostring(Data["sict"]), ";"),
-    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";")
+    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";"),
+    PolicyId = tostring(Data["dpid"]),
+    PolicyName = tostring(Data["dpn"]),
+    RuleId = tostring(Data["drid"]),
+    RuleName = tostring(Data["drn"]),
+    ProtectionActions = split(tostring(Data["dact"]), ", "),
+    SenderFromAddress = tostring(Data["mfrm"]),
+    RecipientEmailAddress = split(tostring(Data["to"]), ",")
 | where Workload == "MicrosoftTeams" and tostring(RawEventData["Category"]) == "DataLossPrevention"
 | project
     Timestamp,
@@ -30,42 +37,13 @@ CloudAppEvents
     Workload,
     SensitiveInformationContentType,
     SensitiveInformationTypeMatchInfo,
+    PolicyId,
+    PolicyName,
+    RuleId,
+    RuleName,
+    ProtectionActions,
+    SenderFromAddress,
+    RecipientEmailAddress,
     AlertTriggered_RawEventData = RawEventData,
     AlertTriggered_ReportId = ReportId,
     InternetMessageIds = internet_message_ids// Unix Time
-| lookup kind=leftouter (
-    CloudAppEvents
-    | where Timestamp > ago(query_period)
-    | where ActionType == "AlertEntityGenerated" and tostring(RawEventData["AlertId"]) == alert_id
-    | extend
-        AlertId = tostring(RawEventData["AlertId"]),
-        EntityType = tostring(RawEventData["EntityType"]),
-        Data = todynamic(tostring(RawEventData["Data"]))
-    | where EntityType == "DlpRuleMatch"
-    | extend
-        PolicyId = coalesce(tostring(Data["cid"]), tostring(Data["dpid"])),
-        PolicyName = tostring(Data["dpn"]),
-        ManagementRuleId = tostring(Data["dmrid"]),
-        RuleId = tostring(Data["drid"]),
-        RuleName = tostring(Data["drn"]),
-        ProtectionActions = split(tostring(Data["dact"]), ", "),
-        ObjectName = tostring(Data["von"]),
-        DMC = split(tostring(Data["dmc"]), ","),
-        SenderFromAddress = tostring(Data["mfrm"]),
-        RecipientEmailAddress = split(tostring(Data["to"]), ",")
-    | project
-        AlertId,
-        PolicyId,
-        PolicyName,
-        ManagementRuleId,
-        RuleId,
-        RuleName,
-        DMC,
-        ProtectionActions,
-        ObjectName,
-        SenderFromAddress,
-        RecipientEmailAddress,
-        AlertEntityGenerated_DlpRuleMatch_RawEventData = RawEventData,
-        AlertEntityGenerated_DlpRuleMatch_ReportId = ReportId
-    ) on AlertId
-| project-away AlertId1
