@@ -18,8 +18,20 @@ CloudAppEvents
     Severity = tostring(Data["sev"]),
     Workload = tostring(Data["wl"]),
     SensitiveInformationContentType = split(tostring(Data["sict"]), ";"),
-    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";")
+    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";"),
+    PolicyId = tostring(Data["dpid"]),
+    PolicyName = tostring(Data["dpn"]),
+    ManagementRuleId = tostring(Data["drid"]),
+    //RuleId = tostring(Data["drid"]),
+    RuleName = tostring(Data["drn"]),
+    ProtectionActions = split(tostring(Data["dact"]), ", "),
+    ObjectName = tostring(Data["von"]),
+    DMC = split(tostring(Data["dmc"]), ","),
+    FileOwnerName = tolower(tostring(Data["flmb"])), // It might not the same as f3u - UserPrincipalName
+    FileOwnerDisplayName = tostring(Data["fo"]),
+    USI = tostring(Data["usi"])
 | where Workload == "SharePoint" and tostring(RawEventData["Category"]) == "DataLossPrevention"
+| lookup kind=leftouter _FilePaths on ObjectName
 | project
     Timestamp,
     Application,
@@ -30,50 +42,21 @@ CloudAppEvents
     Workload,
     SensitiveInformationContentType,
     SensitiveInformationTypeMatchInfo,
+    PolicyId,
+    PolicyName,
+    ManagementRuleId,
+    //RuleId,
+    RuleName,
+    DMC,
+    ProtectionActions,
+    ObjectName,
+    SourceFilePath,
+    FileOwnerName,
+    FileOwnerDisplayName,
+    USI,
     AlertTriggered_RawEventData = RawEventData,
     AlertTriggered_ReportId = ReportId
-| lookup kind=leftouter (
-    CloudAppEvents
-    | where Timestamp > ago(query_period)
-    | where ActionType == "AlertEntityGenerated" and tostring(RawEventData["AlertId"]) == alert_id
-    | extend
-        AlertId = tostring(RawEventData["AlertId"]),
-        EntityType = tostring(RawEventData["EntityType"]),
-        Data = todynamic(tostring(RawEventData["Data"]))
-    | where EntityType == "DlpRuleMatch"
-    | extend
-        CreationTime = todatetime(Data["at"]),
-        PolicyId = coalesce(tostring(Data["cid"]), tostring(Data["dpid"])),
-        PolicyName = tostring(Data["dpn"]),
-        ManagementRuleId = tostring(Data["dmrid"]),
-        RuleId = tostring(Data["drid"]),
-        RuleName = tostring(Data["drn"]),
-        ProtectionActions = split(tostring(Data["dact"]), ", "),
-        ObjectName = tostring(Data["von"]),
-        DMC = split(tostring(Data["dmc"]), ","),
-        FileOwnerName = tolower(tostring(Data["flmb"])), // It might not the same as f3u - UserPrincipalName
-        FileOwnerDisplayName = tostring(Data["fo"]),
-        USI = tostring(Data["usi"])
-    | lookup kind=leftouter _FilePaths on ObjectName
-    | project
-        AlertId,
-        PolicyId,
-        PolicyName,
-        ManagementRuleId,
-        RuleId,
-        RuleName,
-        DMC,
-        ProtectionActions,
-        ObjectName,
-        SourceFilePath,
-        CreationTime,
-        FileOwnerName,
-        FileOwnerDisplayName,
-        USI,
-        AlertEntityGenerated_DlpRuleMatch_RawEventData = RawEventData,
-        AlertEntityGenerated_DlpRuleMatch_ReportId = ReportId
-    ) on AlertId
-| summarize arg_max(CreationTime, *) by Timestamp, SourceFilePath, ObjectName, ManagementRuleId
+// | summarize arg_max(CreationTime, *) by AlertId, Timestamp, SourceFilePath, ObjectName, ManagementRuleId
 | join hint.strategy=shuffle kind=leftouter (
     CloudAppEvents
     | where Timestamp > ago(query_period)
@@ -110,7 +93,7 @@ CloudAppEvents
         LastReason = iff(EvaluationEventCount == 1, "", LastReason),
         LastSensitiveInformation = iff(EvaluationEventCount == 1, dynamic(null), LastSensitiveInformation)
     ) on $left.SourceFilePath == $right.ObjectName, ManagementRuleId //, CreationTime does not always match
-| project-away ObjectName1, ManagementRuleId1, CreationTime1
+| project-away ObjectName1, ManagementRuleId1
 // Add info about the sharing targets
 // Did not have any example to work with, where a DLP alert happened and the file had ActionType in ("AddedToGroup", "AddedToSecureLink", "AddedToSharingLink")
 | as hint.materialized=true _Events
@@ -144,7 +127,7 @@ CloudAppEvents
         by CorrelationId, SiteUrl, UserId, SharingOperation, UniqueSharingId, ObjectName, ItemType, Permission, SharingLinkScope, EventData, TargetUserOrGroupType
     | summarize
         CreationTime = min(CreationTime),
-        TargetUserOrGroup = make_bag(bag_pack(TargetUserOrGroupType, TargetUserOrGroupName))
+        TargetUserOrGroup = make_bag(bag_pack(TargetUserOrGroupType, TargetUserOrGroupName)) // You could exclude targets from the same tenant
         by CorrelationId, SiteUrl, UserId, SharingOperation, UniqueSharingId, ObjectName, ItemType, Permission, SharingLinkScope, EventData
     | extend EmptyColumns = array_concat(
         iff(isnotempty(Permission), dynamic(null), dynamic(["Permission"])),
@@ -185,23 +168,21 @@ CloudAppEvents
     Workload,
     SensitiveInformationContentType,
     SensitiveInformationTypeMatchInfo,
-    AlertTriggered_RawEventData,
-    AlertTriggered_ReportId,
     PolicyId,
     PolicyName,
     ManagementRuleId,
-    RuleId,
+    //RuleId,
     RuleName,
     DMC,
     ProtectionActions,
     ObjectName,
     SourceFilePath,
-    CreationTime,
     FileOwnerName,
     FileOwnerDisplayName,
     USI,
-    AlertEntityGenerated_DlpRuleMatch_RawEventData,
-    AlertEntityGenerated_DlpRuleMatch_ReportId,
+    AlertTriggered_RawEventData,
+    AlertTriggered_ReportId,
+    CreationTime,
     SensitiveInformation,
     EvaluationEventCount,
     LastEvaluationTime,
