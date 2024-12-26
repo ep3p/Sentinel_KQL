@@ -24,7 +24,17 @@ CloudAppEvents
     Severity = tostring(Data["sev"]),
     Workload = tostring(Data["wl"]),
     SensitiveInformationContentType = split(tostring(Data["sict"]), ";"),
-    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";")
+    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";"),
+    PolicyId = tostring(Data["dpid"]),
+    PolicyName = tostring(Data["dpn"]),
+    RuleId = tostring(Data["drid"]),
+    RuleName = tostring(Data["drn"]),
+    ProtectionActions = split(tostring(Data["dact"]), ", "),
+    ObjectName = tostring(Data["von"]),
+    SenderFromAddress = tostring(Data["mfrm"]),
+    RecipientEmailAddress = split(tostring(Data["to"]), ","),
+    CCEmailAddress = split(tostring(Data["cc"]), ","),
+    BCCEmailAddress = split(tostring(Data["bcc"]), ",")
 | where Workload == "Exchange" and tostring(RawEventData["Category"]) == "DataLossPrevention"
 | project
     Timestamp,
@@ -36,6 +46,16 @@ CloudAppEvents
     Workload,
     SensitiveInformationContentType,
     SensitiveInformationTypeMatchInfo,
+    PolicyId,
+    PolicyName,
+    RuleId,
+    RuleName,
+    ProtectionActions,
+    Subject = ObjectName,
+    SenderFromAddress,
+    RecipientEmailAddress,
+    CCEmailAddress,
+    BCCEmailAddress,
     AlertTriggered_RawEventData = RawEventData,
     AlertTriggered_ReportId = ReportId,
     // We will assume there is only 1 email associated to an alert
@@ -61,42 +81,3 @@ CloudAppEvents
     | distinct NetworkMessageId, FileName, FileType, SHA256, FileSize
     | summarize EmailAttachmentInfo = make_list(bag_pack("FileName", FileName, "FileType", FileType, "FileSize", FileSize, "SHA256", SHA256)) by NetworkMessageId
     ) on NetworkMessageId
-| lookup kind=leftouter (
-    CloudAppEvents
-    | where Timestamp > ago(query_period)
-    | where ActionType == "AlertEntityGenerated" and tostring(RawEventData["AlertId"]) == alert_id
-    | extend
-        AlertId = tostring(RawEventData["AlertId"]),
-        EntityType = tostring(RawEventData["EntityType"]),
-        Data = todynamic(tostring(RawEventData["Data"]))
-    | where EntityType == "DlpRuleMatch"
-    | extend
-        PolicyId = coalesce(tostring(Data["cid"]), tostring(Data["dpid"])),
-        PolicyName = tostring(Data["dpn"]),
-        ManagementRuleId = tostring(Data["dmrid"]),
-        RuleId = tostring(Data["drid"]),
-        RuleName = tostring(Data["drn"]),
-        ProtectionActions = split(tostring(Data["dact"]), ", "),
-        ObjectName = tostring(Data["von"]),
-        DMC = split(tostring(Data["dmc"]), ","),
-        SenderFromAddress = tostring(Data["mfrm"]),
-        RecipientEmailAddress = split(tostring(Data["to"]), ","),
-        CCEmailAddress = split(tostring(Data["cc"]), ","),
-        BCCEmailAddress = split(tostring(Data["bcc"]), ",")
-    | project
-        AlertId,
-        PolicyId,
-        PolicyName,
-        ManagementRuleId,
-        RuleId,
-        RuleName,
-        DMC,
-        ProtectionActions,
-        Subject = ObjectName,
-        SenderFromAddress,
-        RecipientEmailAddress,
-        CCEmailAddress,
-        BCCEmailAddress,
-        AlertEntityGenerated_DlpRuleMatch_RawEventData = RawEventData,
-        AlertEntityGenerated_DlpRuleMatch_ReportId = ReportId
-    ) on AlertId
