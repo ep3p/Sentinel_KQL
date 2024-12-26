@@ -11,7 +11,27 @@ CloudAppEvents
     Severity = tostring(Data["sev"]),
     Workload = tostring(Data["wl"]),
     SensitiveInformationContentType = split(tostring(Data["sict"]), ";"),
-    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";")
+    SensitiveInformationTypeMatchInfo = split(tostring(Data["sitmi"]), ";"),
+    PolicyId = tostring(Data["dpid"]),
+    PolicyName = tostring(Data["dpn"]),
+    RuleId = tostring(Data["drid"]),
+    RuleName = tostring(Data["drn"]),
+    ProtectionMode = tostring(Data["enmd"]),
+    ProtectionActions = split(tostring(Data["dact"]), ", "),
+    ObjectName = tostring(Data["von"]),
+    Operation = tostring(Data["eop"]),
+    OperationApp = tostring(Data["app"]),
+    ObjectFilePath = tostring(Data["ofph"]),
+    FileSize = tostring(Data["efs"]),
+    TargetFilePath = tostring(Data["tfph"]),
+    TargetDomain = tostring(Data["tdmn"]),
+    RemovableMassStorageSerialNumber = tostring(Data["rmsn"]),
+    RMSEncrypted = tobool(Data["rmse"]),
+    TargetPrinterName = tostring(Data["pn"]),
+    DeviceId = tostring(Data["mddid"]),
+    DeviceName = tostring(Data["dn"]),
+    ClientIP = tostring(Data["ecip"]),
+    AuxiliarTimestamp = todatetime(Data["ts"])
 | where Workload == "Endpoint" and tostring(RawEventData["Category"]) == "DataLossPrevention"
 | project
     Timestamp,
@@ -23,73 +43,28 @@ CloudAppEvents
     Workload,
     SensitiveInformationContentType,
     SensitiveInformationTypeMatchInfo,
+    PolicyId,
+    PolicyName,
+    RuleId,
+    RuleName,
+    ProtectionMode,
+    ProtectionActions,
+    ObjectName,
+    Operation,
+    OperationApp,
+    ObjectFilePath,
+    FileSize,
+    TargetFilePath,
+    TargetDomain,
+    RemovableMassStorageSerialNumber,
+    RMSEncrypted,
+    TargetPrinterName,
+    DeviceId,
+    DeviceName,
+    ClientIP,
+    AuxiliarTimestamp,
     AlertTriggered_RawEventData = RawEventData,
     AlertTriggered_ReportId = ReportId
-| lookup kind=leftouter (
-    CloudAppEvents
-    | where Timestamp > ago(query_period)
-    | where ActionType == "AlertEntityGenerated" and tostring(RawEventData["AlertId"]) == alert_id
-    | extend
-        AlertId = tostring(RawEventData["AlertId"]),
-        EntityType = tostring(RawEventData["EntityType"]),
-        Data = todynamic(tostring(RawEventData["Data"]))
-    | where EntityType == "DlpRuleMatch"
-    | extend
-        CreationTime = todatetime(Data["at"]),
-        PolicyId = coalesce(tostring(Data["cid"]), tostring(Data["dpid"])),
-        PolicyName = tostring(Data["dpn"]),
-        ManagementRuleId = tostring(Data["dmrid"]),
-        RuleId = tostring(Data["drid"]),
-        RuleName = tostring(Data["drn"]),
-        ProtectionMode = tostring(Data["enmd"]),
-        ProtectionActions = split(tostring(Data["dact"]), ", "),
-        ObjectName = tostring(Data["von"]),
-        DMC = split(tostring(Data["dmc"]), ","),
-        MDT = tostring(Data["mdt"]),
-        TDC = toint(Data["tdc"]),
-        Operation = tostring(Data["eop"]),
-        OperationApp = tostring(Data["app"]),
-        ObjectFilePath = tostring(Data["ofph"]),
-        FileSize = tostring(Data["efs"]),
-        TargetFilePath = tostring(Data["tfph"]),
-        TargetDomain = tostring(Data["tdmn"]),
-        RemovableMassStorageSerialNumber = tostring(Data["rmsn"]),
-        RemovableMassStorageEncrypted = tobool(Data["rmse"]),
-        TargetPrinterName = tostring(Data["pn"]),
-        DeviceId = tostring(Data["mddid"]),
-        DUOP = tostring(Data["duop"]),
-        DeviceName = tostring(Data["dn"]),
-        ClientIP = tostring(Data["ecip"])
-    | project
-        AlertId,
-        PolicyId,
-        PolicyName,
-        ManagementRuleId,
-        RuleId,
-        RuleName,
-        DMC,
-        ProtectionActions,
-        ProtectionMode,
-        MDT,
-        TDC,
-        Operation,
-        OperationApp,
-        ObjectName,
-        ObjectFilePath,
-        CreationTime,
-        FileSize,
-        TargetFilePath,
-        TargetDomain,
-        DUOP,
-        TargetPrinterName,
-        RemovableMassStorageSerialNumber,
-        RemovableMassStorageEncrypted,
-        DeviceId,
-        DeviceName,
-        ClientIP,
-        AlertEntityGenerated_DlpRuleMatch_RawEventData = RawEventData,
-        AlertEntityGenerated_DlpRuleMatch_ReportId = ReportId
-    ) on AlertId
 | join hint.strategy=shuffle kind=leftouter (
     CloudAppEvents
     | where Timestamp > ago(query_period)
@@ -101,6 +76,7 @@ CloudAppEvents
         OperationApp = tostring(RawEventData["Application"]),
         MatchedPolicies = RawEventData["MatchedPolicies"],
         ObjectFilePath = tostring(RawEventData["ObjectId"]),
+        TargetFilePath = tostring(RawEventData["TargetFilePath"]),
         DlpOriginalFilePath = tostring(RawEventData["DlpOriginalFilePath"]),
         OriginatingDomain = tostring(RawEventData["OriginatingDomain"]),
         Justification = tostring(RawEventData["Justification"]),
@@ -123,8 +99,10 @@ CloudAppEvents
         PolicyId = tostring(MatchedPolicy["PolicyId"]),
         RuleId = tostring(MatchedPolicy["RuleId"])
     | project-away MatchedPolicies, MatchedPolicy
-    ) on CreationTime, DeviceId, Operation, OperationApp, ObjectFilePath, PolicyId, RuleId
-| project-away CreationTime1, DeviceId1, Operation1, OperationApp1, ObjectFilePath1, PolicyId1, RuleId1
+    | extend AuxiliarTimestamp = bin(CreationTime, 1m)
+    | summarize arg_min(CreationTime, *) by AuxiliarTimestamp, DeviceId, Operation, OperationApp, ObjectFilePath, TargetFilePath, PolicyId, RuleId
+    ) on AuxiliarTimestamp, DeviceId, Operation, OperationApp, ObjectFilePath, TargetFilePath, PolicyId, RuleId
+| project-away AuxiliarTimestamp, DeviceId1, Operation1, OperationApp1, ObjectFilePath1, PolicyId1, RuleId1, TargetFilePath1
 | mv-apply SensitiveInfoTypeData = EndpointOperation_RawEventData["SensitiveInfoTypeData"] on (
     summarize SensitiveInformation = make_list(bag_remove_keys(SensitiveInfoTypeData, dynamic(["SensitiveInformationDetailedClassificationAttributes"])))
     )
