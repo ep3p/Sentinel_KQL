@@ -1,0 +1,11 @@
+SecurityEvent
+| where EventData has_any ("CN=Partitions,CN=Configuration,", "msExchAcceptedDomain")
+| project
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    Activity,
+    OperationType,
+    EventData,
+    SubjectLogonId
