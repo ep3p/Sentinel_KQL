@@ -5,7 +5,7 @@ let query_period = 1h;
 //     | where Notes has_all ("[Success]", "[Complete]") and isnotempty(ResultDescription)
 //     | summarize make_list(ResultType)
 // );
-let expected_resource_serviceprincipal_ids = dynamic([]);
+// let expected_resource_serviceprincipal_ids = dynamic([]);
 SigninLogs
 | where TimeGenerated > ago(query_period)
 | where AppId == "9ba1a5c7-f17a-4de9-a1f1-6178c8d51223" // Microsoft Intune Company Portal
