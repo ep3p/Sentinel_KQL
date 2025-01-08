@@ -1,0 +1,58 @@
+// https://labs.jumpsec.com/tokensmith-bypassing-intune-compliant-device-conditional-access/
+let query_period = 1h;
+// let _SuccessResultTypes = toscalar(
+//     _GetWatchlist("ResultType-SignInLogsErrorCodes")
+//     | where Notes has_all ("[Success]", "[Complete]") and isnotempty(ResultDescription)
+//     | summarize make_list(ResultType)
+// );
+let expected_resource_serviceprincipal_ids = dynamic([]);
+SigninLogs
+| where TimeGenerated > ago(query_period)
+| where AppId == "9ba1a5c7-f17a-4de9-a1f1-6178c8d51223" // Microsoft Intune Company Portal
+    and ResourceIdentity == "00000003-0000-0000-c000-000000000000" // Microsoft Graph
+| where isempty(tostring(DeviceDetail["deviceId"]))
+// | where ResultType in (_SuccessResultTypes)
+| join kind=rightsemi (
+    SigninLogs
+    | where TimeGenerated > ago(query_period)
+    ) on CorrelationId
+| summarize
+    arg_min(CreatedDateTime, *),
+    ResultTypes = array_sort_asc(make_set(ResultType)),
+    AppIds = array_sort_asc(make_set(AppId)),
+    ResourceIdentities = array_sort_asc(make_set(ResourceIdentity)),
+    ResourceServicePrincipalIds = array_sort_asc(make_set(ResourceServicePrincipalId))
+    by CorrelationId, UserId, IPAddress
+// | where not(
+//     ResultTypes has_all ("50097", "50129") // ResultTypes related to Entra registered (Workplace join)
+//     and AppIds has "29d9ed98-a469-4536-ade2-f981bc1d605e" // Microsoft Authentication Broker
+//     and ResourceIdentities has_any (expected_resource_serviceprincipal_ids) // ResourceDisplayName empty and ResourceIdentity == ResourceServicePrincipalId // might be custom by tenant
+//     and ResourceServicePrincipalIds has_any (expected_resource_serviceprincipal_ids) // ResourceDisplayName empty and ResourceIdentity == ResourceServicePrincipalId // might be custom by tenant
+//     )
+| project-reorder
+    CreatedDateTime,
+    Category,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    AutonomousSystemNumber,
+    Location,
+    ResultType,
+    ResultDescription,
+    AppDisplayName,
+    ResourceDisplayName,
+    ClientAppUsed,
+    UserAgent,
+    DeviceDetail,
+    AuthenticationRequirement,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    AppId,
+    ResourceIdentity,
+    ResourceServicePrincipalId,
+    HomeTenantId,
+    ResourceTenantId,
+    UserType,
+    UserId,
+    OriginalRequestId,
+    CorrelationId
