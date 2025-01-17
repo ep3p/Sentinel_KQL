@@ -9,7 +9,7 @@ let query_period = 1h;
 SigninLogs
 | where TimeGenerated > ago(query_period)
 | where AppId == "9ba1a5c7-f17a-4de9-a1f1-6178c8d51223" // Microsoft Intune Company Portal
-    and ResourceIdentity == "00000003-0000-0000-c000-000000000000" // Microsoft Graph
+    and ResourceIdentity == "00000003-0000-0000-c000-000000000000" // Microsoft Graph , maybe also "00000002-0000-0000-c000-000000000000" according to www.glueckkanja.com
 | where isempty(tostring(DeviceDetail["deviceId"]))
 // | where ResultType in (_SuccessResultTypes)
 | join kind=rightsemi (
