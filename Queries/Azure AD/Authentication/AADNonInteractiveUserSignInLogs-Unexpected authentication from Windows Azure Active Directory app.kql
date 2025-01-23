@@ -1,0 +1,28 @@
+// Since 6th January 2025 threat actors have started using this app (or a specific endpoint) to perform password spray with characteristic properties.
+// let _SuccessResultTypes = toscalar(
+//     _GetWatchlist("ResultType-SignInLogsErrorCodes")
+//     | where Notes has_any ("[Expired]", "[Success]") and isnotempty(ResultDescription)
+//     | summarize make_list(ResultType)
+// );
+AADNonInteractiveUserSignInLogs
+| where AppId == "00000002-0000-0000-c000-000000000000" // Windows Azure Active Directory - ResourceIdentity and ResourceDisplayName are empty
+| where not(ResultType in (50126, 50053)) // usually ResultTypes 50126, 50053
+// | where ClientAppUsed == "Other clients" and UserAgent == "fasthttp"
+// | where ResultType in (_SuccessResultTypes) or AuthenticationDetails has 'succeeded":true'
+| project-reorder
+    CreatedDateTime,
+    Category,
+    UserPrincipalName,
+    AlternateSignInName,
+    IPAddress,
+    Location,
+    AutonomousSystemNumber,
+    ResultType,
+    ResultDescription,
+    AuthenticationDetails,
+    AppDisplayName,
+    UserAgent,
+    AppId,
+    UserId,
+    OriginalRequestId,
+    CorrelationId
