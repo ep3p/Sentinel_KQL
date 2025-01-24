@@ -1,0 +1,63 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let user_threshold = 10;
+let failures_threshold = 3;
+let _UnexpectedNonInteractiveFailures = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has "[Failure]" and (Notes has_all ("[Password]", "[Invalid]") or Notes has "[Malicious]") and isnotempty(ResultDescription) // For example 50126, 50053, 500532
+    | summarize make_list(ResultType)
+);
+let _SuccessResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has_any ("[Expired]", "[Success]") and isnotempty(ResultDescription)
+    | summarize make_list(ResultType)
+);
+AADNonInteractiveUserSignInLogs
+| where TimeGenerated > ago(query_period)
+| where ResultType in (_UnexpectedNonInteractiveFailures) and HomeTenantId == ResourceTenantId
+| summarize
+    FailureStartTime = min(TimeGenerated),
+    FailureEndTime = max(TimeGenerated),
+    FailureEventCount = count(),
+    FailureUserCount = dcount(UserId)
+    by AppDisplayName, AppId, ResourceDisplayName, ResourceIdentity
+| where isnotempty(AppId) or isnotempty(ResourceIdentity)
+| where FailureUserCount > user_threshold and FailureEventCount >= failures_threshold * user_threshold
+| lookup kind=leftouter (
+    AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_frequency)
+    | where ResultType in (_SuccessResultTypes)
+    | summarize
+        SuccessStartTime = min(TimeGenerated),
+        SuccessEndTime = max(TimeGenerated),
+        SuccessEventCount = count(),
+        SuccessUserCount = dcount(UserId),
+        SuccessUsers = array_sort_asc(make_set(UserPrincipalName))
+        by AppId, ResourceIdentity
+    ) on AppId, ResourceIdentity
+| where case(
+    array_length(SuccessUsers) > 0, true, // Authentication success or partial success
+    FailureStartTime > ago(query_frequency), true, // First password spray in last query_frequency
+    false
+    )
+| extend
+    StartTime = min_of(FailureStartTime, SuccessStartTime),
+    Endtime = max_of(FailureEndTime, SuccessEndTime),
+    AlertSeverity = case(
+        array_length(SuccessUsers) > 0, "High", // Authentication success or partial success
+        FailureStartTime > ago(query_frequency), "Informational", // First password spray in last query_frequency
+        "High"
+    )
+| project
+    StartTime,
+    Endtime,
+    AppDisplayName,
+    ResourceDisplayName,
+    FailureEventCount,
+    FailureUserCount,
+    SuccessEventCount,
+    SuccessUserCount,
+    SuccessUsers,
+    AppId,
+    ResourceIdentity,
+    AlertSeverity
