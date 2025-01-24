@@ -47,6 +47,10 @@ AADNonInteractiveUserSignInLogs
         array_length(SuccessUsers) > 0, "High", // Authentication success or partial success
         FailureStartTime > ago(query_frequency), "Informational", // First password spray in last query_frequency
         "High"
+    ),
+    AlertNameAddition = case(
+        array_length(SuccessUsers) > 0, " - Potentially compromised account",
+        ""
     )
 | project
     StartTime,
@@ -60,4 +64,5 @@ AADNonInteractiveUserSignInLogs
     SuccessUsers,
     AppId,
     ResourceIdentity,
-    AlertSeverity
+    AlertSeverity,
+    AlertNameAddition
