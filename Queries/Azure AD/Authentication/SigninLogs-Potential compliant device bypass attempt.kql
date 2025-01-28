@@ -22,7 +22,7 @@ SigninLogs
     AppIds = array_sort_asc(make_set(AppId)),
     ResourceIdentities = array_sort_asc(make_set(ResourceIdentity)),
     ResourceServicePrincipalIds = array_sort_asc(make_set(ResourceServicePrincipalId))
-    by CorrelationId, UserId, IPAddress
+    by CorrelationId, UserId//, IPAddress
 // | where not(
 //     ResultTypes has_all ("50097", "50129") // ResultTypes related to Entra registered (Workplace join)
 //     and AppIds has "29d9ed98-a469-4536-ade2-f981bc1d605e" // Microsoft Authentication Broker
@@ -34,7 +34,7 @@ SigninLogs
     Category,
     UserPrincipalName,
     UserDisplayName,
-    IPAddress,
+    //IPAddress,
     AutonomousSystemNumber,
     Location,
     ResultType,
