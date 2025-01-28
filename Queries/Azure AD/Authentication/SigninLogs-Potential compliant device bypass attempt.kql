@@ -21,7 +21,8 @@ SigninLogs
     ResultTypes = array_sort_asc(make_set(ResultType)),
     AppIds = array_sort_asc(make_set(AppId)),
     ResourceIdentities = array_sort_asc(make_set(ResourceIdentity)),
-    ResourceServicePrincipalIds = array_sort_asc(make_set(ResourceServicePrincipalId))
+    ResourceServicePrincipalIds = array_sort_asc(make_set(ResourceServicePrincipalId)),
+    IPAddresses = array_sort_asc(make_set(IPAddress))
     by CorrelationId, UserId//, IPAddress
 // | where not(
 //     ResultTypes has_all ("50097", "50129") // ResultTypes related to Entra registered (Workplace join)
@@ -35,6 +36,7 @@ SigninLogs
     UserPrincipalName,
     UserDisplayName,
     //IPAddress,
+    IPAddresses,
     AutonomousSystemNumber,
     Location,
     ResultType,
