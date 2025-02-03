@@ -2,23 +2,25 @@
 // IdentityInfo table renews itself completely every ~14 days.
 //
 // Click "Save as function", in Parameters write in the fields:
-// "datetime"  "start_time"  "14d"
-// "datetime"  "end_time"    "time(null)"
+// "datetime"  "query_date"     ""
+// "timespan"  "query_period"   "14d"
 //
 // If you name the function "PrivilegedIdentityInfo", you can check the function with queries like the following:
 //
 // PrivilegedIdentityInfo
 //
-// PrivilegedIdentityInfo(26d, 12d)
+// PrivilegedIdentityInfo(now(), 14d)
 //
-//let Function = (start_time:timespan = 14d, end_time:timespan = time(null)){
+// let Function = (query_date:datetime, query_period:timespan = 14d){
 let _PrivilegedGroupRegex = toscalar(
     union
-        (_GetWatchlist("SID-AuditADObjects")
+        (
+        _GetWatchlist("SID-AuditADObjects")
         | where Notes has_any ("[Privileged]", "[Unpopulated]")
         | project RegEx = regex_quote(SAMAccountName)
         ),
-        (_GetWatchlist("RegEx-PrivDomainGroups")
+        (
+        _GetWatchlist("RegEx-PrivDomainGroups")
         | project RegEx
         )
     | summarize RegEx = make_set(RegEx)
@@ -30,11 +32,11 @@ let _PrivilegedRoleRegex = toscalar(
     | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
 );
 IdentityInfo
-| where TimeGenerated between (ago(start_time) .. ago(end_time))
+| where TimeGenerated between ((query_date - query_period) .. query_date)
 | summarize arg_max(TimeGenerated, *) by AccountObjectId, AccountSID
 | mv-expand GroupMember = GroupMembership to typeof(string), AssignedRole = AssignedRoles to typeof(string)
 | where GroupMember matches regex _PrivilegedGroupRegex or AssignedRole matches regex _PrivilegedRoleRegex
 | project-away GroupMember, AssignedRole
 | summarize take_any(*) by AccountObjectId, AccountSID
-//};
-//Function(14d, time(null))
+// };
+// Function(now(), 14d)
