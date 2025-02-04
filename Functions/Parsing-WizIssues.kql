@@ -1,3 +1,5 @@
+// https://aka.ms/sentinel-wiz-website-run-from-package
+// https://wizio-public.s3.us-east-2.amazonaws.com/deployment-v2/azure/integrations/sentinel/packages/wiz_sentinel_latest.zip
 let expected_keys = dynamic([
     "SourceSystem",
     "TenantId",
