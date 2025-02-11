@@ -1,0 +1,140 @@
+let internet_message_id = "<<<>>>";
+let query_period = 1d;
+let network_message_ids = toscalar(
+    EmailEvents
+    | where Timestamp > ago(query_period)
+    | where InternetMessageId == strcat("<", internet_message_id, ">") or InternetMessageId == internet_message_id
+    | summarize make_set(NetworkMessageId)
+);
+let is_valid_internet_message_id = isnotempty(internet_message_id);
+let proxy_ranges = dynamic([]);
+let corporate_egress = dynamic([]);
+EmailEvents
+| where Timestamp > ago(query_period)
+| where array_length(network_message_ids) > 0 and NetworkMessageId in (network_message_ids)
+| summarize
+    IMI_DeliveryActions = array_sort_asc(make_set(DeliveryAction)),
+    IMI_DeliveryLocations = array_sort_asc(make_set(DeliveryLocation)),
+    IMI_LatestDeliveryActions = array_sort_asc(make_set(LatestDeliveryAction)),
+    IMI_LatestDeliveryLocations = array_sort_asc(make_set(LatestDeliveryLocation)),
+    RecipientCount = count_distinct(RecipientEmailAddress),
+    RecipientEmailAddressesSample = array_sort_asc(make_set(RecipientEmailAddress, 25)),
+    UrlCount = max(UrlCount),
+    AttachmentCount = max(AttachmentCount)
+| extend
+    NetworkMessageIds = network_message_ids,
+    EmailWasProcessed = array_length(IMI_DeliveryActions) > 0,
+    EmailWasDelivered = array_length(IMI_DeliveryActions) > 0
+        and not(array_length(IMI_DeliveryActions) == 1 and IMI_DeliveryActions[0] == "Blocked" and array_length(IMI_LatestDeliveryActions) == 1 and IMI_LatestDeliveryActions[0] == "Blocked")
+| extend AuxiliarKey = true
+| join kind=leftouter (
+    EmailUrlInfo
+    | where Timestamp > ago(query_period)
+    | where array_length(network_message_ids) > 0 and NetworkMessageId in (network_message_ids)
+    | summarize UrlLocations = array_sort_asc(make_set(UrlLocation)) by Url
+    | as _Auxiliar
+    | join kind=leftouter (
+        UrlClickEvents
+        | where Timestamp > ago(query_period)
+        | where Url has_any (toscalar(_Auxiliar | summarize make_list(Url))) or UrlChain has_any (toscalar(_Auxiliar | summarize make_list(Url)))
+        | sort by Timestamp asc
+        | extend IPAddressType = case(
+            ipv4_is_in_any_range(IPAddress, proxy_ranges), "Proxy",
+            ipv4_is_in_any_range(IPAddress, corporate_egress), "Corporate",
+            "Other"
+        )
+        | summarize
+            ClickCount = count(),
+            Workloads = array_sort_asc(make_set(Workload)),
+            IPAddressesSample = array_sort_asc(make_set(IPAddress, 25)),
+            IPAddressTypesSample = array_sort_asc(make_set(IPAddressType, 25)),
+            EmailNetworkMessageIdsSample = make_set_if(NetworkMessageId, Workload == "Email", 25),
+            ClickEventsSample = make_list(bag_pack_columns(Timestamp, Workload, AccountUpn, IPAddress, IPAddressType, IsClickedThrough), 25),
+            take_anyif(ThreatTypes, isnotempty(ThreatTypes)),
+            take_anyif(DetectionMethods, isnotempty(DetectionMethods))
+            by Url, UrlChain, ActionType
+        | sort by ActionType asc
+        | summarize
+            UrlChains = array_sort_asc(make_set(pack_array(UrlChain))),
+            ClickCount = sum(ClickCount),
+            AllowedWorkloads = array_sort_asc(make_set_if(Workloads, not(ActionType == "ClickBlocked"))),
+            //AllowedIPAddresses = array_sort_asc(make_set_if(IPAddresses, not(ActionType == "ClickBlocked"))),
+            AllowedIPAddressTypes = array_sort_asc(make_set_if(IPAddressTypesSample, not(ActionType == "ClickBlocked"))),
+            ClickInfo = make_bag(bag_pack(ActionType, bag_pack_columns(ClickCount, Workloads, IPAddressTypesSample, IPAddressesSample, EmailNetworkMessageIdsSample, ClickEventsSample))),
+            take_anyif(ThreatTypes, isnotempty(ThreatTypes)),
+            take_anyif(DetectionMethods, isnotempty(DetectionMethods))
+            by Url
+        ) on Url
+    | project-away Url1
+    | extend
+        // Possible UrlLocation == Attachment Body CloudAttachment Header QRCode Subject
+        UrlClicksWereProtected = iff(array_length(UrlLocations) > 0, array_length(UrlLocations) == 1 and tostring(UrlLocations[0]) == "Body", bool(null)),
+        ClickWasDetected = iff(array_length(bag_keys(ClickInfo)) > 0 or array_length(UrlLocations) > 0, isnotempty(Url) and isnotempty(ClickCount) and ClickCount > 0, bool(null)),
+        HasAllowedClick = iff(array_length(bag_keys(ClickInfo)) > 0, tostring(bag_keys(ClickInfo)) has_any ("ClickAllowed", "UrlErrorPage"), bool(null)),
+        ClickActionTypes = bag_keys(ClickInfo)
+    | summarize
+        AllUrlClicksWereProtected = tobool(binary_all_and(tolong(UrlClicksWereProtected))),
+        AnyClickWasDetected = tobool(binary_all_or(tolong(ClickWasDetected))),
+        AnyHasAllowedClick = tobool(binary_all_or(tolong(HasAllowedClick))),
+        ClickCount = sum(ClickCount),
+        AllowedWorkloads = array_sort_asc(make_set(AllowedWorkloads)),
+        AllowedIPAddressTypes = array_sort_asc(make_set(AllowedIPAddressTypes)),
+        Urls = array_sort_asc(make_list(Url)),
+        UrlsInfo = make_list(bag_pack_columns(Url, UrlChains, ThreatTypes, DetectionMethods, UrlClicksWereProtected, ClickWasDetected, HasAllowedClick, AllowedWorkloads, AllowedIPAddressTypes, ClickCount, ClickActionTypes, ClickInfo))
+    | extend AuxiliarKey = true
+    ) on AuxiliarKey
+| project-away AuxiliarKey, AuxiliarKey1
+| extend AuxiliarKey = array_length(IMI_DeliveryActions) > 0
+| join kind=leftouter (
+    EmailAttachmentInfo
+    | where Timestamp > ago(query_period)
+    | where array_length(network_message_ids) > 0 and NetworkMessageId in (network_message_ids)
+    | sort by FileType asc, FileName asc
+    | summarize AttachmentInfo = make_set(bag_pack_columns(FileType, FileName, FileSize, SHA256))
+    | extend AuxiliarKey = true
+    ) on AuxiliarKey
+| project-away AuxiliarKey, AuxiliarKey1
+| extend AuxiliarKey = array_length(AttachmentInfo) > 0
+| join kind=leftouter (
+    union DeviceEvents, DeviceFileEvents, DeviceImageLoadEvents, DeviceProcessEvents
+    | where Timestamp > ago(query_period)
+    | where array_length(network_message_ids) > 0 and isnotempty(SHA256) and SHA256 in (toscalar(
+        EmailAttachmentInfo
+        | where Timestamp > ago(query_period)
+        | where array_length(network_message_ids) > 0 and NetworkMessageId in (network_message_ids)
+        | summarize make_set(SHA256)
+        ))
+    | summarize
+        AttachmentCorporateDeviceActionTypes = array_sort_asc(make_set(ActionType)),
+        AttachmentCorporateDeviceNamesSample = array_sort_asc(make_set(DeviceName, 25))
+    | extend AuxiliarKey = true
+    ) on AuxiliarKey
+| project-away AuxiliarKey, AuxiliarKey1
+| extend
+  IsValidInternetMessageId = is_valid_internet_message_id,
+  EmailAttachmentsInCorporateDevices = iff(array_length(AttachmentInfo) > 0, array_length(AttachmentCorporateDeviceActionTypes) > 0, bool(null))
+| project-reorder
+    IsValidInternetMessageId,
+    EmailWasProcessed,
+    EmailWasDelivered,
+    AllUrlClicksWereProtected,
+    AnyClickWasDetected,
+    AnyHasAllowedClick,
+    EmailAttachmentsInCorporateDevices,
+    IMI_DeliveryActions,
+    IMI_DeliveryLocations,
+    IMI_LatestDeliveryActions,
+    IMI_LatestDeliveryLocations,
+    NetworkMessageIds,
+    RecipientCount,
+    RecipientEmailAddressesSample,
+    UrlCount,
+    Urls,
+    ClickCount,
+    AllowedWorkloads,
+    AllowedIPAddressTypes,
+    UrlsInfo,
+    AttachmentCount,
+    AttachmentInfo,
+    AttachmentCorporateDeviceActionTypes,
+    AttachmentCorporateDeviceNamesSample
