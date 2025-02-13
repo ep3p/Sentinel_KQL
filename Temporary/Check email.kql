@@ -80,7 +80,7 @@ EmailEvents
         AllowedWorkloads = array_sort_asc(make_set(AllowedWorkloads)),
         AllowedIPAddressTypes = array_sort_asc(make_set(AllowedIPAddressTypes)),
         Urls = array_sort_asc(make_list(Url)),
-        UrlsInfo = make_list(bag_pack_columns(Url, UrlChains, ThreatTypes, DetectionMethods, UrlClicksWereProtected, ClickWasDetected, HasAllowedClick, AllowedWorkloads, AllowedIPAddressTypes, ClickCount, ClickActionTypes, ClickInfo))
+        UrlsInfo = make_list(bag_pack_columns(Url, UrlChains, UrlLocations, ThreatTypes, DetectionMethods, UrlClicksWereProtected, ClickWasDetected, HasAllowedClick, AllowedWorkloads, AllowedIPAddressTypes, ClickCount, ClickActionTypes, ClickInfo))
     | extend AuxiliarKey = true
     ) on AuxiliarKey
 | project-away AuxiliarKey, AuxiliarKey1
