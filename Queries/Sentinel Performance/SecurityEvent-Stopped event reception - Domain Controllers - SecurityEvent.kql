@@ -1,7 +1,7 @@
 let query_frequency = 15m;
-let query_wait = 1h;
+let query_wait = 2h;
 let _DomainControllers = toscalar(
-    _GetWatchlist('Service-PrivateCorporateServices')
+    _GetWatchlist("Service-PrivateCorporateServices")
     | where Service == "DomainController"
     | summarize make_list(HostName)
 );
@@ -10,4 +10,12 @@ SecurityEvent
 | summarize arg_max(TimeGenerated, *) by Computer
 | where Computer has_any (_DomainControllers)
 | where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
-| project Type, TimeGenerated, TimeCollected, Computer, Activity, SourceComputerId, EventOriginId, _ResourceId
+| project
+    Type,
+    TimeGenerated,
+    TimeCollected,
+    Computer,
+    Activity,
+    SourceComputerId,
+    EventOriginId,
+    _ResourceId
