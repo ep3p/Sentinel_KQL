@@ -1,6 +1,6 @@
 let query_frequency = 15m;
 let query_period = 3h;
-let query_wait = 15m;
+let query_wait = 30m;
 let replication_threshold = 10;
 let _BenignDSReplication =
     _GetWatchlist("Activity-ExpectedSignificantActivity")
@@ -39,7 +39,7 @@ SecurityEvent
     arg_min(TimeGenerated, AccountType, Activity, AccessList, AccessMask, ObjectServer, ObjectType, OperationType, Logon_Account),
     OperationCount = count(),
     PropertiesList = array_sort_asc(make_set(split(replace_string(Properties, "\t", ""), " "))),
-    SubjectLogonIdList = make_set(SubjectLogonId, 250)
+    SubjectLogonIdsSample = make_set(SubjectLogonId, 25)
     by Computer, Account, IpAddress, ObjectName
 // Events where logon was not registered, thus IpAddress is not available, are assumed to be benign and happen infrequently
 | where not(isempty(IpAddress) and OperationCount < replication_threshold and Account in (toscalar(_BenignDSReplication | summarize make_set(Account))))
@@ -57,6 +57,6 @@ SecurityEvent
     OperationType,
     OperationCount,
     PropertiesList,
-    SubjectLogonIdList,
+    SubjectLogonIdsSample,
     Logon_Account,
     IpAddress
