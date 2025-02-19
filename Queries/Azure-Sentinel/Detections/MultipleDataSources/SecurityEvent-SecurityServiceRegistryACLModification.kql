@@ -1,5 +1,4 @@
-let query_frequency = 1h;
-let file_names = dynamic(["subinacl.exe","SetACL.exe"]);
+let file_names = dynamic(["subinacl.exe", "SetACL.exe"]);
 let registry_paths = dynamic([
     @"Services\HealthService",
     @"Services\Sense",
@@ -21,14 +20,23 @@ let parameters = dynamic([
     @"n1:SYSTEM;ta:remtrst;w:dacl"
 ]);
 union
-    (SecurityEvent
-    | where TimeGenerated > ago(query_frequency)
+    (
+    SecurityEvent
     | where EventID == 4688
     | where Process has_any (file_names) and CommandLine has_any (registry_paths) and CommandLine has_any (parameters)
-    | project TimeGenerated, Computer, Account, AccountType, SubjectLogonId, TargetAccount, Activity, NewProcessName, CommandLine
-),
-    (SecurityEvent
-    | where TimeGenerated > ago(query_frequency)
+    | project
+        TimeGenerated,
+        Computer,
+        Account,
+        AccountType,
+        SubjectLogonId,
+        TargetAccount,
+        Activity,
+        NewProcessName,
+        CommandLine
+    ),
+    (
+    SecurityEvent
     | where EventID == 4670
     | where ObjectType == "Key"
     | mv-apply Auxiliar = parse_xml(EventData)["EventData"]["Data"] on (
@@ -49,10 +57,25 @@ union
     | mv-expand AddedSd = iff(array_length(AddedSd) == 0, dynamic([""]), AddedSd) to typeof(string)
     | where isempty(AddedSd) or AddedSd endswith "SY"
     | where case(
-            isempty(AddedSd), true, // Local System access was removed
-            RemovedSd startswith "A" and AddedSd startswith "D", true, // Local System was denied
-            RemovedSd contains "KA" and not(AddedSd contains "KA"), true, // Local System Key All Access was removed
-            false
+        isempty(AddedSd), true, // Local System access was removed
+        RemovedSd startswith "A" and AddedSd startswith "D", true, // Local System was denied
+        RemovedSd contains "KA" and not(AddedSd contains "KA"), true, // Local System Key All Access was removed
+        false
         )
-    | project TimeGenerated, Computer, Account, AccountType, SubjectLogonId, Activity, ProcessName, ObjectType, ObjectName, EntryType, OldSd, NewSd, RemovedSd, AddedSd, EventData
-)
+    | project
+        TimeGenerated,
+        Computer,
+        Account,
+        AccountType,
+        SubjectLogonId,
+        Activity,
+        ProcessName,
+        ObjectType,
+        ObjectName,
+        EntryType,
+        OldSd,
+        NewSd,
+        RemovedSd,
+        AddedSd,
+        EventData
+    )
