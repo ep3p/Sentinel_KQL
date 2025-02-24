@@ -1,0 +1,44 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _ExcludedResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has_any ("[Success-App]", "[Failure-App]") and not(Notes has_all ("[ClientSecret]", "[Invalid]"))
+    | summarize make_list(ResultType)
+);
+let _ExcludedIPAddresses = toscalar(
+    union
+        (
+        _GetWatchlist("IP-Vendors")
+        | where Notes has_any ("[HomeTenant]", "[Proxy]")
+        ),
+        (
+        _GetWatchlist("IP-CorporateCollaborators")
+        | where Notes has_any ("[Egress]")
+        )
+    | summarize make_list(IPAddress)
+);
+AADServicePrincipalSignInLogs
+| where TimeGenerated > ago(query_period)
+| where not(ResultType in (_ExcludedResultTypes)) and not(ipv4_is_in_any_range(IPAddress, _ExcludedIPAddresses))
+| summarize arg_min(TimeGenerated, *) by ResultType, ServicePrincipalId, AppId, ResourceIdentity, IPAddress //parse_ipv6_mask(IPAddress, 120)
+| where TimeGenerated > ago(query_frequency)
+| project
+    TimeGenerated,
+    CreatedDateTime,
+    ServicePrincipalName,
+    ResourceDisplayName,
+    IPAddress,
+    Location,
+    ResultType,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    AuthenticationProcessingDetails,
+    ClientCredentialType,
+    ServicePrincipalId,
+    AppId,
+    ResourceIdentity,
+    ResourceServicePrincipalId,
+    ServicePrincipalCredentialKeyId,
+    ServicePrincipalCredentialThumbprint,
+    Id,
+    CorrelationId
