@@ -19,7 +19,8 @@ AADNonInteractiveUserSignInLogs
     FailureStartTime = min(TimeGenerated),
     FailureEndTime = max(TimeGenerated),
     FailureEventCount = count(),
-    FailureUserCount = dcount(UserId)
+    FailureUserCount = dcount(UserId),
+    FailureRanges = array_sort_asc(make_set(parse_ipv6_mask(IPAddress, 120)))
     by AppDisplayName, AppId, ResourceDisplayName, ResourceIdentity
 | where isnotempty(AppId) or isnotempty(ResourceIdentity)
 | where FailureUserCount > user_threshold and FailureEventCount >= failures_threshold * user_threshold
@@ -32,7 +33,8 @@ AADNonInteractiveUserSignInLogs
         SuccessEndTime = max(TimeGenerated),
         SuccessEventCount = count(),
         SuccessUserCount = dcount(UserId),
-        SuccessUsers = array_sort_asc(make_set(UserPrincipalName))
+        SuccessUsers = array_sort_asc(make_set(UserPrincipalName)),
+        SuccessRanges = array_sort_asc(make_set(parse_ipv6_mask(IPAddress, 120)))
         by AppId, ResourceIdentity
     ) on AppId, ResourceIdentity
 | where case(
@@ -44,9 +46,9 @@ AADNonInteractiveUserSignInLogs
     StartTime = min_of(FailureStartTime, SuccessStartTime),
     Endtime = max_of(FailureEndTime, SuccessEndTime),
     AlertSeverity = case(
-        array_length(SuccessUsers) > 0, "High", // Authentication success or partial success
+        array_length(SuccessUsers) > 0 and array_length(set_intersect(SuccessRanges, FailureRanges)) > 0, "High", // Authentication success or partial success
         FailureStartTime > ago(query_frequency), "Informational", // First password spray in last query_frequency
-        "High"
+        "Informational"
     ),
     AlertNameAddition = case(
         array_length(SuccessUsers) > 0, " - Potentially compromised account",
