@@ -3,6 +3,11 @@ let _EntraConnectSyncAccounts = toscalar(
     | where Activity == "EntraConnectSync"
     | summarize make_list(ActorId)
 );
+let _ExpectedCrossTenantSynchronization =
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "CrossTenantSynchronization"
+    | project InitiatorId = tostring(ActorId), CrossSynchronizationDomain = tostring(Auxiliar)
+;
 AuditLogs
 | where OperationName == "Add user" and Result == "success"
 | extend
@@ -19,6 +24,8 @@ AuditLogs
     TargetUserPrincipalName = tostring(TargetResources[0]["userPrincipalName"]),
     TargetId = tostring(TargetResources[0]["id"])
 | where not(TargetUserType == "Guest")
+| extend CrossSynchronizationDomain = extract(@"\_([^\_]+)\#EXT\#\@[^\@]+\.onmicrosoft\.com$", 1, TargetUserPrincipalName)
+| join kind=leftanti _ExpectedCrossTenantSynchronization on InitiatorId, CrossSynchronizationDomain
 | project
     TimeGenerated,
     LoggedByService,
@@ -31,6 +38,7 @@ AuditLogs
     ResultDescription,
     TargetUserType,
     TargetUserPrincipalName,
+    CrossSynchronizationDomain,
     TargetId,
     TargetUserProperties,
     AdditionalDetails,
