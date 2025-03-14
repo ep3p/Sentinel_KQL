@@ -1,152 +1,113 @@
-let query_frequency = 15m;
+let query_frequency = 5m;
 let query_period = 2d;
 let query_wait = 30m;
-let _HomeTenantDomains = toscalar(
-    _GetWatchlist("UUID-AADTenantIds")
-    | where Notes has "[HomeTenant]"
-    | summarize make_list(Domain)
-);
-let _UntrustedResultTypes = toscalar(
-    _GetWatchlist("ResultType-SignInLogsErrorCodes")
-    | where Notes has "[MFA]" and Notes has_any ("[Unconfigured]", "[NotCompliant]")
-    | summarize make_list(ResultType)
-);
-let _SuspiciousInboxForwardingRuleAlerts = materialize(
-    SecurityAlert
-    | where TimeGenerated between (ago(query_wait + query_frequency) .. ago(query_wait))
-    | where ProductName has "Microsoft Cloud App Security" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Suspicious inbox forwarding rule"
-    //| where CompromisedEntity has_any (_HomeTenantDomains)
-    | extend ExtendedProperties = todynamic(ExtendedProperties)
-    | project
-        Alert_TimeGenerated = TimeGenerated,
-        ProductName,
-        AlertName,
-        Description,
-        AlertSeverity,
-        Status,
-        Tactics,
-        Techniques,
-        Entities,
-        ExtendedProperties,
-        AlertLink
-    | lookup kind=leftouter
-        (AADUserRiskEvents
-        | where TimeGenerated > ago(query_period)
-        | where OperationName == "User Risk Detection" and Source == "MicrosoftCloudAppSecurity" and RiskEventType == "suspiciousInboxForwarding"
-        | summarize arg_max(TimeGenerated, *) by Id
-        | mv-apply Auxiliar_AdditionalInfo = AdditionalInfo on (
-            where Auxiliar_AdditionalInfo["Key"] == "alertUrl"
-            | extend AlertLink = tostring(Auxiliar_AdditionalInfo["Value"])
-            )
-        | project
-            //TimeGenerated,
-            UserDisplayName,
-            UserPrincipalName,
-            UserId,
-            AdditionalInfo,
-            OriginalRequestId = RequestId,
-            CorrelationId,
-            RiskDetail,
-            RiskLevel,
-            RiskState,
-            AlertLink
-        ) on AlertLink
-    | as _Alerts
-    | lookup kind=leftouter (
-        union
-            (SigninLogs
-            | where TimeGenerated > ago(query_period)
-            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
-            | extend
-                DeviceDetail = tostring(DeviceDetail),
-                TimeReceived = _TimeReceived
-            ),
-            (AADNonInteractiveUserSignInLogs
-            | where TimeGenerated > ago(query_period)
-            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
-            | extend TimeReceived = _TimeReceived
-            )
-        | summarize
-            arg_max(TimeReceived, *),
-            MFASuccess_TimeGenerated = minif(TimeGenerated, ConditionalAccessStatus == "success" and AuthenticationRequirement == "multiFactorAuthentication")
-            by OriginalRequestId
-        | project
-            MFASuccess_TimeGenerated,
-            TimeGenerated,
-            Type,
-            //UserPrincipalName,
-            //UserDisplayName,
-            IPAddress,
-            Location,
-            ResultType,
-            ResultDescription,
-            ClientAppUsed,
-            AppDisplayName,
-            ResourceDisplayName,
-            DeviceDetail,
-            UserAgent,
-            AuthenticationDetails,
-            RiskEventTypes,
-            RiskLevelDuringSignIn,
-            RiskLevelAggregated,
-            //UserId,
-            OriginalRequestId//,
-            //CorrelationId
-        )
-        on OriginalRequestId
-);
-let _UntrustedUserIds = toscalar(
-    union
-        (_SuspiciousInboxForwardingRuleAlerts
-        | join kind=innerunique (
-            SigninLogs
-            | where TimeGenerated > ago(query_period)
-            | where ResultType in (_UntrustedResultTypes)
-            | project UserId
-            )
-            on UserId
-        ),
-        (AuthenticationMethodChanges(query_period, toscalar(_SuspiciousInboxForwardingRuleAlerts | summarize make_set(UserId)), false)
-        )
-    | summarize make_set(UserId)
-);
-_SuspiciousInboxForwardingRuleAlerts
-| extend RecentlyConfiguredMFA = UserId in (_UntrustedUserIds)
-| extend BenignAlert = case(
-        // Remove cases where Defender for Cloud Apps considers the alert solved and the account had MFA configured long ago
-        RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed" and not(RecentlyConfiguredMFA), true,
-        false
-    )
-| where not(BenignAlert and AlertSeverity != "High")
+SecurityAlert
+| where TimeGenerated > ago(query_period)
+| where ProductName has "Microsoft Cloud App Security" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Suspicious inbox forwarding rule"
+| summarize arg_min(TimeGenerated, *) by VendorOriginalId
+| where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
+| extend ExtendedProperties = todynamic(ExtendedProperties)
 | project
-    Alert_TimeGenerated,
-    TimeGenerated,
+    Alert_TimeGenerated = TimeGenerated,
     ProductName,
     AlertName,
     Description,
-    AlertLink,
-    UserDisplayName,
-    UserPrincipalName,
-    UserId,
-    OriginalRequestId,
-    CorrelationId,
-    AdditionalInfo,
-    ExtendedProperties,
-    Entities,
     AlertSeverity,
+    Alert_Status = Status,
     Tactics,
     Techniques,
-    Type,
-    IPAddress,
-    Location,
-    ResultType,
-    ResultDescription,
-    ClientAppUsed,
-    AppDisplayName,
-    ResourceDisplayName,
-    DeviceDetail,
-    UserAgent,
-    AuthenticationDetails,
-    RiskEventTypes,
-    RiskLevelDuringSignIn,
-    RiskLevelAggregated
+    SubTechniques,
+    Entities,
+    ExtendedProperties,
+    AlertLink,
+    VendorOriginalId,
+    SystemAlertId
+| lookup kind=leftouter (
+    AADUserRiskEvents
+    | where TimeGenerated > ago(query_period)
+    | where OperationName == "User Risk Detection" and Source == "MicrosoftCloudAppSecurity" and RiskEventType == "suspiciousInboxForwarding"
+    | summarize arg_max(TimeGenerated, *) by Id
+    | mv-apply Auxiliar_AdditionalInfo = AdditionalInfo on (
+        where Auxiliar_AdditionalInfo["Key"] == "alertUrl"
+        | extend VendorOriginalId = tostring(split(tostring(Auxiliar_AdditionalInfo["Value"]), "/")[-1])
+        )
+    | project
+        //TimeGenerated,
+        UserDisplayName,
+        UserPrincipalName,
+        UserId,
+        OriginalRequestId = RequestId,
+        CorrelationId,
+        RiskDetail,
+        RiskLevel,
+        RiskState,
+        DetectionTimingType,
+        AdditionalInfo,
+        VendorOriginalId
+    ) on VendorOriginalId
+| as _Alerts
+| lookup kind=leftouter (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period)
+    | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
+    | extend TimeReceived = _TimeReceived
+    | invoke UnifySignInLogs()
+    | summarize
+        arg_max(TimeReceived, *),
+        MFASuccess_CreatedDateTime = minif(CreatedDateTime, ConditionalAccessStatus == "success" and AuthenticationRequirement == "multiFactorAuthentication")
+        by OriginalRequestId
+    | project
+        TimeGenerated,
+        CreatedDateTime,
+        Type,
+        //UserDisplayName,
+        //UserPrincipalName,
+        //UserId,
+        AlternateSignInName,
+        SignInIdentifier,
+        UserType,
+        IPAddress,
+        AutonomousSystemNumber,
+        Location,
+        NetworkLocationDetails,
+        ResultType,
+        ResultDescription,
+        ClientAppUsed,
+        AppDisplayName,
+        ResourceDisplayName,
+        DeviceDetail,
+        UserAgent,
+        Status,
+        MfaDetail,
+        AuthenticationContextClassReferences,
+        AuthenticationDetails,
+        AuthenticationProcessingDetails,
+        AuthenticationProtocol,
+        AuthenticationRequirement,
+        AuthenticationRequirementPolicies,
+        SessionLifetimePolicies,
+        TokenIssuerType,
+        IncomingTokenType,
+        TokenProtectionStatusDetails,
+        ConditionalAccessStatus,
+        ConditionalAccessPolicies,
+        //RiskDetail,
+        RiskEventTypes,
+        RiskLevelAggregated,
+        RiskLevelDuringSignIn,
+        //RiskState,
+        HomeTenantId,
+        ResourceTenantId,
+        CrossTenantAccessType,
+        AppId,
+        ResourceIdentity,
+        SessionId,
+        OriginalRequestId,
+        //CorrelationId,
+        MFASuccess_CreatedDateTime
+    ) on OriginalRequestId
+| where case(
+    AlertSeverity == "High", true,
+    RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed", false,
+    true
+    )
