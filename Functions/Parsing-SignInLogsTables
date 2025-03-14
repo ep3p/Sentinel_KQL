@@ -1,0 +1,1 @@
+union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs, ADFSSignInLogs, AADServicePrincipalSignInLogs, AADManagedIdentitySignInLogs
