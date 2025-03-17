@@ -1,0 +1,97 @@
+let query_frequency = 15m;
+let query_period = 30m;
+let service_threshold = 5;
+let _ExpectedServiceNames = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "TGSRequestService"
+    | summarize make_list(Auxiliar)
+);
+SecurityEvent
+| where TimeGenerated > ago(query_period)
+| where EventID == 4769 // A 4768 event with unusual ticket options might happen previously
+| parse EventData with * '<Data Name="TargetUserName">'                     TargetUserName:string                   '</Data>' *
+| parse EventData with * '<Data Name="TargetDomainName">'                   TargetDomainName:string                 '</Data>' *
+| parse EventData with * '<Data Name="ServiceName">'                        ServiceName:string                      '</Data>' *
+| parse EventData with * '<Data Name="ServiceSid">'                         ServiceSid:string                       '</Data>' *
+| parse EventData with * '<Data Name="TicketOptions">'                      TicketOptions:string                    '</Data>' *
+| parse EventData with * '<Data Name="TicketOptions">'                      TicketOptionsLong:long                  '</Data>' *
+| parse EventData with * '<Data Name="TicketEncryptionType">'               TicketEncryptionType:string             '</Data>' *
+| parse EventData with * '<Data Name="IpAddress">'                          IpAddress:string                        '</Data>' *
+| parse EventData with * '<Data Name="IpPort">'                             IpPort:string                           '</Data>' *
+| parse EventData with * '<Data Name="Status">'                             Status:string                           '</Data>' *
+//| parse EventData with * '<Data Name="LogonGuid">'                          LogonGuid:string                        '</Data>' *
+| parse EventData with * '<Data Name="TransmittedServices">'                TransmittedServices:string              '</Data>' *
+| parse EventData with * '<Data Name="RequestTicketHash">'                  RequestTicketHash:string                '</Data>' *
+| parse EventData with * '<Data Name="ResponseTicketHash">'                 ResponseTicketHash:string               '</Data>' *
+| parse EventData with * '<Data Name="AccountSupportedEncryptionTypes">'    AccountSupportedEncryptionTypes:string  '</Data>' *
+| parse EventData with * '<Data Name="AccountAvailableKeys">'               AccountAvailableKeys:string             '</Data>' *
+| parse EventData with * '<Data Name="ServiceSupportedEncryptionTypes">'    ServiceSupportedEncryptionTypes:string  '</Data>' *
+| parse EventData with * '<Data Name="ServiceAvailableKeys">'               ServiceAvailableKeys:string             '</Data>' *
+| parse EventData with * '<Data Name="DCSupportedEncryptionTypes">'         DCSupportedEncryptionTypes:string       '</Data>' *
+| parse EventData with * '<Data Name="DCAvailableKeys">'                    DCAvailableKeys:string                  '</Data>' *
+| parse EventData with * '<Data Name="ClientAdvertizedEncryptionTypes">'    ClientAdvertizedEncryptionTypes:string  '</Data>' *
+| parse EventData with * '<Data Name="SessionKeyEncryptionType">'           SessionKeyEncryptionType:string         '</Data>' *
+| where not(ServiceName == "krbtgt" or ServiceName endswith "$" or ServiceName in (_ExpectedServiceNames))
+| extend TicketOptionsTranslated = array_concat(
+    iff(binary_and(TicketOptionsLong, 1073741824) != 0, dynamic(["Forwardable"]),               dynamic(null)), // bit  1 - 30
+    iff(binary_and(TicketOptionsLong,  536870912) != 0, dynamic(["Forwarded"]),                 dynamic(null)), // bit  2 - 29
+    iff(binary_and(TicketOptionsLong,  268435456) != 0, dynamic(["Proxiable"]),                 dynamic(null)), // bit  3 - 28
+    iff(binary_and(TicketOptionsLong,  134217728) != 0, dynamic(["Proxy"]),                     dynamic(null)), // bit  4 - 27
+    iff(binary_and(TicketOptionsLong,   67108864) != 0, dynamic(["Allow-postdate"]),            dynamic(null)), // bit  5 - 26
+    iff(binary_and(TicketOptionsLong,   33554432) != 0, dynamic(["Postdated"]),                 dynamic(null)), // bit  6 - 25
+    iff(binary_and(TicketOptionsLong,   16777216) != 0, dynamic(["Invalid"]),                   dynamic(null)), // bit  7 - 24
+    iff(binary_and(TicketOptionsLong,    8388608) != 0, dynamic(["Renewable"]),                 dynamic(null)), // bit  8 - 23
+    iff(binary_and(TicketOptionsLong,    4194304) != 0, dynamic(["Initial"]),                   dynamic(null)), // bit  9 - 22
+    iff(binary_and(TicketOptionsLong,    2097152) != 0, dynamic(["Pre-authent"]),               dynamic(null)), // bit 10 - 21
+    iff(binary_and(TicketOptionsLong,    1048576) != 0, dynamic(["Opt-hardware-auth"]),         dynamic(null)), // bit 11 - 20
+    iff(binary_and(TicketOptionsLong,     524288) != 0, dynamic(["Transited-policy-checked"]),  dynamic(null)), // bit 12 - 19
+    iff(binary_and(TicketOptionsLong,     262144) != 0, dynamic(["Ok-as-delegate"]),            dynamic(null)), // bit 13 - 18
+    iff(binary_and(TicketOptionsLong,     131072) != 0, dynamic(["Request-anonymous"]),         dynamic(null)), // bit 14 - 17
+    iff(binary_and(TicketOptionsLong,      65536) != 0, dynamic(["Name-canonicalize"]),         dynamic(null)), // bit 15 - 16
+    iff(binary_and(TicketOptionsLong,         32) != 0, dynamic(["Disable-transited-check"]),   dynamic(null)), // bit 26 -  5
+    iff(binary_and(TicketOptionsLong,         16) != 0, dynamic(["Renewable-ok"]),              dynamic(null)), // bit 27 -  4
+    iff(binary_and(TicketOptionsLong,          8) != 0, dynamic(["Enc-tkt-in-skey"]),           dynamic(null)), // bit 28 -  3
+    iff(binary_and(TicketOptionsLong,          2) != 0, dynamic(["Renew"]),                     dynamic(null)), // bit 30 -  1
+    iff(binary_and(TicketOptionsLong,          1) != 0, dynamic(["Validate"]),                  dynamic(null))  // bit 31 -  0
+    )
+// | where not(TicketOptionsTranslated has "Enc-tkt-in-skey" and TicketEncryptionType == "0x12")
+| where not(isempty(TargetUserName) or isempty(IpAddress) or isempty(Status))
+| extend IpAddress = trim_start(@"\:\:ffff\:", IpAddress)
+| summarize arg_min(TimeGenerated, *) by ServiceName, TargetUserName, IpAddress, Status
+| as _Events
+| join kind=leftsemi (
+    _Events
+    | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, TargetUserName, IpAddress, Status)
+    | summarize
+        arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
+        arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
+        by TargetUserName, IpAddress, Status
+    | where CurrentTimeGenerated > ago(query_period)
+    | extend PreviousCount = iff(PreviousTimeGenerated == CurrentTimeGenerated, 0, PreviousCount)
+    | where (not(PreviousCount > service_threshold) and CurrentCount > service_threshold)
+        or ((CurrentCount - PreviousCount) > service_threshold)
+    ) on TargetUserName, IpAddress, Status
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Computers = array_sort_asc(make_set(Computer)),
+    ServiceNames = array_sort_asc(make_set(ServiceName, 100)),
+    DistinctServiceCount = count_distinct(ServiceSid),
+    TicketOptions = make_bag(bag_pack(TicketOptions, TicketOptionsTranslated)),
+    TicketEncryptionTypes = array_sort_asc(make_set(TicketEncryptionType)),
+    take_any(Activity, EventData)
+    by TargetUserName, IpAddress = trim_start(@"\:\:ffff\:", IpAddress), Status
+| where DistinctServiceCount >= service_threshold // Might be an implicit 0x0 Status filter due to ServiceSid emptiness
+| project
+    StartTime,
+    EndTime,
+    Computers,
+    TargetUserName,
+    IpAddress,
+    Activity,
+    ServiceNames,
+    DistinctServiceCount,
+    Status,
+    TicketOptions,
+    TicketEncryptionTypes,
+    EventData
