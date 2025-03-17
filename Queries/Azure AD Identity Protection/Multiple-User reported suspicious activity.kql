@@ -2,40 +2,44 @@ let query_frequency = 5m;
 let query_period = 2d;
 AADUserRiskEvents
 | where TimeGenerated > ago(query_frequency)
-| where OperationName == "User Risk Detection" and Source == "EndUserReported" and RiskEventType == "userReportedSuspiciousActivity"
-| summarize arg_max(TimeGenerated, *) by Id
-| project
+| where Source == "EndUserReported" and RiskEventType == "userReportedSuspiciousActivity"
+| summarize arg_max(TimeGenerated, *) by OperationName, Source, RiskEventType
+| project-reorder
     //TimeGenerated,
-    OperationName,
+    DetectedDateTime,
     Source,
     Activity,
+    DetectionTimingType,
     UserDisplayName,
     UserPrincipalName,
     UserId,
     RiskEventType,
-    RiskState,
     RiskDetail,
-    RiskLevel
+    RiskLevel,
+    RiskState,
+    AdditionalInfo
 | as _Events
 | lookup kind=leftouter (
-    (SigninLogs
+    SigninLogs
     | where TimeGenerated > ago(query_period)
     | where AuthenticationDetails has "SuspiciousActivityReported" or Status has "SuspiciousActivityReported"
     | where UserId in (toscalar(_Events | summarize make_list(UserId)))
-    | extend
-        DeviceDetail = tostring(DeviceDetail),
-        TimeReceived = _TimeReceived
-    )
-    | summarize
-        arg_max(TimeReceived, *)
-        by OriginalRequestId
+    | extend TimeReceived = _TimeReceived
+    | summarize arg_max(TimeReceived, *) by OriginalRequestId
     | project
         TimeGenerated,
+        CreatedDateTime,
         Type,
-        // UserPrincipalName,
-        // UserDisplayName,
+        //UserDisplayName,
+        //UserPrincipalName,
+        UserId,
+        AlternateSignInName,
+        SignInIdentifier,
+        UserType,
         IPAddress,
+        AutonomousSystemNumber,
         Location,
+        NetworkLocationDetails,
         ResultType,
         ResultDescription,
         ClientAppUsed,
@@ -43,33 +47,31 @@ AADUserRiskEvents
         ResourceDisplayName,
         DeviceDetail,
         UserAgent,
+        Status,
+        MfaDetail,
+        AuthenticationContextClassReferences,
         AuthenticationDetails,
-        UserId,
+        AuthenticationProcessingDetails,
+        AuthenticationProtocol,
+        AuthenticationRequirement,
+        AuthenticationRequirementPolicies,
+        SessionLifetimePolicies,
+        TokenIssuerType,
+        IncomingTokenType,
+        TokenProtectionStatusDetails,
+        ConditionalAccessStatus,
+        ConditionalAccessPolicies,
+        //RiskDetail,
+        RiskEventTypes,
+        RiskLevelAggregated,
+        RiskLevelDuringSignIn,
+        //RiskState,
+        HomeTenantId,
+        ResourceTenantId,
+        CrossTenantAccessType,
+        AppId,
+        ResourceIdentity,
+        SessionId,
         OriginalRequestId,
         CorrelationId
     ) on UserId
-| project
-    TimeGenerated,
-    OperationName,
-    Source,
-    Activity,
-    UserDisplayName,
-    UserPrincipalName,
-    RiskEventType,
-    RiskState,
-    RiskDetail,
-    RiskLevel,
-    Type,
-    IPAddress,
-    Location,
-    ResultType,
-    ResultDescription,
-    ClientAppUsed,
-    AppDisplayName,
-    ResourceDisplayName,
-    DeviceDetail,
-    UserAgent,
-    AuthenticationDetails,
-    UserId,
-    OriginalRequestId,
-    CorrelationId
