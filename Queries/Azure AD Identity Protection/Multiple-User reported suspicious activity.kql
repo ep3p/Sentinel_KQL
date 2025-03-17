@@ -3,8 +3,9 @@ let query_period = 2d;
 AADUserRiskEvents
 | where TimeGenerated > ago(query_frequency)
 | where Source == "EndUserReported" and RiskEventType == "userReportedSuspiciousActivity"
-| summarize arg_max(TimeGenerated, *) by OperationName, Source, RiskEventType
-| project-reorder
+| summarize arg_min(TimeGenerated, *) by Id
+| where TimeGenerated > ago(query_frequency)
+| project
     //TimeGenerated,
     DetectedDateTime,
     Source,
