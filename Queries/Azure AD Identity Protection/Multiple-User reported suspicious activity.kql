@@ -1,7 +1,7 @@
 let query_frequency = 5m;
 let query_period = 2d;
 AADUserRiskEvents
-| where TimeGenerated > ago(query_frequency)
+| where TimeGenerated > ago(query_period)
 | where Source == "EndUserReported" and RiskEventType == "userReportedSuspiciousActivity"
 | summarize arg_min(TimeGenerated, *) by Id
 | where TimeGenerated > ago(query_frequency)
