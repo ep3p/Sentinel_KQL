@@ -1,0 +1,48 @@
+let query_frequency = 1h;
+let query_period = 14d;
+DeviceNetworkEvents
+| where Timestamp > ago(query_period)
+| where RemoteUrl matches regex @"d\d[a-z0-9]{12}\.cloudfront.net" and not(InitiatingProcessAccountSid in ("S-1-5-18", "S-1-5-20"))
+| summarize
+    StartTime = arg_min(Timestamp, *),
+    EndTime = max(Timestamp),
+    DeviceNamesSample = array_sort_asc(make_set(DeviceName, 100))
+    by InitiatingProcessVersionInfoCompanyName, InitiatingProcessVersionInfoProductName, InitiatingProcessVersionInfoOriginalFileName, InitiatingProcessVersionInfoInternalFileName, InitiatingProcessVersionInfoFileDescription
+| where StartTime > ago(query_frequency)
+| invoke FileProfile("InitiatingProcessSHA1")
+| where not(GlobalPrevalence > 1000 and GlobalFirstSeen < ago(query_frequency) and SignatureState == "SignedValid")
+| project
+    StartTime,
+    EndTime,
+    DeviceNamesSample,
+    DeviceId,
+    DeviceName,
+    LocalIP,
+    ActionType,
+    RemoteIP,
+    RemotePort,
+    RemoteUrl,
+    Protocol,
+    InitiatingProcessAccountName,
+    InitiatingProcessAccountSid,
+    InitiatingProcessAccountUpn,
+    InitiatingProcessAccountObjectId,
+    InitiatingProcessSHA1,
+    InitiatingProcessSHA256,
+    InitiatingProcessMD5,
+    InitiatingProcessFileName,
+    InitiatingProcessFolderPath,
+    InitiatingProcessCommandLine,
+    InitiatingProcessCreationTime,
+    IsInitiatingProcessRemoteSession,
+    InitiatingProcessParentFileName,
+    InitiatingProcessVersionInfoCompanyName,
+    InitiatingProcessVersionInfoProductName,
+    InitiatingProcessVersionInfoOriginalFileName,
+    InitiatingProcessVersionInfoInternalFileName,
+    InitiatingProcessVersionInfoFileDescription,
+    InitiatingProcessVersionInfoProductVersion,
+    GlobalPrevalence,
+    GlobalFirstSeen,
+    GlobalLastSeen,
+    SignatureState
