@@ -2,7 +2,7 @@ let query_frequency = 1h;
 let query_period = 14d;
 DeviceNetworkEvents
 | where Timestamp > ago(query_period)
-| where RemoteUrl matches regex @"d\d[a-z0-9]{12}\.cloudfront.net" and not(InitiatingProcessAccountSid in ("S-1-5-18", "S-1-5-20"))
+| where RemoteUrl matches regex @"d\d[a-z0-9]{12}\.cloudfront.net"// and not(InitiatingProcessAccountSid in ("S-1-5-18", "S-1-5-20"))
 | summarize
     StartTime = arg_min(Timestamp, *),
     EndTime = max(Timestamp),
