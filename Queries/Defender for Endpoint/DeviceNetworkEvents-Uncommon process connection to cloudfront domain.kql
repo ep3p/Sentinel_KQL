@@ -15,6 +15,7 @@ DeviceNetworkEvents
     StartTime,
     EndTime,
     DeviceNamesSample,
+    Timestamp = StartTime,
     DeviceId,
     DeviceName,
     LocalIP,
@@ -45,4 +46,5 @@ DeviceNetworkEvents
     GlobalPrevalence,
     GlobalFirstSeen,
     GlobalLastSeen,
-    SignatureState
+    SignatureState,
+    ReportId
