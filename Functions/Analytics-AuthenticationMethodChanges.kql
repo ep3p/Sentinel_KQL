@@ -3,7 +3,7 @@
 // Click "Save as function", in Parameters write in the fields:
 // "timespan" "query_period"        "1d"
 // "dynamic"  "query_userids"       "dynamic([])"
-// "bool"     "check_signinlogs"    "true"
+// "bool"     "check_signinlogs"    "false"
 //
 // If you name the function "AuthenticationMethodChanges", you can check the function with queries like the following:
 //
