@@ -40,6 +40,7 @@ let _SecurityInfoChanges =
     // "Security Info" changes have associated a "Update user" event
     | join kind=leftouter (
         AuditLogs
+        | where TimeGenerated > ago(query_period)
         | where OperationName == "Update user"
         // Remove synchronization update user events
         | where not(TargetResources has "LastDirSyncTime")
