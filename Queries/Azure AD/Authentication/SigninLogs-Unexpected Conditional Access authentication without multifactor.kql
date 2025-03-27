@@ -39,8 +39,12 @@ SigninLogs
 | where not(ResultType in (_ExcludedResultTypes))
 | where not(AppId in (_ExcludedAppIds))
 | where not(UserId in (_ExcludedUserIds))
-| mv-expand NetworkLocationDetail = iff(NetworkLocationDetails == "[]", dynamic([""]), todynamic(NetworkLocationDetails))
-| where not(NetworkLocationDetail["networkType"] == "trustedNamedLocation" or NetworkLocationDetail["networkNames"][0] in (_TrustedNamedLocations))
+| mv-apply NetworkLocationDetail = iff(NetworkLocationDetails == "[]", dynamic([""]), todynamic(NetworkLocationDetails)) on (
+    summarize
+        NetworkTypes = make_set(tostring(NetworkLocationDetail["networkType"])),
+        NetworkNames = make_set(tostring(NetworkLocationDetail["networkNames"][0]))
+    )
+| where not(NetworkTypes has_any ("trustedNamedLocation") or NetworkNames has_any (_TrustedNamedLocations))
 | summarize
     StartTime = min(CreatedDateTime),
     EndTime = max(CreatedDateTime),
