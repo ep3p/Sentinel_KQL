@@ -16,7 +16,6 @@ AzureActivity
     EventDataId = array_sort_asc(make_list(EventDataId)),
     arg_max(TimeGenerated, *)
     by CorrelationId, ResourceProviderValue, OperationNameValue, _ResourceId
-| project-away EventDataId1
 // Group together two kinds of logs (where ResourceProviderValue is all caps or title - e.g. MICROSOFT.AUTHORIZATION or Microsoft.Authorization)
 | summarize hint.shufflekey=CorrelationId
     PropertiesDynamic = make_bag(pack(ResourceProviderValue, PropertiesDynamic)),
