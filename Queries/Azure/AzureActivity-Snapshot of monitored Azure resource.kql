@@ -1,0 +1,61 @@
+let _MonitoredResources =
+    _GetWatchlist("ResourceId-AuditAzureResources")
+    | where Notes has "[Snapshot]"
+    | project ResourceId, SubscriptionId, ResourceGroup, Resource
+;
+AzureActivity
+| where OperationNameValue has_any ("/snapshots/beginGetAccess", "/snapshots/write") // "/snapshots/delete", "/snapshots/endGetAccess"
+| where _ResourceId has_any (toscalar(_MonitoredResources | where isempty(Resource) | summarize make_list(ResourceId)))
+    or _ResourceId has_any (toscalar(_MonitoredResources | where isnotempty(Resource) | extend ResourceId = replace_regex(ResourceId, @"^(.+?\/)[^\/]+(\/[^\/]+)$", @"\1snapshots\2") | summarize make_list(ResourceId)))
+| extend PreferenceInteger = iff(ResourceProviderValue == toupper(ResourceProviderValue), 0, 1)
+// Group together Start, Accept, Success... operations
+| summarize hint.shufflekey=CorrelationId
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    PropertiesDynamic = make_bag(pack(ActivityStatusValue, iff(PreferenceInteger == 1, todynamic(Properties), Properties_d))),
+    EventDataId = array_sort_asc(make_list(EventDataId)),
+    arg_max(TimeGenerated, *)
+    by CorrelationId, ResourceProviderValue, OperationNameValue, _ResourceId
+| project-away EventDataId1
+// Group together two kinds of logs (where ResourceProviderValue is all caps or title - e.g. MICROSOFT.AUTHORIZATION or Microsoft.Authorization)
+| summarize hint.shufflekey=CorrelationId
+    PropertiesDynamic = make_bag(pack(ResourceProviderValue, PropertiesDynamic)),
+    EventDataId = make_bag(pack(ResourceProviderValue, EventDataId)),
+    take_any(TenantId, SourceSystem, CategoryValue, SubscriptionId, Type),
+    arg_min(PreferenceInteger, CallerIpAddress, Authorization, Authorization_d, Claims_d, Properties_d, EventSubmissionTimestamp, Hierarchy),
+    arg_max(PreferenceInteger, Level, OperationNameValue, Caller, HTTPRequest, OperationId, ResourceGroup, ResourceProviderValue, ActivityStatusValue, ActivitySubstatusValue, OperationName, ActivityStatus, ActivitySubstatus, Category, ResourceId, ResourceProvider, Resource)
+    by CorrelationId, TimeGenerated, StartTime, EndTime, _ResourceId
+| project
+    TimeGenerated,
+    StartTime,
+    EndTime,
+    ResourceProvider,
+    Category,
+    CategoryValue,
+    ResourceProviderValue,
+    Level,
+    CallerIpAddress,
+    Caller,
+    OperationName,
+    OperationNameValue,
+    ActivityStatusValue,
+    //ActivityStatus,
+    ActivitySubstatusValue,
+    ActivitySubstatus,
+    SubscriptionId,
+    ResourceGroup,
+    Resource,
+    ResourceId,
+    _ResourceId,
+    Authorization,
+    PropertiesDynamic,
+    HTTPRequest,
+    Authorization_d,
+    Properties_d,
+    Claims_d,
+    Hierarchy,
+    OperationId,
+    CorrelationId,
+    EventSubmissionTimestamp,
+    EventDataId,
+    Type
