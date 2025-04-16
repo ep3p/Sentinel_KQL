@@ -1,13 +1,24 @@
 let query_frequency = 1h;
 let query_period = 14d;
+let suspicious_domains = dynamic([
+	@"d\d[a-z0-9]{12}\.cloudfront.net",
+	@"[\-\w]+\-[a-f0-9]{3,5}\.kxcdn\.com",
+	@"[\-\w]+\-[a-z0-9]{16}\.\w\d\d\.azurefd\.net",
+	@"portswigger\.net",
+	@"oastify\.com",
+	@"whatismyip\.com",
+	@"whatismyip\.net",
+	@"whatismyipaddress\.com"
+]);
 DeviceNetworkEvents
 | where Timestamp > ago(query_period)
-| where RemoteUrl matches regex @"d\d[a-z0-9]{12}\.cloudfront.net"// and not(InitiatingProcessAccountSid in ("S-1-5-18", "S-1-5-20"))
+| where RemoteUrl matches regex strcat_array(suspicious_domains, "|") // and not(InitiatingProcessAccountSid in ("S-1-5-18", "S-1-5-20"))
 | where isnotempty(InitiatingProcessFileName)
 | summarize
     StartTime = arg_min(Timestamp, *),
     EndTime = max(Timestamp),
-    DeviceNamesSample = array_sort_asc(make_set(DeviceName, 100))
+    DeviceNamesSample = array_sort_asc(make_set(DeviceName, 100)),
+    RemoteUrlsSample = array_sort_asc(make_set(RemoteUrl, 100))
     by InitiatingProcessVersionInfoCompanyName, InitiatingProcessVersionInfoProductName, InitiatingProcessVersionInfoOriginalFileName, InitiatingProcessVersionInfoInternalFileName, InitiatingProcessVersionInfoFileDescription
 | where StartTime > ago(query_frequency)
 | invoke FileProfile("InitiatingProcessSHA1")
@@ -16,6 +27,7 @@ DeviceNetworkEvents
     StartTime,
     EndTime,
     DeviceNamesSample,
+    RemoteUrlsSample,
     Timestamp = StartTime,
     DeviceId,
     DeviceName,
