@@ -18,12 +18,15 @@ AzureActivity
     by CorrelationId, ResourceProviderValue, OperationNameValue, _ResourceId
 // Group together two kinds of logs (where ResourceProviderValue is all caps or title - e.g. MICROSOFT.AUTHORIZATION or Microsoft.Authorization)
 | summarize hint.shufflekey=CorrelationId
+    TimeGenerated = max(TimeGenerated),
+    StartTime = min(StartTime),
+    EndTime = max(EndTime),
     PropertiesDynamic = make_bag(pack(ResourceProviderValue, PropertiesDynamic)),
     EventDataId = make_bag(pack(ResourceProviderValue, EventDataId)),
     take_any(TenantId, SourceSystem, CategoryValue, SubscriptionId, Type),
     arg_min(PreferenceInteger, CallerIpAddress, Authorization, Authorization_d, Claims_d, Properties_d, EventSubmissionTimestamp, Hierarchy),
     arg_max(PreferenceInteger, Level, OperationNameValue, Caller, HTTPRequest, OperationId, ResourceGroup, ResourceProviderValue, ActivityStatusValue, ActivitySubstatusValue, OperationName, ActivityStatus, ActivitySubstatus, Category, ResourceId, ResourceProvider, Resource)
-    by CorrelationId, TimeGenerated, StartTime, EndTime, _ResourceId
+    by CorrelationId, _ResourceId
 | project
     TimeGenerated,
     StartTime,
