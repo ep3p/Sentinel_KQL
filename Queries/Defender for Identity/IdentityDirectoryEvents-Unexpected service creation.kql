@@ -1,0 +1,31 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _ExpectedServiceCommandsRegex = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ServiceCreation"
+    | summarize RegEx = strcat(@"^(", strcat_array(make_list(Auxiliar), "|"), @")$")
+);
+IdentityDirectoryEvents
+| where TimeGenerated > ago(query_period)
+| where ActionType == "Service creation"
+| extend
+    ServiceName = tostring(AdditionalFields["ServiceName"]),
+    ServiceCommand = tostring(AdditionalFields["ServiceCommand"]),
+    Count = toint(AdditionalFields["Count"])
+| where not(ServiceCommand matches regex _ExpectedServiceCommandsRegex)
+| summarize arg_min(TimeGenerated, *) by Protocol, ServiceName, ServiceCommand, AccountName, AccountSid
+| where TimeGenerated > ago(query_frequency)
+| project
+    TimeGenerated,
+    Application,
+    ActionType,
+    Protocol,
+    AccountDisplayName,
+    AccountUpn,
+    AccountSid,
+    ServiceName,
+    ServiceCommand,
+    TargetDeviceName,
+    Count,
+    AdditionalFields,
+    ReportId
