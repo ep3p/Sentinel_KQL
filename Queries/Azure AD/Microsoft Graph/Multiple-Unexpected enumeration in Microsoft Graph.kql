@@ -1,6 +1,5 @@
 let query_frequency = 1h;
 let query_period = 1d; // 14d in rule parameters for IdentityInfo
-// https://learn.microsoft.com/en-us/graph/query-parameters?tabs=http#skip-parameter
 let paging_threshold = 100;
 let paging_resource_types = dynamic(["applications", "devices", "groups", "members", "servicePrincipals", "users"]); // "detectedApps", "managedAppRegistrations", "managedDevices", "roleAssignments", "microsoft.graph.user", "microsoft.graph.group", "configurationPolicies"
 let paging_resource_types_threshold = 2;
@@ -24,7 +23,7 @@ let _AppIdsDynamic = toscalar(_ServicePrincipals | summarize make_list(AppId));
 let _AppDisplayNamesDynamic = toscalar(_ServicePrincipals | summarize make_list(ServicePrincipalName));
 MicrosoftGraphActivityLogs
 | where TimeGenerated > ago(query_period)
-| where RequestUri has_any ("$skip=", "$skiptoken=")
+| where RequestUri has_any ("$skip=", "$skiptoken=", "$nextLink", "$top=999", "microsoft.graph.getByIds") // https://learn.microsoft.com/en-us/graph/query-parameters?tabs=http#skip-parameter
 | join hint.strategy=shuffle kind=leftanti _ExpectedPagingAccountIds on ServicePrincipalId, AppId
 | extend Endpoint = replace_regex(tostring(split(RequestUri, "?")[0]), @"[a-f0-9]{8}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{12}", "<<<replaced_UUID>>>")
 | extend ResourceType = tostring(split(trim_end(@"\/", Endpoint), "/")[-1])
@@ -37,6 +36,7 @@ MicrosoftGraphActivityLogs
 | where EndTime > ago(query_frequency)
 | where (PagingCount > paging_threshold and array_length(set_intersect(paging_resource_types, PagingResourceTypes)) >= paging_resource_types_threshold)
     or (PagingCount > paging_total_threshold and array_length(set_intersect(paging_resource_types, PagingResourceTypes)) >= 1)
+    or (PagingCount > paging_threshold and PagingResourceTypes has "microsoft.graph.getByIds")
 | project UserId, ServicePrincipalId, PagingCount, PagingResourceTypes//, PagingEndpoints
 | as hint.materialized=true _Events
 | join kind=leftouter (
