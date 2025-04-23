@@ -1,5 +1,6 @@
 AuditLogs
-| where Category in ("CrossTenantAccessSettings", "CrossTenantIdentitySyncSettings", "MultiTenantOrgTenant", "MultiTenantOrgIdentitySyncPolicyTemplate", "MultiTenantOrgPartnerConfigurationTemplate") or OperationName has_any ("cross-tenant", "MultiTenantOrg", "multi tenant org")
+| where Category in ("CrossTenantAccessSettings", "CrossTenantIdentitySyncSettings", "MultiTenantOrgTenant", "MultiTenantOrgIdentitySyncPolicyTemplate", "MultiTenantOrgPartnerConfigurationTemplate")
+    or OperationName has_any ("cross-tenant", "MultiTenantOrg", "multi tenant org")
 | extend
     Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
     InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
