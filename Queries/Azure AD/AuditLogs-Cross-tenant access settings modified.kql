@@ -5,6 +5,17 @@ AuditLogs
     Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
     InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
     IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| mv-expand TargetResource = iff(array_length(TargetResources) == 0, dynamic([""]), TargetResources)
+| mv-apply modifiedProperty = TargetResource["modifiedProperties"] on (
+    summarize NewValues = make_bag(
+        bag_pack(tostring(modifiedProperty["displayName"]), trim(@'[\"\s]+', tostring(modifiedProperty["newValue"]))))
+    )
+| extend
+    PartnerIdentifier = tostring(NewValues["PartnerIdentifier"]),
+    PartnerPolicyType = tostring(NewValues["PartnerPolicyType"]),
+    PartnerPolicyDetail = tostring(NewValues["PartnerPolicyDetail"]),
+    PartnerPolicyDetailVersion = tostring(NewValues["PartnerPolicyDetailVersion"]),
+    MultiTenantOrgAddedByTenantId = tostring(NewValues["MultiTenantOrgAddedByTenantId"])
 | project
     TimeGenerated,
     LoggedByService,
@@ -15,7 +26,14 @@ AuditLogs
     OperationName,
     Result,
     ResultDescription,
+    PartnerIdentifier,
+    PartnerPolicyType,
+    PartnerPolicyDetail,
+    PartnerPolicyDetailVersion,
+    MultiTenantOrgAddedByTenantId,
+    NewValues,
     AdditionalDetails,
+    Identity,
     InitiatorId,
     InitiatedBy,
     TargetResources,
