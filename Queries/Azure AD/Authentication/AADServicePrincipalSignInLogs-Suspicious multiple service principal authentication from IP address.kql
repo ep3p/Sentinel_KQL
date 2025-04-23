@@ -1,0 +1,51 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let new_activity_threshold = 1d;
+let _ExcludedIPAddresses = toscalar(
+    union
+        (
+        _GetWatchlist("IP-Vendors")
+        | where Notes has_any ("[HomeTenant]", "[Proxy]")
+        ),
+        (
+        _GetWatchlist("IP-CorporateCollaborators")
+        | where Notes has_any ("[Egress]")
+        )
+    | summarize make_list(IPAddress)
+);
+union AADServicePrincipalSignInLogs
+| where TimeGenerated > ago(query_period)
+| where isnotempty(IPAddress) and isnotempty(ServicePrincipalId) and isnotempty(ResultType)
+| summarize arg_min(TimeGenerated, *) by IPAddress, ServicePrincipalId, ResultType
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    FailedStartTime = minif(TimeGenerated, not(ResultType == 0)),
+    SuccessfulStartTime = minif(TimeGenerated, not(ResultType == 0)),
+    FailedServicePrincipalIds = make_set_if(ServicePrincipalId, not(ResultType == 0), 100),
+    SuccessfulServicePrincipalIds = make_set_if(ServicePrincipalId, ResultType == 0, 100),
+    FailedServicePrincipalNames = make_set_if(ServicePrincipalName, not(ResultType == 0), 100),
+    SuccessfulServicePrincipalNames = make_set_if(ServicePrincipalName, ResultType == 0, 100)
+    by IPAddress
+| where EndTime > ago(query_frequency)
+| extend
+    FailedServicePrincipalCount = array_length(FailedServicePrincipalIds),
+    SuccessfulServicePrincipalCount = array_length(SuccessfulServicePrincipalIds)
+| where not(FailedServicePrincipalCount == 1 and SuccessfulServicePrincipalCount == 0)
+| where not(FailedServicePrincipalCount == 0 and SuccessfulServicePrincipalCount == 1)
+| where not(FailedServicePrincipalCount == 0 and SuccessfulServicePrincipalCount > 1 and SuccessfulStartTime < ago(new_activity_threshold))
+| where not(FailedServicePrincipalCount == 1 and SuccessfulServicePrincipalCount == 1 and tostring(FailedServicePrincipalIds[0]) == tostring(SuccessfulServicePrincipalIds[0]))
+| where not(FailedServicePrincipalCount <= 1 and SuccessfulServicePrincipalCount > 0 and ipv4_is_in_any_range(IPAddress, _ExcludedIPAddresses))
+| where not(FailedServicePrincipalCount > 1 and SuccessfulServicePrincipalCount > 0 and ipv4_is_in_any_range(IPAddress, _ExcludedIPAddresses) and FailedStartTime < ago(new_activity_threshold))
+| project
+    StartTime,
+    EndTime,
+    IPAddress,
+    FailedStartTime,
+    FailedServicePrincipalCount,
+    FailedServicePrincipalNames,
+    SuccessfulStartTime,
+    SuccessfulServicePrincipalCount,
+    SuccessfulServicePrincipalNames,
+    FailedServicePrincipalIds,
+    SuccessfulServicePrincipalIds
