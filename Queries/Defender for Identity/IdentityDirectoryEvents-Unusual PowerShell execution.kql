@@ -1,0 +1,31 @@
+let query_frequency = 1h;
+let query_period = 14d;
+IdentityDirectoryEvents
+| where TimeGenerated > ago(query_period)
+| where ActionType == "PowerShell execution"
+| extend
+    IsSuccess = tostring(AdditionalFields["IsSuccess"]),
+    Count = toint(AdditionalFields["Count"])
+| summarize
+    Count = sum(Count),
+    arg_min(TimeGenerated, *)
+    by Protocol, AccountSid, DeviceName, IPAddress, DestinationDeviceName, IsSuccess
+| where TimeGenerated > ago(query_frequency)
+| project
+    TimeGenerated,
+    Timestamp,
+    Application,
+    ActionType,
+    Protocol,
+    DeviceName,
+    IPAddress,
+    AccountDisplayName,
+    AccountName,
+    AccountUpn,
+    AccountSid,
+    AccountDomain,
+    DestinationDeviceName,
+    IsSuccess,
+    Count,
+    AdditionalFields,
+    ReportId
