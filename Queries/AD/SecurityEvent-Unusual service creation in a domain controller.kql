@@ -1,0 +1,25 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _DomainControllers = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Service == "DomainController"
+    | summarize make_list(HostName)
+);
+SecurityEvent
+| where TimeGenerated > ago(query_period)
+| where EventID == 4697 and Computer has_any (_DomainControllers)
+| summarize arg_min(TimeGenerated, *) by Computer, Account, ServiceAccount, ServiceFileName, ServiceStartType, ServiceType
+| where TimeGenerated > ago(query_frequency)
+| project
+    TimeGenerated,
+    Computer,
+    AccountType,
+    Account,
+    Activity,
+    ServiceAccount,
+    ServiceName,
+    ServiceFileName,
+    ServiceType,
+    ServiceStartType,
+    SubjectLogonId,
+    EventData
