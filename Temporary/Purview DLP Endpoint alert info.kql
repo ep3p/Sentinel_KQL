@@ -2,7 +2,8 @@ let alert_id = "<<<>>>";
 let query_period = 1d;
 CloudAppEvents
 | where Timestamp > ago(query_period)
-| where ActionType == "AlertTriggered" and tostring(RawEventData["AlertId"]) == alert_id
+| where ActionType in ("AlertTriggered", "AlertUpdated") and tostring(RawEventData["AlertId"]) == alert_id
+| summarize arg_max(Timestamp, *)
 | extend
     AlertId = tostring(RawEventData["AlertId"]),
     Data = todynamic(tostring(RawEventData["Data"]))
