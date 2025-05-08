@@ -1,0 +1,45 @@
+SigninLogs
+| where IncomingTokenType has "saml11" and Status["additionalDetails"] has "MFA requirement satisfied by claim provided by external provider"// and MfaDetail == "{}" and AuthenticationDetails == "[]"
+//    and TokenProtectionStatusDetails["signInSessionStatus"] == "unbound" and ResultType in (0, 399218)
+//    and ((isempty(ResourceIdentity) and AppId == "72782ba9-4490-4f03-8d82-562370ea3566") // Office 365
+//        or ResourceIdentity == "4765445b-32c6-49b0-83e6-1d93765276ca")  // OfficeHome
+//        or a PowerShell app could also be used
+| join kind=rightsemi (union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs, ADFSSignInLogs) on CorrelationId
+| as _Events
+| where isempty(SessionId)
+| union (
+    union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs, ADFSSignInLogs
+    | where SessionId in (toscalar(_Events | where isnotempty(SessionId) | summarize make_set(SessionId)))
+    )
+| summarize
+    AppDisplayNames = array_sort_asc(make_set(AppDisplayName, 100)),
+    ResourceDisplayNames = array_sort_asc(make_set(ResourceDisplayName, 100)),
+    CorrelationIds = make_set(CorrelationId, 100),
+    arg_min(CreatedDateTime, *)
+    by UserId, IPAddress, Location, ResultType, ClientAppUsed, UserAgent, IncomingTokenType, SessionId, HomeTenantId, ResourceTenantId, TokenIssuerType
+| sort by UserPrincipalName asc, CreatedDateTime asc
+| project
+    CreatedDateTime,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    AutonomousSystemNumber,
+    ResultType,
+    ResultDescription,
+    Status = coalesce(tostring(Status_dynamic), Status_string),
+    AppDisplayNames,
+    ResourceDisplayNames,
+    ClientAppUsed,
+    UserAgent,
+    DeviceDetail = coalesce(tostring(DeviceDetail_dynamic), DeviceDetail_string),
+    TokenIssuerType,
+    IncomingTokenType,
+    TokenProtectionStatusDetails = coalesce(tostring(TokenProtectionStatusDetails_dynamic), TokenProtectionStatusDetails_string),
+    SessionId,
+    HomeTenantId,
+    ResourceTenantId,
+    CrossTenantAccessType,
+    UserType,
+    UserId,
+    CorrelationIds
