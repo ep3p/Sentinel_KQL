@@ -1,5 +1,5 @@
 SecurityEvent
-| where EventData has_any ("CN=Partitions,CN=Configuration,", "msExchAcceptedDomain")
+| where EventData has_any ("CN=Partitions,CN=Configuration,", "msExchAcceptedDomain", "msDS-DelegatedManagedServiceAccount", "msDS-ManagedAccountPrecededByLink")
 | project
     TimeGenerated,
     Computer,
