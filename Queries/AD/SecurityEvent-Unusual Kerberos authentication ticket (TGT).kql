@@ -11,7 +11,6 @@ SecurityEvent
 | parse EventData with * '<Data Name="CertThumbprint">'       CertThumbprint:string       '</Data>' *
 | extend MachineTargetUserName = TargetUserName endswith "$"
 | summarize
-    count(),
     StartTime = min(TimeGenerated),
     EndTime = max(TimeGenerated),
     take_any(Activity, ServiceName),
