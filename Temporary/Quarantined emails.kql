@@ -1,0 +1,84 @@
+let query_frequency = 7d;
+let query_period = 30d;
+let query_wait = 1h;
+let _PostDelivery_MovedToQuarantine =
+    EmailPostDeliveryEvents
+    | where Timestamp between (ago(query_frequency + query_wait) .. ago(query_wait))
+    | where Action == "Moved to quarantine" or (ActionType has "ZAP" and not(Action == "Add message info only"))
+    | join kind=rightsemi (
+        EmailPostDeliveryEvents
+        | where Timestamp > ago(query_period)
+        ) on NetworkMessageId
+    | summarize arg_max(Timestamp, *) by NetworkMessageId
+    | where DeliveryLocation == "Quarantine"
+    | project
+        NetworkMessageId,
+        InternetMessageId,
+        PostDelivery_DeliveryLocation = DeliveryLocation,
+        PostDelivery_ActionTrigger = ActionTrigger,
+        PostDelivery_ActionType = ActionType,
+        PostDelivery_Action = Action,
+        PostDelivery_ThreatTypes = ThreatTypes,
+        PostDelivery_DetectionMethods = DetectionMethods,
+        PostDelivery_ActionResult = ActionResult,
+        PostDelivery_SenderFromAddress = SenderFromAddress,
+        PostDelivery_RecipientEmailAddress = RecipientEmailAddress
+    | as _AuxiliarEvents
+    | join kind=leftouter (
+            EmailEvents
+            | where Timestamp > ago(query_period)
+            | where NetworkMessageId in (toscalar(_AuxiliarEvents | summarize make_set(NetworkMessageId)))
+            | summarize arg_max(Timestamp, *) by NetworkMessageId, InternetMessageId, SenderFromAddress, RecipientEmailAddress
+        ) on NetworkMessageId
+    | where isnotempty(DeliveryLocation) and isnotempty(LatestDeliveryLocation) and DeliveryLocation != LatestDeliveryLocation
+    | project-away NetworkMessageId1, InternetMessageId1
+;
+let _EmailEvents_Quarantined =
+    EmailEvents
+    | where Timestamp between (ago(query_frequency + query_wait) .. ago(query_wait))
+    | where DeliveryLocation == "Quarantine" or LatestDeliveryLocation == "Quarantine" or DeliveryAction in ("Blocked", "Moved to quarantine") or LatestDeliveryAction in ("Blocked", "Moved to quarantine") or EmailAction has "Send to quarantine"
+    | where not(LatestDeliveryAction == "Quarantine release")
+    | where not(DeliveryAction == "Blocked" and LatestDeliveryAction == "Blocked" and ((DeliveryLocation == "Dropped" and LatestDeliveryLocation == "Dropped") or (DeliveryLocation == "Failed" and LatestDeliveryLocation == "Failed")))
+    | where not(NetworkMessageId in (toscalar(_PostDelivery_MovedToQuarantine | summarize make_set(NetworkMessageId))))
+    // | where not(LatestDeliveryLocation == "Deleted items")
+    | project
+        Timestamp,
+        NetworkMessageId,
+        InternetMessageId,
+        SenderMailFromAddress,
+        SenderMailFromDomain,
+        SenderFromAddress,
+        SenderFromDomain,
+        SenderDisplayName,
+        SenderIPv4,
+        SenderIPv6,
+        AuthenticationDetails,
+        RecipientEmailAddress,
+        RecipientObjectId,
+        Subject,
+        EmailClusterId,
+        EmailDirection,
+        EmailAction,
+        EmailActionPolicy,
+        EmailActionPolicyGuid,
+        BulkComplaintLevel,
+        DeliveryAction,
+        DeliveryLocation,
+        LatestDeliveryAction,
+        LatestDeliveryLocation,
+        ThreatTypes,
+        ThreatNames,
+        ThreatClassification,
+        DetectionMethods,
+        ConfidenceLevel,
+        EmailLanguage,
+        AttachmentCount,
+        UrlCount,
+        Connectors,
+        OrgLevelPolicy,
+        OrgLevelAction,
+        ExchangeTransportRule,
+        ReportId,
+        AdditionalFields
+;
+union _EmailEvents_Quarantined, _PostDelivery_MovedToQuarantine
