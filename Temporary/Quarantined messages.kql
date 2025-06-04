@@ -1,0 +1,90 @@
+let query_frequency = 7d;
+let query_period = 30d;
+let query_wait = 1h;
+let _PostDelivery_MovedToQuarantine =
+    MessagePostDeliveryEvents
+    | where Timestamp between (ago(query_frequency + query_wait) .. ago(query_wait))
+    | where Action == "Moved to quarantine"
+    | join kind=rightsemi (
+        MessagePostDeliveryEvents
+        | where Timestamp > ago(query_period)
+        ) on TeamsMessageId
+    | summarize arg_max(Timestamp, *) by TeamsMessageId
+    | where LatestDeliveryLocation == "Quarantine"
+    | project 
+        TeamsMessageId,
+        PostDelivery_LatestDeliveryLocation = LatestDeliveryLocation,
+        PostDelivery_ActionTrigger = ActionTrigger,
+        PostDelivery_ActionType = ActionType,
+        PostDelivery_Action = Action,
+        PostDelivery_ThreatTypes = ThreatTypes,
+        PostDelivery_DetectionMethods = DetectionMethods,
+        PostDelivery_ConfidenceLevel = ConfidenceLevel,
+        PostDelivery_ActionResult = ActionResult,
+        PostDelivery_IsExternalThread = IsExternalThread,
+        PostDelivery_SenderEmailAddress = SenderEmailAddress,
+        PostDelivery_RecipientDetails = RecipientDetails
+    | as _AuxiliarEvents
+    | join kind=leftouter (
+        MessageEvents
+        | where Timestamp > ago(query_period)
+        | where TeamsMessageId in (toscalar(_AuxiliarEvents | summarize make_set(TeamsMessageId)))
+        | summarize arg_max(Timestamp, *) by TeamsMessageId, SenderEmailAddress//, RecipientDetails
+        ) on TeamsMessageId
+    | project-away TeamsMessageId1
+    | where isnotempty(DeliveryLocation) and isnotempty(PostDelivery_LatestDeliveryLocation) and DeliveryLocation != PostDelivery_LatestDeliveryLocation
+    | join kind=leftouter (
+        MessageUrlInfo
+        | where Timestamp > ago(query_period)
+        | where TeamsMessageId in (toscalar(_AuxiliarEvents | summarize make_set(TeamsMessageId)))
+        | summarize Urls = make_set(bag_pack("Url", Url, "UrlDomain", UrlDomain)) by TeamsMessageId
+        ) on TeamsMessageId
+    | project-away TeamsMessageId1
+;
+let _MessageEvents_Quarantined =
+    MessageEvents
+    | where Timestamp between (ago(query_frequency + query_wait) .. ago(query_wait))
+    | where DeliveryLocation == "Quarantine" or DeliveryAction in ("Blocked", "Moved to quarantine")
+    | where not(DeliveryAction == "Quarantine release")
+    | where not(DeliveryAction == "Blocked" and DeliveryLocation in ("Dropped", "Failed"))
+    | where not(TeamsMessageId in (toscalar(_PostDelivery_MovedToQuarantine | summarize make_set(TeamsMessageId))))
+    | as _SecondAuxiliarEvents
+    | join kind=leftouter (
+        MessageUrlInfo
+        | where Timestamp > ago(query_period)
+        | where TeamsMessageId in (toscalar(_SecondAuxiliarEvents | summarize make_set(TeamsMessageId)))
+        | summarize Urls = make_set(bag_pack("Url", Url, "UrlDomain", UrlDomain)) by TeamsMessageId
+        ) on TeamsMessageId
+    | project-away TeamsMessageId1
+    | project
+        Timestamp,
+        LastEditedTime,
+        TeamsMessageId,
+        IsOwnedThread,
+        IsExternalThread,
+        ThreadId,
+        ThreadName,
+        ThreadType,
+        ThreadSubType,
+        GroupId,
+        GroupName,
+        ParentMessageId,
+        MessageId,
+        MessageVersion,
+        MessageType,
+        MessageSubtype,
+        SenderType,
+        SenderEmailAddress,
+        SenderDisplayName,
+        SenderObjectId,
+        RecipientDetails,
+        Subject,
+        DeliveryAction,
+        DeliveryLocation,
+        Urls,
+        ThreatTypes,
+        DetectionMethods,
+        ConfidenceLevel,
+        ReportId
+;
+union _MessageEvents_Quarantined, _PostDelivery_MovedToQuarantine
