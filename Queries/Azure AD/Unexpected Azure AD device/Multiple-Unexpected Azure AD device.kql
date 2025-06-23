@@ -1,64 +1,79 @@
-let query_frequency = 1h; // Time frame to query device addition or deletion.
-let query_period = 14d;
-let query_wait = 0h; // Wait x time for other relevant events to happen. Use 0h for immediate results.
+// This query can help you to detect unexpected Entra ID devices.
+//
+// Click "Save as function", in Parameters write in the fields:
+// "timespan" "query_frequency" "14d"
+// "timespan" "query_period"    "14d"
+// "timespan" "query_wait"      "1h"
+//
+// If you name the function "UnexpectedEntraIDDevice", you can check the function with queries like the following:
+//
+// UnexpectedEntraIDDevice()
+//
+// UnexpectedEntraIDDevice(1h, 14d, 1h)
+//
+// UnexpectedEntraIDDevice(14d, 14d, 1h)
+//
+// let query_frequency = 14d;
+// let query_period = 14d;
+// let query_wait = 1h;
+//let Function = (query_frequency:timespan = 14d, query_period:timespan = 14d){
 // TrustType possible values: Workplace (indicates bring your own personal devices), AzureAd (Cloud only joined devices), ServerAd (on-premises domain joined devices joined to Azure AD)
-let _ExpectedTrustTypes = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
-    | where Activity == "AzureADTrustType"
-    | summarize make_list(Auxiliar)
-);
+// let _ExpectedTrustTypes =
+//     _GetWatchlist("Activity-ExpectedSignificantActivity")
+//     | where Activity == "EntraIDDeviceTrustType"
+//     | mv-expand DeviceOSType = split(tostring(DeviceTrustType = split(Auxiliar, " - ")[1]), ", ") to typeof(string)
+//     | project DeviceTrustType = tostring(split(Auxiliar, " - ")[0]), DeviceOSType
+// ;
 // A device management app could be Microsoft Intune
 let _ExpectedDeviceManagementIds = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "DeviceManagement"
     | summarize make_list(ActorId)
 );
 // Group Tags in Microsoft Intune
 let _ExpectedIntuneOrderIds = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "IntuneOrderId"
     | summarize make_list(Auxiliar)
 );
-let _AADADSyncAccounts = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
-    | where Activity == "AADADSync"
-    | summarize make_list(ActorPrincipalName)
+let _EntraConnectSyncAccounts = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "EntraConnectSync"
+    | summarize make_list(ActorId)
 );
-let _UserInfo =
-    IdentityInfo
-    | where TimeGenerated > ago(query_period) and isnotempty(AccountObjectId) //and UserType == "Member"
-    | summarize arg_max(TimeGenerated, AccountUPN, MailAddress, AdditionalMailAddresses) by AccountObjectId
-    | project AccountObjectId, UserPrincipalName = AccountUPN, MailAddress, AdditionalMailAddresses
-;
+// let _UserInfo =
+//     IdentityInfo
+//     | where TimeGenerated > ago(query_period) and isnotempty(AccountObjectId) //and UserType == "Member"
+//     | summarize arg_max(TimeGenerated, AccountUPN, MailAddress, AdditionalMailAddresses) by AccountObjectId
+//     | project AccountObjectId, UserPrincipalName = AccountUPN, MailAddress, AdditionalMailAddresses
+// ;
 let _AddDeleteDeviceEvents =
     AuditLogs
     | where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
-    | where Category == "Device" and LoggedByService == "Core Directory" and AADOperationType in ("Add", "Delete")
+    | where LoggedByService == "Core Directory" and Category == "Device" and AADOperationType in ("Add", "Delete")
     | where not(ResultDescription == "Microsoft.Online.Workflows.ObjectAlreadyExistsException")
+    | where not(tostring(InitiatedBy["user"]["id"]) in (_EntraConnectSyncAccounts))
+    | where not(tostring(InitiatedBy["app"]["servicePrincipalId"]) in (_ExpectedDeviceManagementIds))
     | extend
-        ObjectId = tostring(TargetResources[0].id),
-        DeviceName = tostring(TargetResources[0].displayName),
-        InitiatedByUser = tostring(InitiatedBy.user.userPrincipalName),
-        InitiatedByApp = tostring(InitiatedBy.app.displayName)
-    | where not(InitiatedByUser in (_AADADSyncAccounts))
-    | where not(tostring(InitiatedBy.app.servicePrincipalId) in (_ExpectedDeviceManagementIds))
+        ObjectId = tostring(TargetResources[0]["id"]),
+        DeviceName = tostring(TargetResources[0]["displayName"]),
+        InitiatedByUser = tostring(InitiatedBy["user"]["userPrincipalName"]),
+        InitiatedByApp = tostring(InitiatedBy["app"]["displayName"])
     | project TimeGenerated, Type, InitiatedByUser, InitiatedByApp, OperationName, Result, ResultDescription, DeviceName, ObjectId, AdditionalDetails, InitiatedBy, TargetResources, CorrelationId
-    | mv-apply ModifiedProperty = TargetResources[0].modifiedProperties on (
-        summarize BagToUnpack = make_bag(pack(replace_string(tostring(ModifiedProperty.displayName), "TargetId.", ""), translate(@'["\]', "", tostring(ModifiedProperty.newValue))))
+    | mv-apply ModifiedProperty = TargetResources[0]["modifiedProperties"] on (
+        summarize BagToUnpack = make_bag(bag_pack(replace_string(tostring(ModifiedProperty["displayName"]), "TargetId.", ""), translate(@'["\]', "", tostring(ModifiedProperty["newValue"]))))
     )
-    | evaluate bag_unpack(BagToUnpack, columnsConflict = 'replace_source')
-    | where not(OperationName == "Add device" and column_ifexists("DeviceTrustType", "") in (_ExpectedTrustTypes))
+    | evaluate bag_unpack(BagToUnpack, columnsConflict = "replace_source")
+    // | join kind=leftanti _ExpectedTrustTypes on DeviceTrustType, DeviceOSType
     | extend
-        AutopilotZTDID = extract(@"ZTDID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AutopilotZTDID = extract(@"ZTDID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         AccountObjectId = extract(@"USER\-GID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        ["USER-GID"] = extract(@"USER\-GID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        ["USER-HWID"] = extract(@"USER\-HWID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        IntuneOrderId = extract(@"OrderId:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        AzureResourceId = extract(@"AzureResourceId:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
-    | lookup kind=leftouter _UserInfo on AccountObjectId
+        ["USER-HWID"] = extract(@"USER\-HWID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        IntuneOrderId = extract(@"OrderId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AzureResourceId = extract(@"AzureResourceId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
+    // | lookup kind=leftouter _UserInfo on AccountObjectId
 ;
-let _AddObjectIds = toscalar(
-    _AddDeleteDeviceEvents
+let _AddObjectIds = toscalar(_AddDeleteDeviceEvents
     | where OperationName == "Add device"
     | summarize make_set(ObjectId)
 );
@@ -66,91 +81,97 @@ let _UpdateDeviceEvents =
     AuditLogs
     | where TimeGenerated > ago(query_frequency + query_wait)
     //| where OperationName in ("Update device", "Add member to group", "Remove member from group", "Device no longer compliant", "Device no longer managed")
-    | where not(Category == "Device" and LoggedByService == "Core Directory" and AADOperationType in ("Add", "Delete", "Assign", "Unassign"))
-    | where TargetResources[0].type == "Device"
-        and isnotempty(_AddObjectIds)
-        and TargetResources[0].id in (_AddObjectIds)
+    | where not(LoggedByService == "Core Directory" and Category == "Device" and AADOperationType in ("Add", "Delete", "Assign", "Unassign"))
     | where not(ResultDescription == "Microsoft.Online.DirectoryServices.DirectoryValueExistsException")
+    | where isnotempty(_AddObjectIds) and tostring(TargetResources[0]["id"]) in (_AddObjectIds)
+    | where not(tostring(InitiatedBy["user"]["id"]) in (_EntraConnectSyncAccounts))
     | extend
-        ObjectId = tostring(TargetResources[0].id),
-        DeviceName = tostring(TargetResources[0].displayName),
-        InitiatedByUser = tostring(InitiatedBy.user.userPrincipalName),
-        InitiatedByApp = tostring(InitiatedBy.app.displayName)
-    | where not(InitiatedByUser in (_AADADSyncAccounts))
+        ObjectId = tostring(TargetResources[0]["id"]),
+        DeviceName = tostring(TargetResources[0]["displayName"]),
+        InitiatedByUser = tostring(InitiatedBy["user"]["userPrincipalName"]),
+        InitiatedByApp = tostring(InitiatedBy["app"]["displayName"])
     | project TimeGenerated, Type, InitiatedByUser, InitiatedByApp, OperationName, Result, ResultDescription, DeviceName, ObjectId, AdditionalDetails, InitiatedBy, TargetResources, CorrelationId
-    | mv-apply ModifiedProperty = TargetResources[0].modifiedProperties on (
+    | mv-apply ModifiedProperty = TargetResources[0]["modifiedProperties"] on (
         summarize BagToUnpack = make_bag(
-            pack(replace_string(tostring(ModifiedProperty.displayName), "TargetId.", ""),
-                iff(OperationName has "Remove" and tostring(ModifiedProperty.displayName) startswith "Group",
-                    translate(@'["\]', "", tostring(ModifiedProperty.oldValue)),
-                    translate(@'["\]', "", tostring(ModifiedProperty.newValue)))))
+            bag_pack(replace_string(tostring(ModifiedProperty["displayName"]), "TargetId.", ""),
+                iff(OperationName has "Remove" and tostring(ModifiedProperty["displayName"]) startswith "Group",
+                    translate(@'["\]', "", tostring(ModifiedProperty["oldValue"])),
+                    translate(@'["\]', "", tostring(ModifiedProperty["newValue"])))))
     )
-    | evaluate bag_unpack(BagToUnpack, columnsConflict = 'replace_source')
+    | evaluate bag_unpack(BagToUnpack, columnsConflict = "replace_source")
     | extend
-        AutopilotZTDID = extract(@"ZTDID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AutopilotZTDID = extract(@"ZTDID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
         AccountObjectId = extract(@"USER\-GID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        ["USER-GID"] = extract(@"USER\-GID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        ["USER-HWID"] = extract(@"USER\-HWID\:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        IntuneOrderId = extract(@"OrderId:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
-        AzureResourceId = extract(@"AzureResourceId:([^\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
-    | lookup kind=leftouter _UserInfo on AccountObjectId
+        ["USER-HWID"] = extract(@"USER\-HWID\:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        IntuneOrderId = extract(@"OrderId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", "")),
+        AzureResourceId = extract(@"AzureResourceId:([^\:\,]+)", 1, column_ifexists("DevicePhysicalIds", ""))
+    // | lookup kind=leftouter _UserInfo on AccountObjectId
 ;
 let _RegisterUserToDeviceEvents =
     AuditLogs
     | where TimeGenerated > ago(query_frequency + query_wait)
-    | where Category == "Device" and LoggedByService == "Core Directory" and AADOperationType in ("Assign", "Unassign")
-    | where not(ResultDescription == "Microsoft.Online.Workflows.ObjectAlreadyExistsException")
-    | where isnotempty(_AddObjectIds) and TargetResources[1].id in (_AddObjectIds)
+    | where LoggedByService == "Core Directory" and Category == "Device" and AADOperationType in ("Assign", "Unassign")
+    | where not(ResultDescription in ("Microsoft.Online.Workflows.ObjectAlreadyExistsException", "Microsoft.Online.DirectoryServices.DirectoryValueExistsException"))
+    | where isnotempty(_AddObjectIds) and TargetResources[1]["id"] in (_AddObjectIds)
+    | where not(tostring(InitiatedBy["user"]["id"]) in (_EntraConnectSyncAccounts))
     | extend
-        ObjectId = tostring(TargetResources[1].id),
-        InitiatedByUser = tostring(InitiatedBy.user.userPrincipalName),
-        InitiatedByApp = tostring(InitiatedBy.app.displayName),
-        DeviceUser = pack(iff(OperationName has "registered owner", "Owner", "User"), tostring(TargetResources[0].userPrincipalName))
-    | where not(InitiatedByUser in (_AADADSyncAccounts))
+        ObjectId = tostring(TargetResources[1]["id"]),
+        InitiatedByUser = tostring(InitiatedBy["user"]["userPrincipalName"]),
+        InitiatedByApp = tostring(InitiatedBy["app"]["displayName"]),
+        DeviceUser = pack(iff(OperationName has "registered owner", "Owner", "User"), tostring(TargetResources[0]["userPrincipalName"]))
     | project TimeGenerated, Type, InitiatedByUser, InitiatedByApp, OperationName, Result, ResultDescription, ObjectId, AdditionalDetails, InitiatedBy, TargetResources, CorrelationId, DeviceUser
     | extend ["Device.DisplayName"] = "", DeviceId = ""
-    | mv-apply ModifiedProperty = TargetResources[0].modifiedProperties on (
+    | mv-apply ModifiedProperty = TargetResources[0]["modifiedProperties"] on (
         summarize BagToUnpack = make_bag(
-            pack(tostring(ModifiedProperty.displayName),
+            bag_pack(tostring(ModifiedProperty["displayName"]),
                 iff(OperationName has "Remove",
-                    translate(@'["\]', "", tostring(ModifiedProperty.oldValue)),
-                    translate(@'["\]', "", tostring(ModifiedProperty.newValue)))))
+                    translate(@'["\]', "", tostring(ModifiedProperty["oldValue"])),
+                    translate(@'["\]', "", tostring(ModifiedProperty["newValue"])))))
     )
-    | evaluate bag_unpack(BagToUnpack, columnsConflict = 'replace_source', ignoredProperties=dynamic(['Device.ObjectID']))
+    | evaluate bag_unpack(BagToUnpack, columnsConflict = "replace_source", ignoredProperties=dynamic(["Device.ObjectID"]))
     | project-rename DeviceName = ["Device.DisplayName"]
 ;
 let _DeviceEvents = materialize(
     union _AddDeleteDeviceEvents, _UpdateDeviceEvents, _RegisterUserToDeviceEvents
+    | extend
+        DeviceTrustType = column_ifexists("DeviceTrustType", ""),
+        CloudDisplayName = column_ifexists("CloudDisplayName", ""),
+        DisplayName = column_ifexists("DisplayName", ""),
+        ["Included Updated Properties"] = column_ifexists("Included Updated Properties", "")
+    | project-rename IncludedUpdatedProperties = ["Included Updated Properties"]
     | as _Auxiliar
     | project-away DeviceId
     | lookup kind=inner (
         _Auxiliar
+        | sort by TimeGenerated asc
         | summarize
             OperationNames = make_set(OperationName),
             DeviceId = take_any(column_ifexists("DeviceId", "")),
-            AddIntuneOrderId = take_anyif(IntuneOrderId, OperationName == "Add device"),
             take_anyif(AccountObjectId, OperationName == "Add device"),
             take_anyif(AzureResourceId, OperationName == "Add device"),
             take_anyif(AutopilotZTDID, OperationName == "Add device"),
-            UpdateIntuneOrderId = take_anyif(IntuneOrderId, OperationName == "Update device")
+            AddIntuneOrderId = take_anyif(IntuneOrderId, OperationName == "Add device"),
+            UpdateIntuneOrderId = take_anyif(IntuneOrderId, OperationName == "Update device"),
+            DeviceTrustTypes = make_set_if(DeviceTrustType, isnotempty(DeviceTrustType)),
+            //LastAddTimeGenerated = maxif(TimeGenerated, OperationName == "Add device"),
+            //LastDeleteTimeGenerated = maxif(TimeGenerated, OperationName == "Delete device"),
+            LastDeviceName = tostring(make_list_if(coalesce(CloudDisplayName, DisplayName, DeviceName), IncludedUpdatedProperties has_any ("CloudDisplayName", "DisplayName"))[-1])
             by ObjectId
         | where OperationNames has "Add device"
-        | where not(AddIntuneOrderId in (_ExpectedIntuneOrderIds) or UpdateIntuneOrderId in (_ExpectedIntuneOrderIds))
-        | where not(isnotempty(AccountObjectId) and isnotempty(AzureResourceId))
-        | where not(isnotempty(AutopilotZTDID))
+        // Custom conditions
+        //| where not(isnotempty(AccountObjectId) and isnotempty(AzureResourceId))
+        //| where not(AddIntuneOrderId in (_ExpectedIntuneOrderIds) or UpdateIntuneOrderId in (_ExpectedIntuneOrderIds))
+        //| where not(isnotempty(AutopilotZTDID))
+        //| where not(array_length(DeviceTrustTypes) == 1 and tostring(DeviceTrustTypes[0]) == "Workplace") and isnotempty(LastDeleteTimeGenerated) and isnotempty(LastAddTimeGenerated) and LastDeleteTimeGenerated > LastAddTimeGenerated)
         | project ObjectId, DeviceId
     ) on ObjectId
-    | extend
-        DeviceTrustType = column_ifexists("DeviceTrustType", ""),
-        ["Included Updated Properties"] = column_ifexists("Included Updated Properties", "")
-    | project-rename IncludedUpdatedProperties = ["Included Updated Properties"]
 );
 let _DeviceIds = toscalar(_DeviceEvents | summarize make_set(DeviceId));
 let _SignInEvents =
     union
         (SigninLogs
         | where TimeGenerated > ago(query_frequency + query_wait)
-        | where DeviceDetail.deviceId in (_DeviceIds)
+        | where DeviceDetail["deviceId"] in (_DeviceIds)
         ),
         (AADNonInteractiveUserSignInLogs
         | where TimeGenerated > ago(query_frequency + query_wait)
@@ -159,14 +180,12 @@ let _SignInEvents =
         )
     | summarize
         arg_min(TimeGenerated,
-            DeviceName = tostring(DeviceDetail.displayName),
-            AppDisplayName,
-            ResourceDisplayName,
+            DeviceName = tostring(DeviceDetail["displayName"]),
             DeviceDetail,
             UserPrincipalName,
-            IPAddress,
-            CorrelationId)
-        by Type, DeviceId = tostring(DeviceDetail.deviceId), UserId
+            CorrelationId,
+            Type)
+        by DeviceId = tostring(DeviceDetail["deviceId"]), UserId, IPAddress
 ;
 union _DeviceEvents, _SignInEvents
 | sort by DeviceId asc, TimeGenerated asc
@@ -179,6 +198,7 @@ union _DeviceEvents, _SignInEvents
     DeviceName,
     DeviceTrustType,
     UserPrincipalName,
+    IPAddress,
     ObjectId,
     DeviceId,
     AutopilotZTDID,
@@ -190,3 +210,5 @@ union _DeviceEvents, _SignInEvents
     TargetResources,
     CorrelationId,
     IncludedUpdatedProperties
+//};
+//Function(query_frequency, query_period, query_wait)
