@@ -1,8 +1,8 @@
-// This query can help you to detect Azure AD role assignments.
+// This query can help you to detect Entra ID role assignments.
 //
-// You can call this function by running this same query code, or if you save this function as "AzureADRoleAssignments", by simply calling:
+// You can call this function by running this same query code, or if you save this function as "EntraIDRoleAssignments", by simply calling:
 //
-// AzureADRoleAssignments
+// EntraIDRoleAssignments
 //
 //let Function = (){
 let _PIM_ids = toscalar(
@@ -10,8 +10,8 @@ let _PIM_ids = toscalar(
     | where Activity == "PrivilegedIdentityManagement" and Notes has "[App]"
     | summarize make_list(ActorId)
 );
-let _PrivAADRoles = toscalar(
-    _GetWatchlist("RegEx-PrivAADRoles")
+let _PrivEntraIDRoles = toscalar(
+    _GetWatchlist("RegEx-PrivEntraIDRoles")
     | summarize RegEx = make_list(RegEx)
     | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
 );
@@ -19,15 +19,12 @@ let _RoleManagementPIM = materialize(
     AuditLogs
     | where Category == "RoleManagement" and LoggedByService == "PIM" and OperationName has_any ("to role", "from role", "role assignment")
     | mv-apply AdditionalDetail = AdditionalDetails on (
-        summarize ParsedAdditionalDetails = make_bag(pack(tostring(AdditionalDetail["key"]), tostring(AdditionalDetail["value"])))
+        summarize ParsedAdditionalDetails = make_bag(bag_pack(tostring(AdditionalDetail["key"]), tostring(AdditionalDetail["value"])))
     )
-    // | mv-apply TargetResource = TargetResources on (
-    //     summarize TargetResourcesTypes = make_list(tostring(TargetResource["type"]))
-    // )
     | mv-apply TargetResource = TargetResources on (
         summarize TargetResource = make_list(TargetResource) by TargetResourceType = tostring(TargetResource["type"])
         | extend TargetResource = iff(array_length(TargetResource) == 1, TargetResource[0], TargetResource)
-        | summarize ParsedTargetResources = make_bag(pack(TargetResourceType, TargetResource))
+        | summarize ParsedTargetResources = make_bag(bag_pack(TargetResourceType, TargetResource))
     )
     | project
         TimeGenerated,
@@ -172,7 +169,7 @@ union
     )
 | where not(LoggedByService == "PIM" and isnotempty(CompletedCount) and CompletedCount == 0)
 | extend
-    PrivilegedRole = TargetRoleDisplayName matches regex _PrivAADRoles or CoreDirectory_TargetRoleDisplayName  matches regex _PrivAADRoles,
+    PrivilegedRole = TargetRoleDisplayName matches regex _PrivEntraIDRoles or CoreDirectory_TargetRoleDisplayName  matches regex _PrivEntraIDRoles,
     WorkingTime = IsWorkingTime(TimeGenerated),
     AlertName = strcat(
         iff(RemoveOperation, "Remove", "Add"),
@@ -182,9 +179,9 @@ union
         iff(EligibleOperation, "eligible ", ""),
         "member ",
         iff(RemoveOperation, "from", "to"),
-        " Azure AD role"),
+        " Entra ID role"),
     AlertDescription = strcat(
-        'This rule detects operations with Azure AD roles.\n\nThe ',
+        'This rule detects operations with Entra ID roles.\n\nThe ',
         case(TargetType == "User", 'user', TargetType == "ServicePrincipal", 'service principal', 'member'),
         case(TargetType == "User", strcat(' "', TargetDisplayName, '" (', TargetUserPrincipalName, ')'), strcat(' "', coalesce(TargetDisplayName, TargetId), '"')),
         ' was ',
