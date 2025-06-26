@@ -1,50 +1,57 @@
-let PermissionsData = materialize(
-    externaldata(delegatedScopesList: dynamic, applicationScopesList: dynamic)
-    [@'https://raw.githubusercontent.com/microsoftgraph/microsoft-graph-devx-content/master/permissions/permissions-descriptions.json']
+let _DelegatedGraphPermissions = materialize(
+    externaldata(AdminConsentDescription:string, AdminConsentDisplayName:string, Id:string, IsEnabled:bool, Origin:string, Type:string, UserConsentDescription:string, UserConsentDisplayName:string, Value:string, AdditionalProperties:dynamic)
+    [@'https://raw.githubusercontent.com/merill/microsoft-info/refs/heads/main/_info/GraphDelegateRoles.json']
     with(format='multijson')
+    | project
+        PermissionName = Value,
+        DelegatedPermissionId = Id,
+        DelegatedPermissionType = Type,
+        UserConsentDisplayName,
+        UserConsentDescription,
+        AdminConsentDisplayName,
+        AdminConsentDescription
 );
-let DelegatedPermissions =
-    PermissionsData
-    | project delegatedScopesList
-    | mv-expand delegatedScopesList
-    | evaluate bag_unpack(delegatedScopesList)
+let _ApplicationGraphPermissions = materialize(
+    externaldata(AllowedMemberTypes:dynamic, Description:string, DisplayName:string, Id:string, IsEnabled:bool, Origin:string, Value:string, AdditionalProperties:dynamic)
+    [@'https://raw.githubusercontent.com/merill/microsoft-info/refs/heads/main/_info/GraphAppRoles.json']
+    with(format='multijson')
     | project
-        PermissionName = value,
-        AdminConsent = isAdmin,
-        DelegatedPermissionId = id,
-        ConsentDisplayName = consentDisplayName,
-        ConsentDescription = consentDescription,
-        AdminConsentDisplayName = adminConsentDisplayName,
-        AdminConsentDescription = adminConsentDescription
-;
-let ApplicationPermissions =
-    PermissionsData
-    | project applicationScopesList
-    | mv-expand applicationScopesList
-    | evaluate bag_unpack(applicationScopesList)
+        PermissionName = Value,
+        ApplicationPermissionId = Id,
+        ApplicationPermissionDisplayName = DisplayName,
+        ApplicationPermissionDescription = Description
+);
+let _GraphPermissionsCustomClassification = materialize(
+    externaldata(AppId: string, AppRoleId: string, AppRoleDisplayName: string, Category: string, EAMTierLevelName: string)//, EAMTierLevelTagValue: int)
+    [@"https://raw.githubusercontent.com/Cloud-Architekt/AzurePrivilegedIAM/main/Classification/Classification_AppRoles.json"]
+    with(format='multijson')
     | project
-        PermissionName = value,
-        ApplicationPermissionId = id,
-        ApplicationConsentDisplayName = consentDisplayName,
-        ApplicationConsentDescription = consentDescription
-;
-ApplicationPermissions
-| join kind=fullouter DelegatedPermissions on PermissionName
+        ApplicationPermissionId = AppRoleId,
+        PermissionName = AppRoleDisplayName,
+        Category,
+        EAMTierLevelName
+);
+_ApplicationGraphPermissions
+| join kind=fullouter _GraphPermissionsCustomClassification on ApplicationPermissionId
+| project-away *1
+| join kind=fullouter _DelegatedGraphPermissions on PermissionName
 | extend
     PermissionName = iff(isnotempty(PermissionName), PermissionName, PermissionName1),
     PermissionAPI = "Microsoft Graph",
     ConsentRisk = ""
-| sort by PermissionAPI asc, PermissionName asc
+| sort by DelegatedPermissionType == "User" desc, PermissionName asc
 | project
     PermissionAPI,
     PermissionName,
-    AdminConsent,
     ConsentRisk,
-    ConsentDisplayName,
-    ConsentDescription,
+    DelegatedPermissionId,
+    DelegatedPermissionType,
+    UserConsentDisplayName,
+    UserConsentDescription,
     AdminConsentDisplayName,
     AdminConsentDescription,
-    DelegatedPermissionId,
-    ApplicationConsentDisplayName,
-    ApplicationConsentDescription,
-    ApplicationPermissionId
+    ApplicationPermissionId,
+    ApplicationPermissionDisplayName,
+    ApplicationPermissionDescription,
+    Category,
+    EAMTierLevelName
