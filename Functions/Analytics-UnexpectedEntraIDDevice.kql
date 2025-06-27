@@ -16,7 +16,7 @@
 // let query_frequency = 14d;
 // let query_period = 14d;
 // let query_wait = 1h;
-//let Function = (query_frequency:timespan = 14d, query_period:timespan = 14d){
+//let Function = (query_frequency:timespan = 14d, query_period:timespan = 14d, query_wait:timespan = 1h){
 // TrustType possible values: Workplace (indicates bring your own personal devices), AzureAd (Cloud only joined devices), ServerAd (on-premises domain joined devices joined to Azure AD)
 // let _ExpectedTrustTypes =
 //     _GetWatchlist("Activity-ExpectedSignificantActivity")
