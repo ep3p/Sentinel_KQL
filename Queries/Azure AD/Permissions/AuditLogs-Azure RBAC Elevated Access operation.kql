@@ -1,0 +1,31 @@
+AuditLogs
+| where LoggedByService == "Azure RBAC (Elevated Access)" and Category == "AzureRBACRoleManagementElevateAccess"// and isempty(AADOperationType)
+| extend
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| mv-apply AdditionalDetail = AdditionalDetails on (
+    summarize AdditionalDetailsBag = make_bag(bag_pack(tostring(AdditionalDetail["key"]), tostring(AdditionalDetail["value"])))
+    )
+| extend
+    AppId = tostring(AdditionalDetailsBag["APP ID"]),
+    AzureOperationName = tostring(AdditionalDetailsBag["OperationName"]),
+    TargetId = replace_regex(tostring(AdditionalDetailsBag["Principal ID linked to Role Assignment"]), @"([a-f0-9]{8})([a-f0-9]{4})([a-f0-9]{4})([a-f0-9]{4})([a-f0-9]{12})", @"\1-\2-\3-\4-\5")
+| project
+    TimeGenerated,
+    LoggedByService,
+    Category,
+    AADOperationType,
+    Initiator,
+    IPAddress,
+    OperationName,
+    Result,
+    ResultDescription,
+    AzureOperationName,
+    TargetId,
+    AppId,
+    AdditionalDetails,
+    InitiatorId,
+    InitiatedBy,
+    TargetResources,
+    CorrelationId

@@ -1,2 +1,0 @@
-AuditLogs
-| where Category == "AzureRBACRoleManagementElevateAccess" or LoggedByService has_any ("Azure RBAC", "Elevated Access")
