@@ -1,0 +1,27 @@
+let query_frequency = 1h;
+let query_period = 3d;
+let _ExpectedFrequencies =
+    _GetWatchlist("DataType-IngestedTables")
+    | where Type == "CommonSecurityLog"
+    | mv-expand DeviceProduct = split(Auxiliar, " & ") to typeof(string)
+    | project Type, DeviceProduct, Critical, ExpectedIngestionFrequency = totimespan(Frequency)
+;
+CommonSecurityLog
+| where TimeGenerated > ago(query_period)
+| summarize IngestionTime = max(ingestion_time()) by Type, DeviceProduct
+| lookup kind=inner _ExpectedFrequencies on Type, DeviceProduct
+| where IngestionTime between (ago(ExpectedIngestionFrequency + query_frequency) .. ago(ExpectedIngestionFrequency))
+| extend
+    TimespanWithoutIngestion = now() - IngestionTime,
+    AlertSeverity = case(
+        Critical == "true",
+        "High",
+        "Informational"
+        )
+| project
+    Type,
+    DeviceProduct,
+    Critical,
+    ExpectedIngestionFrequency,
+    TimespanWithoutIngestion,
+    AlertSeverity
