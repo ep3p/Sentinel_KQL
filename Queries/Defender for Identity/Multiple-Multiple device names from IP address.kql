@@ -17,7 +17,7 @@ let _SecurityEvents =
     SecurityEvent
     | where TimeGenerated > ago(query_period)
     | where EventID in (4624, 4625)
-    | where not(IpAddress in ("-", "")) and not(WorkstationName in ("-", "")) and not(toupper(tostring(split(Computer, ".")[0])) == toupper(WorkstationName))
+    | where not(IpAddress in ("-", "", "::1")) and not(WorkstationName in ("-", "")) and not(toupper(tostring(split(Computer, ".")[0])) == toupper(WorkstationName))
     | extend
         IPAddress = IpAddress,
         DeviceName = WorkstationName,
@@ -25,7 +25,7 @@ let _SecurityEvents =
 ;
 union isfuzzy=true _DefenderForIdentity, _SecurityEvents
 | where not(IPAddress in (_ExcludedIPAddresses))
-| extend ParsedDeviceName = toupper(tostring(split(DeviceName, ".")[0]))
+| extend ParsedDeviceName = trim(@"\s+", toupper(tostring(split(DeviceName, ".")[0])))
 | as _Events
 | join kind=leftsemi (
     _Events
