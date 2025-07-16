@@ -1,0 +1,58 @@
+AuditLogs
+| where OperationName == "User reported unusual sign-in event as not legitimate"// and Category == "Authentication" and LoggedByService == "Authentication Methods"
+| mv-apply AdditionalDetail = AdditionalDetails on (
+        summarize ParsedAdditionalDetails = make_bag(bag_pack(tostring(AdditionalDetail["key"]), tostring(AdditionalDetail["value"])))
+    )
+| project
+    Report_TimeGenerated = TimeGenerated,
+    Report_UserId = tostring(ParsedAdditionalDetails["oid"]),
+    Report_IPAddress = tostring(ParsedAdditionalDetails["ipaddr"]),
+    Report_Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    Report_InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    //IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+    OriginalRequestId = tostring(TargetResources[0]["id"])
+| join kind=leftouter SigninLogs on OriginalRequestId
+//| where not(Report_IPAddress == IPAddress)
+| project
+    Report_TimeGenerated,
+    Report_UserId,
+    Report_IPAddress,
+    Report_Initiator,
+    Report_InitiatorId,
+    OriginalRequestId,
+    CreatedDateTime,
+    UserPrincipalName,
+    UserDisplayName,
+    IPAddress,
+    Location,
+    AutonomousSystemNumber,
+    NetworkLocationDetails,
+    ResultType,
+    ResultDescription,
+    Status,
+    AuthenticationDetails,
+    AuthenticationRequirement,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    AppDisplayName,
+    ResourceDisplayName,
+    ClientAppUsed,
+    UserAgent,
+    DeviceDetail,
+    TokenIssuerType,
+    IncomingTokenType,
+    TokenProtectionStatusDetails,
+    RiskState,
+    RiskLevelAggregated,
+    RiskLevelDuringSignIn,
+    RiskEventTypes,
+    UniqueTokenIdentifier,
+    SessionId,
+    HomeTenantId,
+    ResourceTenantId,
+    CrossTenantAccessType,
+    UserType,
+    UserId,
+    AppId,
+    ResourceIdentity,
+    CorrelationId
