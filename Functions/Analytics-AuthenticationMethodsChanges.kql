@@ -1,0 +1,160 @@
+// This query can help you to check accounts that changed their MFA or Authentication Methods in Entra ID
+//
+// Click "Save as function", in Parameters write in the fields:
+// "bool" "check_signinlogs" "false"
+//
+// If you name the function "AuthenticationMethodsChanges", you can check the function with queries like the following:
+//
+// AuthenticationMethodsChanges()
+//
+// AuthenticationMethodsChanges(true)
+//
+// let check_signinlogs = false;
+//let Function = (check_signinlogs = false){
+let _NotCoreEvents =
+    AuditLogs
+    | where case(
+        LoggedByService == "Device Registration Service" and Category == "UserManagement", true,
+        LoggedByService == "Authentication Methods" and Category == "UserManagement", true,
+        OperationName has_any ("Strong Authentication"), true,
+        false
+        )
+    | where Result == "success"
+    | where not(LoggedByService == "Authentication Methods" and Category == "UserManagement" and OperationName has_any (
+        "cancelled",
+        "Restore multifactor authentication on all remembered devices",
+        "Get passkey creation options",
+        "password change",
+        "password reset"
+        ))
+    | where not(OperationName == "User started security info registration" and Result == "failure" and ResultDescription == "A system error has occurred.")
+    | mv-expand TargetUserAuxiliar = pack_array(tostring(TargetResources[0]["id"]), tostring(TargetResources[0]["userPrincipalName"])) to typeof(string)
+    | where isnotempty(TargetUserAuxiliar)
+    | join kind=leftouter (
+        AuditLogs
+        | where OperationName == "Update user"
+        | where Result == "success"
+        // Remove synchronization update user events
+        | where not(TargetResources has "LastDirSyncTime")
+        // Remove empty updates
+        | mv-apply ModifiedProperty = TargetResources[0]["modifiedProperties"] on (
+        summarize BagToUnpack = make_bag(bag_pack(tostring(ModifiedProperty["displayName"]), translate(@'["\]', "", tostring(ModifiedProperty["newValue"]))))
+        )
+        | where isempty(TargetResources) or not(BagToUnpack["Included Updated Properties"] == "")
+        | mv-expand TargetUserAuxiliar = pack_array(tostring(TargetResources[0]["id"]), tostring(TargetResources[0]["userPrincipalName"])) to typeof(string)
+        | where isnotempty(TargetUserAuxiliar)
+        | project
+            UpdateUser_TimeGenerated = TimeGenerated,
+            UpdateUser_TargetResources = TargetResources,
+            UpdateUser_CorrelationId = CorrelationId,
+            TargetUserAuxiliar
+        ) on TargetUserAuxiliar
+    | project-away TargetUserAuxiliar*
+    // Remove update user event info if it is not related
+    | extend
+        UpdateUser_TargetResources = iff(UpdateUser_TimeGenerated between ((TimeGenerated-5m) .. TimeGenerated), UpdateUser_TargetResources, dynamic(null)),
+        UpdateUser_CorrelationId = iff(UpdateUser_TimeGenerated between ((TimeGenerated-5m) .. TimeGenerated), UpdateUser_CorrelationId, "")
+    | extend
+        UpdateUser_TimeGenerated = iff(UpdateUser_TimeGenerated between ((TimeGenerated-5m) .. TimeGenerated), UpdateUser_TimeGenerated, datetime(null))
+    // Take the most "recent" update user event
+    | summarize arg_max(UpdateUser_TimeGenerated, *) by CorrelationId, OperationName
+    | summarize arg_max(TimeGenerated, *) by CorrelationId // One event from "Device Registration Service" and another from "Authentication Methods" can have the same CorrelationId
+    | extend
+        Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+        InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+        IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"]),
+        TargetUserName = coalesce(tostring(TargetResources[0]["userPrincipalName"]), tostring(UpdateUser_TargetResources[0]["userPrincipalName"])),
+        TargetId = coalesce(tostring(TargetResources[0]["id"]), tostring(UpdateUser_TargetResources[0]["id"]))
+    | project
+        TimeGenerated,
+        LoggedByService,
+        Category,
+        AADOperationType,
+        Initiator,
+        IPAddress,// Might just show a Microsoft address for some ServiceApi operation types
+        OperationName,
+        Result,
+        ResultDescription,
+        TargetUserName,
+        TargetId,
+        AdditionalDetails,
+        InitiatorId,
+        InitiatedBy,
+        TargetResources,
+        CorrelationId,
+        UpdateUser_TargetResources,
+        UpdateUser_CorrelationId
+;
+let _CoreEvents =
+    AuditLogs
+    | where OperationName == "Update user" //and LoggedByService == "Core Directory" and Category == "UserManagement" and Identity in ("Azure MFA StrongAuthenticationService", "Azure Credential Configuration Endpoint Service")
+    | where Result == "success"
+    | where not(CorrelationId in (toscalar(_NotCoreEvents | summarize make_set_if(UpdateUser_CorrelationId, isnotempty(UpdateUser_CorrelationId)))))
+    | mv-expand ModifiedProperty = TargetResources[0]["modifiedProperties"]
+    | where ModifiedProperty["displayName"] startswith "StrongAuthentication"
+    | where not(ModifiedProperty["displayName"] == "StrongAuthenticationPhoneAppDetail"
+        and tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(ModifiedProperty["newValue"])))) == tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(ModifiedProperty["oldValue"])))))
+    | project-away ModifiedProperty
+    // We will assume there is only one unique "Update user" by CorrelationId
+    | summarize take_any(*) by CorrelationId
+    | extend
+        TargetUserName = tostring(TargetResources[0]["userPrincipalName"]),
+        TargetId = tolower(TargetResources[0]["id"]),
+        UpdateUser_CorrelationId = CorrelationId,
+        UpdateUser_TargetResources = TargetResources
+    | as _AuxiliarEvents
+    | join kind=leftouter (
+        AADNonInteractiveUserSignInLogs
+        | where check_signinlogs
+        | where (
+                ResourceIdentity in ("1f5530b3-261a-47a9-b357-ded261e17918")// Azure Multi-Factor Auth Connector
+                or (AppId == "0000000c-0000-0000-c000-000000000000" and ResourceIdentity in ("93625bc8-bfe2-437a-97e0-3d0060024faa", "65d91a3d-ab74-42e6-8a2f-0add61688c74", "00000003-0000-0000-c000-000000000000", "19db86c3-b2b9-44cc-b339-36da233a3be2", "00000002-0000-0000-c000-000000000000"))
+                or (AppId == "19db86c3-b2b9-44cc-b339-36da233a3be2" and ResourceIdentity in ("0000000c-0000-0000-c000-000000000000", "00000003-0000-0000-c000-000000000000"))
+                )
+            and ResultType == 0
+            //and HomeTenantId in (_HomeTenantIds)
+            and UserId in (toscalar(_AuxiliarEvents | summarize make_set(TargetId)))
+        | project
+            CreatedDateTime,
+            IPAddress,
+            UserId
+    ) on $left.TargetId == $right.UserId
+    // Remove update user event info if it is not related
+    | extend
+        IPAddress = iff(CreatedDateTime between ((TimeGenerated-5m) .. TimeGenerated), IPAddress, ""),
+        UserId = iff(CreatedDateTime between ((TimeGenerated-5m) .. TimeGenerated), UserId, "")
+    | extend
+        CreatedDateTime = iff(CreatedDateTime between ((TimeGenerated-5m) .. TimeGenerated), CreatedDateTime, datetime(null))
+    // Take the most "recent" update user event
+    | summarize arg_max(CreatedDateTime, *) by CorrelationId
+    | extend
+        Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+        InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"]))
+    | project
+        TimeGenerated,
+        LoggedByService,
+        Category,
+        AADOperationType,
+        Initiator,
+        IPAddress,// Might just show a Microsoft address for some ServiceApi operation types
+        OperationName,
+        Result,
+        ResultDescription,
+        TargetUserName,
+        TargetId,
+        AdditionalDetails,
+        InitiatorId,
+        InitiatedBy,
+        TargetResources,
+        CorrelationId,
+        UpdateUser_TargetResources,
+        UpdateUser_CorrelationId
+;
+union _NotCoreEvents, _CoreEvents
+| mv-apply ModifiedProperty = UpdateUser_TargetResources[0]["modifiedProperties"] on (
+    summarize BagToUnpack = make_bag(bag_pack(tostring(ModifiedProperty["displayName"]), bag_pack("oldValue", ModifiedProperty["oldValue"], "newValue", ModifiedProperty["newValue"])))
+    )
+| extend BagToUnpack = bag_remove_keys(BagToUnpack, set_difference(bag_keys(BagToUnpack), split(trim(@'\"', tostring(BagToUnpack["Included Updated Properties"]["newValue"])), ", ")))
+| evaluate bag_unpack(BagToUnpack, columnsConflict = "keep_source")
+//};
+//Function(check_signinlogs)
