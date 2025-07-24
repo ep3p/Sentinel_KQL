@@ -41,7 +41,7 @@ let _NotCoreEvents =
             summarize BagToUnpack = make_bag(bag_pack(tostring(ModifiedProperty["displayName"]), translate(@'["\]', "", tostring(ModifiedProperty["newValue"]))))
         )
         | where not(BagToUnpack["Included Updated Properties"] == "" or BagToUnpack["Included Updated Properties"] has_any ("LastDirSyncTime", "StsRefreshTokensValidFrom"))
-        // | where BagToUnpack["Included Updated Properties"] contains "StrongAuthentication" or BagToUnpack["Included Updated Properties"] contains "DeviceKey"
+        // | where BagToUnpack["Included Updated Properties"] contains "StrongAuthentication" or BagToUnpack["Included Updated Properties"] contains "DeviceKey" or BagToUnpack["Included Updated Properties"] contains "SecuredAccess" or BagToUnpack["Included Updated Properties"] contains "PassData"
         | mv-expand TargetUserAuxiliar = pack_array(tostring(TargetResources[0]["id"]), tostring(TargetResources[0]["userPrincipalName"])) to typeof(string)
         | where isnotempty(TargetUserAuxiliar)
         | project
@@ -92,7 +92,7 @@ let _CoreEvents =
     // | where Result == "success"
     | where not(CorrelationId in (toscalar(_NotCoreEvents | summarize make_set_if(UpdateUser_CorrelationId, isnotempty(UpdateUser_CorrelationId)))))
     | mv-expand ModifiedProperty = TargetResources[0]["modifiedProperties"]
-    | where ModifiedProperty["displayName"] contains "StrongAuthentication" or ModifiedProperty["displayName"] contains "DeviceKey"
+    | where ModifiedProperty["displayName"] contains "StrongAuthentication" or ModifiedProperty["displayName"] contains "DeviceKey" or ModifiedProperty["displayName"] contains "SecuredAccess" or ModifiedProperty["displayName"] contains "PassData"
     | where not(ModifiedProperty["displayName"] == "StrongAuthenticationPhoneAppDetail"
         and tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(ModifiedProperty["newValue"])))) == tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(ModifiedProperty["oldValue"])))))
     | project-away ModifiedProperty
