@@ -88,7 +88,7 @@ let _NotCoreEvents =
 ;
 let _CoreEvents =
     AuditLogs
-    | where OperationName == "Update user" //and LoggedByService == "Core Directory" and Category == "UserManagement" and Identity in ("Azure MFA StrongAuthenticationService", "Azure Credential Configuration Endpoint Service")
+    | where OperationName == "Update user" //and LoggedByService == "Core Directory" and Category == "UserManagement" and Identity in ("Azure MFA StrongAuthenticationService", "Azure Credential Configuration Endpoint Service", "Azure ESTS Service")
     // | where Result == "success"
     | where not(CorrelationId in (toscalar(_NotCoreEvents | summarize make_set_if(UpdateUser_CorrelationId, isnotempty(UpdateUser_CorrelationId)))))
     | mv-expand ModifiedProperty = TargetResources[0]["modifiedProperties"]
