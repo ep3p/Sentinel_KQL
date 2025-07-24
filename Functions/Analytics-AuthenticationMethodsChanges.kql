@@ -36,13 +36,12 @@ let _NotCoreEvents =
         AuditLogs
         | where OperationName == "Update user"
         // | where Result == "success"
-        // Remove synchronization update user events
-        | where not(TargetResources has "LastDirSyncTime")
         // Remove empty updates
         | mv-apply ModifiedProperty = TargetResources[0]["modifiedProperties"] on (
-        summarize BagToUnpack = make_bag(bag_pack(tostring(ModifiedProperty["displayName"]), translate(@'["\]', "", tostring(ModifiedProperty["newValue"]))))
+            summarize BagToUnpack = make_bag(bag_pack(tostring(ModifiedProperty["displayName"]), translate(@'["\]', "", tostring(ModifiedProperty["newValue"]))))
         )
-        | where isempty(TargetResources) or not(BagToUnpack["Included Updated Properties"] == "")
+        | where not(BagToUnpack["Included Updated Properties"] == "" or BagToUnpack["Included Updated Properties"] has_any ("LastDirSyncTime", "StsRefreshTokensValidFrom"))
+        // | where BagToUnpack["Included Updated Properties"] contains "StrongAuthentication" or BagToUnpack["Included Updated Properties"] contains "DeviceKey"
         | mv-expand TargetUserAuxiliar = pack_array(tostring(TargetResources[0]["id"]), tostring(TargetResources[0]["userPrincipalName"])) to typeof(string)
         | where isnotempty(TargetUserAuxiliar)
         | project
@@ -93,11 +92,11 @@ let _CoreEvents =
     // | where Result == "success"
     | where not(CorrelationId in (toscalar(_NotCoreEvents | summarize make_set_if(UpdateUser_CorrelationId, isnotempty(UpdateUser_CorrelationId)))))
     | mv-expand ModifiedProperty = TargetResources[0]["modifiedProperties"]
-    | where ModifiedProperty["displayName"] startswith "StrongAuthentication"
+    | where ModifiedProperty["displayName"] contains "StrongAuthentication" or ModifiedProperty["displayName"] contains "DeviceKey"
     | where not(ModifiedProperty["displayName"] == "StrongAuthenticationPhoneAppDetail"
         and tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(ModifiedProperty["newValue"])))) == tostring(array_sort_asc(extract_all(@'\"Id\"\:\"([^\"]+)\"', tostring(ModifiedProperty["oldValue"])))))
     | project-away ModifiedProperty
-    // We will assume there is only one unique "Update user" by CorrelationId
+    // We will assume there is only one unique "Update user" by CorrelationId (you might receive duplicated events)
     | summarize take_any(*) by CorrelationId
     | extend
         TargetUserName = tostring(TargetResources[0]["userPrincipalName"]),
@@ -110,17 +109,25 @@ let _CoreEvents =
         | where check_signinlogs
         | where (
                 ResourceIdentity in ("1f5530b3-261a-47a9-b357-ded261e17918")// Azure Multi-Factor Auth Connector
-                or (AppId == "0000000c-0000-0000-c000-000000000000" and ResourceIdentity in ("93625bc8-bfe2-437a-97e0-3d0060024faa", "65d91a3d-ab74-42e6-8a2f-0add61688c74", "00000003-0000-0000-c000-000000000000", "19db86c3-b2b9-44cc-b339-36da233a3be2", "00000002-0000-0000-c000-000000000000"))
-                or (AppId == "19db86c3-b2b9-44cc-b339-36da233a3be2" and ResourceIdentity in ("0000000c-0000-0000-c000-000000000000", "00000003-0000-0000-c000-000000000000"))
+                or (AppId == "0000000c-0000-0000-c000-000000000000"//   Microsoft App Access Panel
+                    and ResourceIdentity in (
+                        "93625bc8-bfe2-437a-97e0-3d0060024faa",//       Microsoft password reset service
+                        "65d91a3d-ab74-42e6-8a2f-0add61688c74",//       Microsoft Approval Management
+                        "00000003-0000-0000-c000-000000000000",//       Microsoft Graph
+                        "19db86c3-b2b9-44cc-b339-36da233a3be2",//       My Signins
+                        "00000002-0000-0000-c000-000000000000"))//      Windows Azure Active Directory
+                or (AppId == "19db86c3-b2b9-44cc-b339-36da233a3be2"//   My Signins
+                    and ResourceIdentity in (
+                        "0000000c-0000-0000-c000-000000000000",//       Microsoft App Access Panel
+                        "00000003-0000-0000-c000-000000000000"))//      Microsoft Graph
                 )
             and ResultType == 0
-            //and HomeTenantId in (_HomeTenantIds)
             and UserId in (toscalar(_AuxiliarEvents | summarize make_set(TargetId)))
         | project
             CreatedDateTime,
             IPAddress,
             UserId
-    ) on $left.TargetId == $right.UserId
+        ) on $left.TargetId == $right.UserId
     // Remove update user event info if it is not related
     | extend
         IPAddress = iff(CreatedDateTime between ((TimeGenerated-5m) .. TimeGenerated), IPAddress, ""),
