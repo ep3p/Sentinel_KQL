@@ -22,6 +22,8 @@ let _NotCoreEvents =
     | where Result == "success"
     | where not(LoggedByService == "Authentication Methods" and Category == "UserManagement" and OperationName has_any (
         "cancelled",
+        "started security info registration",
+        "reviewed security info",
         "Restore multifactor authentication on all remembered devices",
         "Get passkey creation options",
         "password change",
@@ -33,7 +35,7 @@ let _NotCoreEvents =
     | join kind=leftouter (
         AuditLogs
         | where OperationName == "Update user"
-        | where Result == "success"
+        // | where Result == "success"
         // Remove synchronization update user events
         | where not(TargetResources has "LastDirSyncTime")
         // Remove empty updates
@@ -88,7 +90,7 @@ let _NotCoreEvents =
 let _CoreEvents =
     AuditLogs
     | where OperationName == "Update user" //and LoggedByService == "Core Directory" and Category == "UserManagement" and Identity in ("Azure MFA StrongAuthenticationService", "Azure Credential Configuration Endpoint Service")
-    | where Result == "success"
+    // | where Result == "success"
     | where not(CorrelationId in (toscalar(_NotCoreEvents | summarize make_set_if(UpdateUser_CorrelationId, isnotempty(UpdateUser_CorrelationId)))))
     | mv-expand ModifiedProperty = TargetResources[0]["modifiedProperties"]
     | where ModifiedProperty["displayName"] startswith "StrongAuthentication"
