@@ -1,4 +1,8 @@
+let query_frequency = 15m;
+// let query_period = 30m;
+let query_wait = 15m;
 AuditLogs
+| where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
 | where OperationName == "User reported unusual sign-in event as not legitimate"// and Category == "Authentication" and LoggedByService == "Authentication Methods"
 | mv-apply AdditionalDetail = AdditionalDetails on (
         summarize ParsedAdditionalDetails = make_bag(bag_pack(tostring(AdditionalDetail["key"]), tostring(AdditionalDetail["value"])))
@@ -11,8 +15,11 @@ AuditLogs
     Report_InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
     //IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
     OriginalRequestId = tostring(TargetResources[0]["id"])
-| join kind=leftouter SigninLogs on OriginalRequestId
-//| where not(Report_IPAddress == IPAddress)
+| join kind=leftouter (
+    SigninLogs
+    | where TimeGenerated > ago(query_frequency + query_wait)
+    ) on OriginalRequestId
+// | where not(Report_IPAddress == IPAddress)
 | project
     Report_TimeGenerated,
     Report_UserId,
