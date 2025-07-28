@@ -1,37 +1,38 @@
-let query_frequency = 1h;
 let _ExpectedCountryCodes = toscalar(
-    _GetWatchlist('Activity-ExpectedSignificantActivity')
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "CorporateCountryCallingCode"
     | summarize make_list(Auxiliar)
 );
-AuthenticationMethodChanges(query_period=query_frequency)
-| extend PhoneNumber = extract_all(@'PhoneNumber\"\:\"([^\"]+)', tostring(column_ifexists("StrongAuthenticationUserDetails", dynamic(null)).newValue))
-| mv-expand Target = SecurityInfo_TargetResources
-| mv-apply ModifiedProperties = Target["modifiedProperties"] on (
-    summarize BagToUnpack = make_bag(pack(tostring(ModifiedProperties["displayName"]), trim(@'\"', tostring(ModifiedProperties["newValue"]))))
+AuthenticationMethodsChanges()
+| where TargetResources has "PhoneNumber" or UpdateUser_TargetResources has "PhoneNumber"
+| extend PhoneNumbers = extract_all(@'PhoneNumber\"\:\"([^\"]+)', tostring(column_ifexists("StrongAuthenticationUserDetails", dynamic(null))["newValue"]))
+| mv-apply ModifiedProperties = TargetResources[0]["modifiedProperties"] on (
+    summarize AuxiliarPhoneNumbers = make_set_if(
+        trim(@'\"', tostring(ModifiedProperties["newValue"])),
+        tostring(ModifiedProperties["displayName"]) endswith "PhoneNumber" and isnotempty(trim(@'\"', tostring(ModifiedProperties["newValue"]))))
+        // Phone.Phone.PhoneNumber TemporaryAccessPass.Phone.PhoneNumber
     )
-| evaluate bag_unpack(BagToUnpack, columnsConflict = 'keep_source', ignoredProperties = dynamic(["Phone.Id", "Phone.PhoneType"]))
-| extend ["Phone.PhoneNumber"] = column_ifexists("Phone.PhoneNumber", "")
-| extend PhoneNumber = iff(isnotempty(["Phone.PhoneNumber"]), set_union(PhoneNumber, pack_array(["Phone.PhoneNumber"])), PhoneNumber)
-| project-away Target, ["Phone.PhoneNumber"]
-| where array_length(PhoneNumber) > 1
-| extend DistinctCountryCodes = set_union(extract_all(@'\"(\+\d+)\s+', tostring(PhoneNumber)), dynamic(null))
+| extend PhoneNumbers = set_union(PhoneNumbers, AuxiliarPhoneNumbers)
+| project-away AuxiliarPhoneNumbers
+| where array_length(PhoneNumbers) > 1
+| extend DistinctCountryCodes = set_union(extract_all(@'\"(\+\d+)\s+', tostring(PhoneNumbers)), dynamic(null))
 | where array_length(DistinctCountryCodes) > 1
 | where not(array_length(set_difference(DistinctCountryCodes, _ExpectedCountryCodes)) == 0)
-| project-reorder
+| project
     TimeGenerated,
-    ActorPrincipalName,
+    Initiator,
     IPAddress,
     OperationName,
-    TargetUserPrincipalName,
     Result,
     ResultDescription,
-    PhoneNumber,
+    TargetUserName,
+    TargetId,
+    PhoneNumbers,
     DistinctCountryCodes,
-    Strong*,
-    LoggedByService,
+    AdditionalDetails,
+    InitiatorId,
     InitiatedBy,
+    TargetResources,
+    CorrelationId,
     UpdateUser_TargetResources,
-    SecurityInfo_TargetResources,
-    UserId,
-    CorrelationId
+    UpdateUser_CorrelationId
