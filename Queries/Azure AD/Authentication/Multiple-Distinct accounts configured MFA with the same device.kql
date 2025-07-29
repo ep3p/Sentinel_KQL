@@ -5,7 +5,7 @@ AuthenticationMethodsChanges()
 | where TargetResources has_any ("PhoneNumber", "DeviceToken") or UpdateUser_TargetResources has_any ("PhoneNumber", "DeviceToken")
 | extend
     PhoneNumbers = extract_all(@'PhoneNumber\"\:\"([^\"]+)', tostring(column_ifexists("StrongAuthenticationUserDetails", dynamic(null))["newValue"])),
-    DeviceTokens = extract_all(@'DeviceToken\"\:\"([^\"]+)', tostring(column_ifexists("StrongAuthenticationPhoneAppDetail", dynamic(null)).newValue))
+    DeviceTokens = extract_all(@'DeviceToken\"\:\"([^\"]+)', tostring(column_ifexists("StrongAuthenticationPhoneAppDetail", dynamic(null))["newValue"]))
 | mv-apply ModifiedProperties = TargetResources[0]["modifiedProperties"] on (
     summarize AuxiliarPhoneNumbers = make_set_if(
         trim(@'\"', tostring(ModifiedProperties["newValue"])),
