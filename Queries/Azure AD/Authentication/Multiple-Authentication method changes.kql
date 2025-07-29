@@ -1,5 +1,0 @@
-// Please, use the function you can find in:
-//
-// https://github.com/ep3p/Sentinel_KQL/blob/main/Functions/AuthenticationMethodChanges.kql
-//
-AuthenticationMethodChanges()
