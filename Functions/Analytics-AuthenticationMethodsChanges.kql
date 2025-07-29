@@ -64,7 +64,7 @@ let _NotCoreEvents =
         Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
         InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
         IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"]),
-        TargetUserName = coalesce(tostring(TargetResources[0]["userPrincipalName"]), tostring(UpdateUser_TargetResources[0]["userPrincipalName"])),
+        TargetUserPrincipalName = coalesce(tostring(TargetResources[0]["userPrincipalName"]), tostring(UpdateUser_TargetResources[0]["userPrincipalName"])),
         TargetId = coalesce(tostring(TargetResources[0]["id"]), tostring(UpdateUser_TargetResources[0]["id"]))
     | project
         TimeGenerated,
@@ -76,7 +76,7 @@ let _NotCoreEvents =
         OperationName,
         Result,
         ResultDescription,
-        TargetUserName,
+        TargetUserPrincipalName,
         TargetId,
         AdditionalDetails,
         InitiatorId,
@@ -99,7 +99,7 @@ let _CoreEvents =
     // We will assume there is only one unique "Update user" by CorrelationId (you might receive duplicated events)
     | summarize take_any(*) by CorrelationId
     | extend
-        TargetUserName = tostring(TargetResources[0]["userPrincipalName"]),
+        TargetUserPrincipalName = tostring(TargetResources[0]["userPrincipalName"]),
         TargetId = tolower(TargetResources[0]["id"]),
         UpdateUser_CorrelationId = CorrelationId,
         UpdateUser_TargetResources = TargetResources
@@ -149,7 +149,7 @@ let _CoreEvents =
         OperationName,
         Result,
         ResultDescription,
-        TargetUserName,
+        TargetUserPrincipalName,
         TargetId,
         AdditionalDetails,
         InitiatorId,
