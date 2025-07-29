@@ -10,10 +10,10 @@ union
     | summarize
         StartTime = min(TimeGenerated),
         EndTime = max(TimeGenerated),
-        ResultTypes = array_sort_asc(make_set(ResultType, 100)),
-        AppDisplayNames = array_sort_asc(make_set(AppDisplayName, 100)),
-        ResourcesDisplayNames = array_sort_asc(make_set(ResourceDisplayName, 100)),
-        UserAgents = make_set(UserAgent, 100),
+        ResultTypes = array_sort_asc(make_set(ResultType, 50)),
+        AppDisplayNames = array_sort_asc(make_set(AppDisplayName, 50)),
+        ResourcesDisplayNames = array_sort_asc(make_set(ResourceDisplayName, 50)),
+        UserAgents = make_set(UserAgent, 50),
         take_any(UserPrincipalName, UserDisplayName, AlternateSignInName, Location)
         by IPAddress, UserId
     | project
@@ -34,8 +34,8 @@ union
     AuditLogs
     | mv-expand TargetResource = TargetResources
     | where TargetResource["type"] == "User"
-    | extend AccountObjectId = tostring(TargetResource["id"])
-    | where AccountObjectId in (_BreakGlassUserId)
+    | extend TargetId = tostring(TargetResource["id"])
+    | where TargetId in (_BreakGlassUserId)
     | extend
         Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
         InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
@@ -43,20 +43,19 @@ union
         TargetUserPrincipalName = tostring(TargetResource["userPrincipalName"])
     | project
         TimeGenerated,
-        Category,
         LoggedByService,
+        Category,
         AADOperationType,
         Initiator,
         IPAddress,
         OperationName,
-        ActivityDisplayName,
         Result,
         ResultDescription,
         TargetUserPrincipalName,
-        AccountObjectId,
+        TargetId,
+        AdditionalDetails,
         InitiatorId,
         InitiatedBy,
-        AdditionalDetails,
         TargetResources,
         CorrelationId
     )
