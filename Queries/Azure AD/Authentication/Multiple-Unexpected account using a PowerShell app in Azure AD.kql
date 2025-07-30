@@ -1,44 +1,38 @@
 let query_frequency = 1h;
 let query_period = 14d;
-let UUID_regex = toscalar(
-    _GetWatchlist('RegEx-SingleRegularExpressions')
-    | where UseCase == "UUID"
-    | project RegEx
-);
-let _HomeTenantId = toscalar(
-    _GetWatchlist('UUID-AADTenantIds')
-    | where Notes has "[HomeTenant]"
-    | summarize make_list(TenantId)
-);
 let _ShellApps = toscalar(
-    _GetWatchlist('UUID-AADApps')
+    _GetWatchlist("UUID-EntraIdApps")
     | where Notes has "[PowerShell]"
     | summarize make_list(AppId)
 );
+// let _HomeTenantId = toscalar(
+//     _GetWatchlist("UUID-EntraIdTenantIds")
+//     | where Notes has "[HomeTenant]"
+//     | summarize make_list(TenantId)
+// );
 let _ExpectedResultTypes = toscalar(
-    _GetWatchlist('ResultType-SignInLogsErrorCodes')
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
     | where isnotempty(ResultDescription) and not(Notes has_any ("[Success]", "[Expired]"))
     | summarize make_list(ResultType)
 );
 let MicrosoftAzureCLI_appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
 let _MicrosoftAzureCLIExpectedResultTypes = toscalar(
-    _GetWatchlist('ResultType-SignInLogsErrorCodes')
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
     | where (Notes has_all ("[Success]", "[Interrupt]") and Notes has_any ("[MFA]", "[NotCompliant]")) or (Notes has_all ("[Token]", "[Expired]"))
     | summarize make_list(ResultType)
 );
 let _ExpectedADGroups = toscalar(
-    _GetWatchlist('RegEx-PrivDomainGroups')
+    _GetWatchlist("RegEx-PrivDomainGroups")
     | where Notes has "[PowerShell]"
     | summarize RegEx = make_list(RegEx)
     | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
 );
 let _ExpectedAADRoles = toscalar(
-    _GetWatchlist('RegEx-PrivAADRoles')
+    _GetWatchlist("RegEx-PrivAADRoles")
     | where Notes has "[PowerShell]"
     | summarize RegEx = make_list(RegEx)
     | extend RegEx = strcat(@'^(', strcat_array(RegEx, '|'), @')$')
 );
-// User info before the signin events
 let _Users =
     IdentityInfo
     | where TimeGenerated between (ago(query_period) .. ago(query_frequency))
@@ -54,34 +48,35 @@ let _ExpectedUsers =
 union SigninLogs, AADNonInteractiveUserSignInLogs
 | where TimeGenerated > ago(query_frequency)
 | where AppId in (_ShellApps)
-// Remove events where the accessed resource is not from our tenant
-//| where ResourceTenantId in (_HomeTenantId)
-// Remove expected result types
+//| where ResourceTenantId in (_HomeTenantId) // Remove events where the accessed resource is not from our tenant
 | where not(ResultType in (_ExpectedResultTypes))
-// Remove expected users
 | where not(UserId in (_ExpectedUsers))
 // Remove unsuccessful guest signins from app "Microsoft Azure CLI", when they use this app we assume a signin event happens in all tenants where they are a guest
 | where not(AppId == MicrosoftAzureCLI_appid and ResultType in (_MicrosoftAzureCLIExpectedResultTypes))// and (UserType != "Member" or not(HomeTenantId in (_HomeTenantId))))
-| summarize arg_max(TimeGenerated, *) by CorrelationId, ResultType
+| summarize arg_max(TimeGenerated, *) by UserId, SessionId, ResultType, IPAddress, AppDisplayName, AppId, ResourceDisplayName, ResourceIdentity
 | extend DeviceDetail = coalesce(tostring(DeviceDetail_dynamic), DeviceDetail_string)
 | summarize
-    TimeGenerated = min(TimeGenerated),
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    Resources = make_set(ResourceDisplayName),
+    SessionIds = make_set(SessionId),
     CorrelationIds = make_set(CorrelationId),
     ResultTypes = make_set(ResultType),
     take_anyif(UserPrincipalName, not(UserPrincipalName == UserId)),
-    take_any(Location, ClientAppUsed, ResourceDisplayName, UserAgent, AuthenticationDetails, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, DeviceDetail)
+    take_any(Location, ClientAppUsed, UserAgent, AuthenticationDetails, RiskEventTypes, RiskLevelDuringSignIn, RiskLevelAggregated, DeviceDetail)
     by UserId, IPAddress, AppDisplayName, AppId
 | join kind=leftouter _Users on $left.UserId == $right.AccountObjectId
-| extend UserPrincipalName = tolower(case(isnotempty(UserPrincipalName), UserPrincipalName, isnotempty(MailAddress), MailAddress, AccountUPN))
+| extend UserPrincipalName = tolower(coalesce(UserPrincipalName, MailAddress, AccountUPN))
 | project
-    TimeGenerated,
+    StartTime,
+    EndTime,
     UserPrincipalName,
     AccountDisplayName,
     IPAddress,
     Location,
     ResultTypes,
     AppDisplayName,
-    ResourceDisplayName,
+    Resources,
     ClientAppUsed,
     DeviceDetail,
     UserAgent,
@@ -97,8 +92,9 @@ union SigninLogs, AADNonInteractiveUserSignInLogs
     UserAccountControl,
     RiskLevel,
     RiskState,
-    CorrelationIds,
     AuthenticationDetails,
+    SessionIds,
+    CorrelationIds,
     RiskEventTypes,
     RiskLevelDuringSignIn,
     RiskLevelAggregated,
