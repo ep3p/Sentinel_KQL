@@ -1,6 +1,6 @@
 let legacy_auth_protocols = dynamic(["Authenticated SMTP", "AutoDiscover", "Exchange ActiveSync", "Exchange Online PowerShell", "Exchange Web Services", "IMAP4", "MAPI Over HTTP", "Outlook Anywhere (RPC over HTTP)", "Outlook Service", "POP3", "Reporting Web Services", "Other clients"]);
 let legacy_user_agents = dynamic(["BAV2ROPC", "CBAinPROD", "CBAinTAR", "MSRPC"]);
-let _UncompromisedResultTypes = toscalar(
+let _ExpectedResultTypes = toscalar(
     _GetWatchlist("ResultType-SignInLogsErrorCodes")
     | where Notes has "[Failure]" and not(Notes has "[Expired]") and isnotempty(ResultDescription)
     | summarize make_list(ResultType)
@@ -12,62 +12,49 @@ let _ExpectedLocations = toscalar(
 );
 let _ExpectedIPRanges = toscalar(
     union
-        (_GetWatchlist("IP-Vendors")
-        | where Vendor == "Microsoft"
-        ),
-        (_GetWatchlist("IP-CorporateCollaborators")
-        | where Notes has "[Egress]")
+        (_GetWatchlist("IP-CorporateCollaborators") | where Notes has "[Egress]"),
+        (_GetWatchlist("IP-Vendors") | where Vendor == "Microsoft" and Notes has "[HomeTenant]")
     | summarize make_list(IPAddress)
 );
-let _CorrelationIds = toscalar(
-    SigninLogs
-    | where ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)
-    | where not(AuthenticationDetails has "Incorrect password" or ResultType in (_UncompromisedResultTypes))
-    | where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPRanges))
-    | summarize make_list(CorrelationId)
-);
 SigninLogs
-| where CorrelationId in (_CorrelationIds) and not(RiskState in ("dismissed", "remediated"))
+| where ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)
+| where not(AuthenticationDetails has "Incorrect password" or RiskState == "remediated")
+| where not(ResultType in (_ExpectedResultTypes) and not(ResultDescription has "Sign-in was blocked by built-in protections due to high confidence of risk" or Status has "Sign-in was blocked by built-in protections due to high confidence of risk"))
+| where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPRanges))
 | summarize
-    arg_min(TimeGenerated, Type, UserPrincipalName, UserDisplayName, Location, ResultDescription, DeviceDetail),
-    ClientAppUsed = make_set(ClientAppUsed),
-    UserAgent = make_set(UserAgent),
-    AppDisplayName = make_set(AppDisplayName),
-    ResourceDisplayName = make_set(ResourceDisplayName),
-    AuthenticationDetails = make_set_if(AuthenticationDetails, not(AuthenticationDetails == "[]")),
-    RiskState = make_set_if(RiskState, not(RiskState == "none")),
-    RiskEventTypes = make_set_if(todynamic(RiskEventTypes), not(RiskEventTypes == "[]")),
-    RiskLevelDuringSignIn = make_set_if(RiskLevelDuringSignIn, not(RiskLevelDuringSignIn == "none")),
-    RiskLevelAggregated = make_set_if(RiskLevelAggregated, not(RiskLevelAggregated == "none")),
-    OriginalRequestId = make_set(OriginalRequestId),
-    CorrelationId = make_set(CorrelationId)
-    by UserId, IPAddress, ResultType
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    ResultTypes = make_set(ResultType),
+    Resources = make_set(ResourceDisplayName),
+    RiskStates = make_set_if(RiskState, not(RiskState == "none")),
+    RiskLevelsAggregated = make_set_if(RiskLevelAggregated, not(RiskLevelAggregated == "none")),
+    RiskEventTypes = make_set(todynamic(RiskEventTypes)),
+    CorrelationIds = make_set(CorrelationId),
+    arg_max(TimeGenerated, UserPrincipalName, UserDisplayName, Location, NetworkLocationDetails, ConditionalAccessStatus, ConditionalAccessPolicies)
+    by UserId, IPAddress, AppDisplayName, AppId, UserAgent, ClientAppUsed
 | extend AlertSeverity = case(
-    not(Location in (_ExpectedLocations)), "High",
-    not(ResultType == "53003"), "High", //Blocked by Conditional Access
     Location in (_ExpectedLocations), "Low",
     "High"
     )
 | project
-    TimeGenerated,
+    StartTime,
+    EndTime,
     UserPrincipalName,
     UserDisplayName,
     IPAddress,
     Location,
-    ResultType,
-    ResultDescription,
+    NetworkLocationDetails,
+    ResultTypes,
+    AppDisplayName,
+    Resources,
     ClientAppUsed,
     UserAgent,
-    AppDisplayName,
-    ResourceDisplayName,
-    DeviceDetail,
-    AuthenticationDetails,
-    RiskState,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    RiskStates,
+    RiskLevelsAggregated,
     RiskEventTypes,
-    RiskLevelDuringSignIn,
-    RiskLevelAggregated,
+    CorrelationIds,
+    AppId,
     UserId,
-    OriginalRequestId,
-    CorrelationId,
-    Type,
     AlertSeverity
