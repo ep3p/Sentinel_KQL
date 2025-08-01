@@ -10,17 +10,16 @@ let _ExpectedLocations = toscalar(
     | where Activity == "CorporateGeolocation"
     | summarize make_list(Auxiliar)
 );
-let _ExpectedIPRanges = toscalar(
-    union
-        (_GetWatchlist("IP-CorporateCollaborators") | where Notes has "[Egress]"),
-        (_GetWatchlist("IP-Vendors") | where Vendor == "Microsoft" and Notes has "[HomeTenant]")
-    | summarize make_list(IPAddress)
+let _ExpectedUsers = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "LegacyProtocolAuthentication"
+    | summarize make_list(ActorId)
 );
 SigninLogs
 | where ClientAppUsed in (legacy_auth_protocols) or UserAgent in (legacy_user_agents)
 | where not(AuthenticationDetails has "Incorrect password" or RiskState == "remediated")
 | where not(ResultType in (_ExpectedResultTypes) and not(ResultDescription has "Sign-in was blocked by built-in protections due to high confidence of risk" or Status has "Sign-in was blocked by built-in protections due to high confidence of risk"))
-| where not(isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPRanges))
+| where not(UserId in (_ExpectedUsers))
 | summarize
     StartTime = min(TimeGenerated),
     EndTime = max(TimeGenerated),
