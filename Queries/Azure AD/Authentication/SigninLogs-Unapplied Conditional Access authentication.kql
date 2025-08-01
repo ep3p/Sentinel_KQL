@@ -1,8 +1,7 @@
 SigninLogs
 | where ConditionalAccessStatus == "notApplied" and ConditionalAccessPolicies != "[]"
 | mv-apply ConditionalAccessPolicy = ConditionalAccessPolicies on (
-    extend PolicyResult = tostring(ConditionalAccessPolicy["result"])
-    | summarize ConditionalAccessPoliciesResults = make_set(PolicyResult)
+    summarize ConditionalAccessPoliciesResults = make_set(tostring(ConditionalAccessPolicy["result"]))
     )
 | where not(
     TokenIssuerType == "AzureADBackupAuth"
