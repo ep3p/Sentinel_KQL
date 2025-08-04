@@ -1,83 +1,73 @@
-let query_frequency = 1h;
-let query_period = 14d;
 let _HomeTenantId = toscalar(
-    _GetWatchlist("UUID-AADTenantIds")
+    _GetWatchlist("UUID-EntraIdTenantIds")
     | where Notes has "[HomeTenant]"
     | summarize make_list(TenantId)
 );
+let _SuccessResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has "[Success]"
+    | summarize make_list(ResultType)
+);
 let _ExcludedResultTypes = toscalar(
     _GetWatchlist("ResultType-SignInLogsErrorCodes")
-    | where Notes has_all ("[Success]", "[Interrupt]", "[Consent]")
+    | where Notes has_all ("[Success]", "[Interrupt]", "[Consent]") or Notes has_all ("[Success]", "[Interrupt]", "[Password]")
     | summarize make_list(ResultType)
 );
 let _ExcludedAppIds = toscalar(
-    _GetWatchlist("UUID-AADApps")
+    _GetWatchlist("UUID-EntraIdApps")
     | where Notes has "[ExcludedConditionalAccess]"
     | summarize make_list(AppId)
 );
-let _ExcludedADGroups = toscalar(
-    _GetWatchlist("SID-AuditADObjects")
-    | where Notes has "[ExcludedConditionalAccess]"
-    | summarize make_list(SAMAccountName)
-);
 let _ExcludedUserIds = toscalar(
-    IdentityInfo
-    | where TimeGenerated > ago(query_period)
-    | summarize arg_max(TimeGenerated, GroupMembership) by AccountObjectId
-    | mv-expand GroupMembership to typeof(string)
-    | where GroupMembership in (_ExcludedADGroups)
-    | summarize make_list(AccountObjectId)
-);
-let _TrustedNamedLocations = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
-    | where Activity == "TrustedNamedLocation"
-    | summarize make_list(SourceResource)
+    | where Notes has "[ExcludedConditionalAccess]"
+    | summarize make_list(ActorId)
 );
+// let _TrustedNamedLocations = toscalar(
+//     _GetWatchlist("Activity-ExpectedSignificantActivity")
+//     | where Activity == "TrustedNamedLocation"
+//     | summarize make_list(SourceResource)
+// );
 SigninLogs
-| where TimeGenerated > ago(query_frequency)
 | where not(AuthenticationRequirement == "multiFactorAuthentication") and not(ConditionalAccessStatus in ("failure", "notApplied")) and ResourceTenantId in (_HomeTenantId)
-| where not(ResultType in (_ExcludedResultTypes))
+| where ResultType in (_SuccessResultTypes) and not(ResultType in (_ExcludedResultTypes))
 | where not(AppId in (_ExcludedAppIds))
 | where not(UserId in (_ExcludedUserIds))
-| mv-apply NetworkLocationDetail = iff(NetworkLocationDetails == "[]", dynamic([""]), todynamic(NetworkLocationDetails)) on (
-    summarize
-        NetworkTypes = make_set(tostring(NetworkLocationDetail["networkType"])),
-        NetworkNames = make_set(tostring(NetworkLocationDetail["networkNames"][0]))
-    )
-| where not(NetworkTypes has_any ("trustedNamedLocation") or NetworkNames has_any (_TrustedNamedLocations))
+// | mv-apply NetworkLocationDetail = todynamic(NetworkLocationDetails) on (
+//     summarize
+//         NetworkTypes = make_set(tostring(NetworkLocationDetail["networkType"])),
+//         NetworkNames = make_set(tostring(NetworkLocationDetail["networkNames"][0]))
+//     )
+// | where not(NetworkTypes has_any ("trustedNamedLocation") or NetworkNames has_any (_TrustedNamedLocations))
 | summarize
     StartTime = min(CreatedDateTime),
     EndTime = max(CreatedDateTime),
     ResultTypes = array_sort_asc(make_set(ResultType)),
-    AppDisplayNames = array_sort_asc(make_set(AppDisplayName)),
-    ResourceDisplayNames = array_sort_asc(make_set(ResourceDisplayName)),
     UserAgents = array_sort_asc(make_set(UserAgent)),
-    AppIds = array_sort_asc(make_set(AppId)),
     CorrelationIds = array_sort_asc(make_set(CorrelationId)),
-    take_any(UserPrincipalName, UserDisplayName, Location, ConditionalAccessStatus, ConditionalAccessPolicies, DeviceDetail, AuthenticationRequirement, AuthenticationRequirementPolicies,NetworkLocationDetails, UserType, Category)
-    by UserId, IPAddress, ClientAppUsed, TokenIssuerType
+    arg_min(CreatedDateTime, *)
+    by UserId, IPAddress, AppId, ResourceIdentity
 | project
     StartTime,
     EndTime,
-    Category,
     UserPrincipalName,
     UserDisplayName,
     IPAddress,
     Location,
     NetworkLocationDetails,
     ResultTypes,
-    AppDisplayNames,
-    ResourceDisplayNames,
+    AppDisplayName,
+    ResourceDisplayName,
+    AuthenticationDetails,
     AuthenticationRequirement,
-    AuthenticationRequirementPolicies,
     ConditionalAccessStatus,
     ConditionalAccessPolicies,
     DeviceDetail,
     ClientAppUsed,
     UserAgents,
     TokenIssuerType,
+    AppId,
+    ResourceIdentity,
     UserType,
     UserId,
-    AppIds,
-    CorrelationIds,
-    AppDisplayNameSample = tostring(AppDisplayNames[0])
+    CorrelationIds
