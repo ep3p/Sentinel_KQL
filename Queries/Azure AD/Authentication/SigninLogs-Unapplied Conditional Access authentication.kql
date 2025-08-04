@@ -20,12 +20,11 @@ SigninLogs
     ResourceDisplayNames = array_sort_asc(make_set(ResourceDisplayName)),
     UserAgents = array_sort_asc(make_set(UserAgent)),
     CorrelationIds = array_sort_asc(make_set(CorrelationId)),
-    take_any(UserPrincipalName, UserDisplayName, Location, ConditionalAccessStatus, ConditionalAccessPolicies, DeviceDetail, AuthenticationRequirement, AuthenticationRequirementPolicies,NetworkLocationDetails, UserType, Category)
+    take_any(UserPrincipalName, UserDisplayName, Location, ConditionalAccessStatus, ConditionalAccessPolicies, DeviceDetail, AuthenticationRequirement, AuthenticationRequirementPolicies,NetworkLocationDetails, UserType)
     by UserId, IPAddress, ClientAppUsed, TokenIssuerType
 | project
     StartTime,
     EndTime,
-    Category,
     UserPrincipalName,
     UserDisplayName,
     IPAddress,
