@@ -1,7 +1,6 @@
 AuditLogs
 | where Category == "ApplicationManagement" and AADOperationType == "Update" //and OperationName == "Update Application" and Result == "success"
-| mv-expand TargetResource = TargetResources
-| mv-expand modifiedProperty = TargetResource["modifiedProperties"]
+| mv-expand modifiedProperty = TargetResources[0]["modifiedProperties"]
 | extend ModifiedProperty = tostring(modifiedProperty["displayName"])
 | where ModifiedProperty in ("AppIdentifierUri", "AppAddress")
 | extend
@@ -10,39 +9,39 @@ AuditLogs
 | where isnotempty(NewAddresses)
 | extend AddedAddresses = set_difference(NewAddresses, OldAddresses)
 | where array_length(AddedAddresses) > 0
-| mv-expand AddedAddress = AddedAddresses to typeof(string)
-| extend
-    ResourceDisplayName = tostring(TargetResource["displayName"]),
-    TargetResources = pack(OperationName, TargetResources)
+| extend AppDisplayName = tostring(TargetResources[0]["displayName"])
 | summarize
     TimeGenerated = min(TimeGenerated),
-    OperationNames = make_set(OperationName),
-    AddedAddresses = make_set(AddedAddresses),
-    OldAddresses = make_set(OldAddresses),
-    TargetResources = make_bag(TargetResources),
-    take_any(LoggedByService, Category, AADOperationType, AdditionalDetails, Identity, InitiatedBy)
-    by CorrelationId, Result, ResourceDisplayName, ModifiedProperty, AddedAddress
+    AddedAddresses = array_sort_asc(make_set(AddedAddresses)),
+    NewAddresses = array_sort_asc(make_set(NewAddresses)),
+    OldAddresses = array_sort_asc(make_set(OldAddresses)),
+    OperationNames = array_sort_asc(make_set(OperationName)),
+    TargetResources = make_bag(bag_pack(Id, TargetResources)),
+    OperationIds = make_list(Id),
+    take_any(*)
+    by CorrelationId, AppDisplayName, Result
 | extend
     Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
     InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
     IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| mv-expand AddedAddress = AddedAddresses to typeof(string)
 | project
     TimeGenerated,
+    LoggedByService,
     Category,
     AADOperationType,
-    Identity,
-    Initiator,
+    Initiator = coalesce(Initiator, Identity),
     IPAddress,
     OperationNames,
     Result,
-    ResourceDisplayName,
-    ModifiedProperty,
+    AppDisplayName,
     AddedAddress,
     AddedAddresses,
     OldAddresses,
-    InitiatorId,
-    InitiatedBy,
+    NewAddresses,
     AdditionalDetails,
+    InitiatedBy,
+    InitiatorId,
     TargetResources,
-    LoggedByService,
+    OperationIds,
     CorrelationId
