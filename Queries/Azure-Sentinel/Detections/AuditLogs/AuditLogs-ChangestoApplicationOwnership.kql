@@ -1,10 +1,7 @@
 AuditLogs
 | where LoggedByService == "Core Directory" and Category == "ApplicationManagement" and OperationName has "owner"
 | mv-apply modifiedProperty = TargetResources[0]["modifiedProperties"] on (
-    summarize modifiedProperties = make_bag(
-        bag_pack(tostring(modifiedProperty["displayName"]),
-            bag_pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])),
-                "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
+    summarize modifiedProperties = make_bag(bag_pack(tostring(modifiedProperty["displayName"]), bag_pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])), "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
     )
 | extend
     OwnerId = TargetResources[0]["id"],
@@ -16,10 +13,13 @@ AuditLogs
     IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
 | project
     TimeGenerated,
-    Identity,
+    LoggedByService,
+    Category,
+    AADOperationType,
     Initiator,
     IPAddress,
     OperationName,
+    Result,
     Owner,
     AppDisplayName,
     InitiatedBy,
