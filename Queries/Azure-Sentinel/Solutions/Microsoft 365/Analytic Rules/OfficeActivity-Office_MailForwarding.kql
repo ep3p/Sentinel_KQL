@@ -1,16 +1,23 @@
 let query_frequency = 1h;
 let query_period = 14d;
+let _Users =
+    IdentityInfo
+    | where TimeGenerated > ago(query_period)
+    | summarize arg_max(TimeGenerated, Department, CompanyName, JobTitle, MailAddress) by AccountObjectId, AccountSID
+;
 OfficeActivity
 | where TimeGenerated > ago(query_period)
-//| where OfficeWorkload == "Exchange"
-| where Operation in ("Set-Mailbox", "New-InboxRule", "Set-InboxRule")
+// | where OfficeWorkload == "Exchange"
+// | where Operation in ("New-InboxRule", "Set-InboxRule", "Set-Mailbox")
+| where Parameters has_any ("ForwardTo", "RedirectTo", "ForwardingSmtpAddress")
 | extend
     UserIdValues = extract_all(@'Microsoft Exchange Hosted Organizations\/(?P<Actor>[^\"]+)\"\s.+\s\"\w.+?Microsoft Exchange Hosted Organizations\/(?P<Target>[^\"]+)\"', dynamic(["Actor", "Target"]), UserId)[0]
 | extend
-    Actor = iff(isnotempty(UserIdValues), tostring(UserIdValues[0]), UserId),
-    Target = iff(isnotempty(UserIdValues), tostring(UserIdValues[1]), UserId)
+    ActorAccount = iff(isnotempty(UserIdValues), tostring(UserIdValues[0]), UserId),
+    TargetAccount = tolower(iff(isnotempty(UserIdValues), tostring(UserIdValues[1]), UserId))
+| project-away UserIdValues
 | mv-apply Parameter = todynamic(Parameters) on (
-    summarize ParametersDict = make_bag(pack(tostring(Parameter["Name"]), tostring(Parameter["Value"])))
+    summarize ParametersDict = make_bag(bag_pack(tostring(Parameter["Name"]), tostring(Parameter["Value"])))
     )
 | extend
     ForwardTo = iff(isnotempty(ParametersDict["ForwardTo"]), split(ParametersDict["ForwardTo"], ";"), dynamic([])),
@@ -18,13 +25,37 @@ OfficeActivity
     ForwardingSmtpAddress = iff(isnotempty(ParametersDict["ForwardingSmtpAddress"]), pack_array(trim_start(@"smtp:", tostring(ParametersDict["ForwardingSmtpAddress"]))), dynamic([]))
 | mv-expand DestinationEmailAddress = array_concat(ForwardTo, RedirectTo, ForwardingSmtpAddress) to typeof(string)
 | project-away ForwardTo, RedirectTo, ForwardingSmtpAddress
+| extend DestinationEmailAddress = tolower(DestinationEmailAddress)
+| where not(TargetAccount == DestinationEmailAddress)
 | as _Events
-| lookup kind=inner (
+| join kind=inner (
     _Events
-    | summarize TargetCount = dcount(Target), MaxTimeGenerated = max(TimeGenerated) by DestinationEmailAddress
-    | where TargetCount > 1 and MaxTimeGenerated > ago(query_frequency)
-    | project-away TargetCount, MaxTimeGenerated
+    | join kind=leftouter (
+        _Users
+        | project
+            Target_CompanyName = CompanyName,
+            Target_Department = Department,
+            Target_JobTitle = JobTitle,
+            Target_MailAddress = MailAddress
+        ) on $left.TargetAccount == $right.Target_MailAddress
+    | summarize
+        EndTime = max(TimeGenerated),
+        TargetCount = count_distinct(TargetAccount),
+        TargetBackgrounds = make_set_if(strcat(Target_CompanyName, Target_Department, Target_JobTitle), isnotempty(Target_Department) and isnotempty(Target_JobTitle) and isnotempty(Target_CompanyName)),
+        take_any(Target_CompanyName, Target_Department)
+        by DestinationEmailAddress
+    | where TargetCount > 1 and EndTime > ago(query_frequency)
+    | join kind=leftouter (
+        _Users
+        | project
+            Destination_CompanyName = CompanyName,
+            Destination_Department = Department,
+            Destination_MailAddress = MailAddress
+        ) on $left.DestinationEmailAddress == $right.Destination_MailAddress
+    | where not(array_length(TargetBackgrounds) == 1 and Target_CompanyName == Destination_CompanyName and Target_Department == Destination_Department)
+    | project-away TargetCount, EndTime
     ) on DestinationEmailAddress
+| project-away DestinationEmailAddress1
 | extend ClientIPValues = extract_all(@'\[?(::ffff:)?(?P<IPAddress>(\d+\.\d+\.\d+\.\d+)|[^\]]+)\]?([-:](?P<Port>\d+))?', dynamic(["IPAddress", "Port"]), ClientIP)[0]
 | extend
     IPAddress = tostring(ClientIPValues[0])//,
@@ -35,10 +66,11 @@ OfficeActivity
     OfficeWorkload,
     UserId,
     IPAddress,
-    Actor,
+    ActorAccount,
     Operation,
     ResultStatus,
-    Target,
+    TargetAccount,
     DestinationEmailAddress,
     OfficeObjectId,
-    Parameters
+    Parameters,
+    AppAccessContext
