@@ -22,10 +22,7 @@ IdentityInfo
     | where not(LoggedByService == "Self-service Password Management" and OperationName == "Self-service password reset flow activity progress" and (Result == "failure" or ResultDescription == "User submitted their user ID"))
     | where not(LoggedByService == "Core Directory" and OperationName has "update" and tostring(TargetResource["modifiedProperties"]) == "[]")
     | mv-apply modifiedProperty = TargetResource["modifiedProperties"] on (
-        summarize modifiedProperties = make_bag(
-            bag_pack(tostring(modifiedProperty["displayName"]),
-                bag_pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])),
-                    "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
+        summarize modifiedProperties = make_bag(bag_pack(tostring(modifiedProperty["displayName"]), bag_pack("oldValue", trim(@'[\"\s]+', tostring(modifiedProperty["oldValue"])), "newValue", trim(@'[\"\s]+', tostring(modifiedProperty["newValue"])))))
     )
     | where not(LoggedByService == "Core Directory" and OperationName has "update" and tostring(modifiedProperties["Action Client Name"]["newValue"]) == "DirectorySync")
     | where not(LoggedByService == "Core Directory" and OperationName has "Update user" and isnotempty(modifiedProperties["Included Updated Properties"]) and tostring(modifiedProperties["Included Updated Properties"]["newValue"]) in ("LastDirSyncTime", ""))
