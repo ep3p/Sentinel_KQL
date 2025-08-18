@@ -10,6 +10,7 @@ OfficeActivity
     RecordType,
     UserType,
     UserId,
+    ClientIP,
     Operation,
     ResultStatus,
     OfficeObjectId,
