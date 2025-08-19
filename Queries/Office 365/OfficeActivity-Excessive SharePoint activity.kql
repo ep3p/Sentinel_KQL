@@ -5,7 +5,7 @@ let query_lookback_end = 1d;
 let query_window_checks = 6;
 let score_threshold = 200000;
 let home_tenant_domain = toscalar(
-    _GetWatchlist("UUID-AADTenantIds")
+    _GetWatchlist("UUID-EntraIdTenantIds")
     | where Notes has "[HomeTenant]"
     | project trim_end(@"\.onmicrosoft\.com", OnMicrosoftDomain)
 );
@@ -18,14 +18,13 @@ let _DefaultSharePointAdministrators = toscalar(
 );
 OfficeActivity
 | where TimeGenerated > ago(2 * query_frequency)
-| where not(isempty(Site_Url)) and not(UserId in (_DefaultSharePointAdministrators))
+| where isnotempty(Site_Url) and not(UserId in (_DefaultSharePointAdministrators))
 // Don't consider sites that were visited in the previous days
 | join kind=leftanti(
     OfficeActivity
     | where TimeGenerated between (ago(query_period) .. ago(query_lookback_end))
     | where not(isempty(Site_Url)) and not(UserId in (_DefaultSharePointAdministrators))
-    )
-    on Site_Url, UserId//, OfficeObjectId
+    ) on Site_Url, UserId//, OfficeObjectId
 // Remove operations where site is the default SharePoint site, OfficeObjectIds usually will be default images/files
 | where not(Site_Url == sharepoint_url and Operation in ("FileAccessed", "FilePreviewed"))
 // Remove operations where the user accesses default images of a site
@@ -38,9 +37,9 @@ OfficeActivity
 | where not(OfficeWorkload == "SharePoint" and Operation in ("FileAccessed", "FileAccessedExtended")
     and SourceFileExtension == "js" and SourceRelativeUrl startswith "ClientSideAssets/")
 // Remove operations where the user accesses the default view of a site/folder
-| where not(OfficeWorkload == "SharePoint" and Operation == "FileAccessed" and SourceFileName == "AllItems.aspx")
+| where not(OfficeWorkload == "SharePoint" and Operation in ("FileAccessed", "FileAccessedExtended") and SourceFileName in ("AllPages.aspx", "AllItems.aspx", "allitems.aspx", "ByAuthor.aspx", "Thumbnails.aspx"))
 // Remove operations where the user accesses the default view of a site/folder
-| where not(OfficeWorkload == "OneDrive" and Operation == "FileAccessed" and SourceFileName == "All.aspx")
+| where not(OfficeWorkload == "OneDrive" and Operation in ("FileAccessed", "FileAccessedExtended") and SourceFileName == "All.aspx")
 // Remove presumably benign operations with high noise potential
 | where not(OfficeWorkload == "SharePoint" and Operation in ("FileSyncUploadedFull"))
 // Remove operations where the user visited his OneDrive personal folder
@@ -50,6 +49,8 @@ OfficeActivity
     and OfficeObjectId has strcat("_", replace(@'\.', '_', tostring(split(UserId, "@")[-1])))
     and SourceRelativeUrl has_any ("Documents/Microsoft Teams Chat Files", "Documents/Archivos de chat de Microsoft Teams")
     )
+// Remove operations of some characteristic jsons in Hub Sites
+| where not(OfficeWorkload == "SharePoint" and SourceRelativeUrl == "_catalogs/hubsite")// and SourceFileName matches regex @"[a-f0-9]{8}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{12}\-\d{4}\.json")
 // Custom enterprise filters
 // It is recommended you filter a few specific site/operation pairs of your tenant that might generate noise for this query
 // One example could be a welcome SharePoint site that is visited automatically by all users when opening a browser
