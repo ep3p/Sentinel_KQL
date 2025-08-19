@@ -1,4 +1,3 @@
-// This rule detects when an account makes operations with a high number of distinct SharePoint objects, that presumably where not accessed by this account in the previous days.
 let query_frequency = 1h;
 let query_period = 14d;
 let query_lookback_end = 1d;
