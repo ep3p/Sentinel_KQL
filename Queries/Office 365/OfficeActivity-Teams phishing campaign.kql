@@ -2,7 +2,7 @@ let query_frequency = 15m;
 let query_period = 30m;
 let threshold = 5;
 let _ExpectedDomains = toscalar(
-    _GetWatchlist("UUID-AADTenantIds")
+    _GetWatchlist("UUID-EntraIdTenantIds")
     | where Notes has "[ChatCreated]"
     | summarize make_list(TenantId)
 );
@@ -16,7 +16,7 @@ OfficeActivity
     RecipientOrganizationId = tostring(Members[1]["OrganizationId"]),
     RecipientDisplayName = tostring(Members[1]["DisplayName"]),
     RecipientUPN = tostring(Members[1]["UPN"])
-| where not(SenderOrganizationId in (_ExpectedDomains))
+| where isnotempty(SenderOrganizationId) and not(SenderOrganizationId in (_ExpectedDomains))
 | extend SenderOrganizationDomain = tostring(split(SenderUPN, "@")[-1])
 | as _Events
 | join kind=leftsemi (
