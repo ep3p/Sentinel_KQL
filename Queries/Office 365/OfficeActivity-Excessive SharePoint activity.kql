@@ -53,6 +53,7 @@ OfficeActivity
 // Custom enterprise filters
 // It is recommended you filter a few specific site/operation pairs of your tenant that might generate noise for this query
 // One example could be a welcome SharePoint site that is visited automatically by all users when opening a browser
+// Another example, you should exclude Microsoft Teams Chat Files in SourceRelativeUrl paths (both in English and your native language), for OneDrive
 | mv-expand QueryRange = range(now() - query_frequency + query_frequency/query_window_checks, now(), query_frequency/query_window_checks) to typeof(datetime)
 | where TimeGenerated between ((QueryRange - query_frequency) .. QueryRange)
 | summarize
