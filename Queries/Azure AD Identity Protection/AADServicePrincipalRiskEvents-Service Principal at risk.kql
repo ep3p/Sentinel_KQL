@@ -1,6 +1,5 @@
-// This query checks Azure AD Identity Protection risk detections for workload identities, and tries to summarize them, because Identity Protection does not trigger always a SecurityAlert for those events.
 let query_frequency = 1h;
-let query_period = 7d;
+let query_period = 14d;
 AADServicePrincipalRiskEvents
 | where TimeGenerated > ago(query_period)
 | summarize
@@ -10,7 +9,7 @@ AADServicePrincipalRiskEvents
 | where case(
     isnotempty(ConfirmedTimeGenerated), false,
     isempty(ActivityDateTime) and isempty(DetectedDateTime) and isnotempty(LastUpdatedDateTime) and RiskState == "dismissed", false,
-    RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed", false,
+    //RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed", false,
     true
     )
 | summarize arg_min(TimeGenerated, *) by ServicePrincipalId, RiskEventType, DetectionTimingType, RiskLevel, RiskState
@@ -18,7 +17,7 @@ AADServicePrincipalRiskEvents
 | extend AlertSeverity = strcat(toupper(substring(RiskLevel, 0, 1)), substring(RiskLevel, 1))
 | project
     TimeGenerated,
-    ServicePrincipalDisplayName, 
+    ServicePrincipalDisplayName,
     IpAddress,
     Location,
     OperationName,
