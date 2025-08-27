@@ -16,7 +16,7 @@ AuditLogs
     RoleAssignment_Result = Result,
     RoleAssignment,
     TargetType = tostring(TargetResources[0]["type"]),
-    Target = iff(isnotempty(TargetResources[0]["displayName"]), tostring(TargetResources[0]["displayName"]), tolower(TargetResources[0]["userPrincipalName"])),
+    Target = tolower(TargetResources[0]["userPrincipalName"]),
     TargetId = tostring(TargetResources[0]["id"]),
     RoleAssignment_InitiatedBy = InitiatedBy,
     RoleAssignment_TargetResources = TargetResources,
@@ -49,7 +49,7 @@ AuditLogs
         PermissionGrant_TargetResources = TargetResources,
         PermissionGrant_AdditionalDetails = AdditionalDetails,
         PermissionGrant_CorrelationId = CorrelationId
-) on AppServicePrincipalId
+    ) on AppServicePrincipalId
 | where PermissionGrant_TimeGenerated < RoleAssignment_TimeGenerated
 | project
     PermissionGrant_TimeGenerated,
