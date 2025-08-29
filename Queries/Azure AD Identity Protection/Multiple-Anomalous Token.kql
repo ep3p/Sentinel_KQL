@@ -1,127 +1,119 @@
-let query_frequency = 1h;
-let query_period = 3d;
-let disallowed_risks = dynamic(["high"]);
-SecurityAlert
+let query_frequency = 5m;
+let query_period = 2d;
+AADUserRiskEvents
 | where TimeGenerated > ago(query_period)
-| where ProductName has "Azure Active Directory Identity Protection" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Anomalous Token"
-| extend ExtendedProperties = todynamic(ExtendedProperties)
-| extend OriginalRequestId = tostring(ExtendedProperties["Request Id"])
-| summarize minTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by OriginalRequestId, AlertName, AlertSeverity
-| where minTimeGenerated > ago(query_frequency)
+| where Source == "IdentityProtection" and RiskEventType == "anomalousToken"
+| summarize FirstTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by Id
+| where FirstTimeGenerated > ago(query_frequency)
 | project
-    Alert_TimeGenerated = TimeGenerated,
-    ProductName,
-    AlertName,
-    Description,
-    AlertSeverity,
-    Status,
-    Tactics,
-    Techniques,
-    Entities,
-    ExtendedProperties,
-    OriginalRequestId
-| evaluate bag_unpack(ExtendedProperties, OutputColumnPrefix="Alert_", ignoredProperties=dynamic(["Alert generation status", "ProcessedBySentinel", "Request Id", "Tenant Login Source", "User Account", "User Name"]))
-| as _Alerts
+    //TimeGenerated,
+    ActivityDateTime,
+    DetectedDateTime,
+    Source,
+    Activity,
+    DetectionTimingType,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    IpAddress,
+    RequestId,
+    CorrelationId,
+    TokenIssuerType,
+    RiskEventType,
+    RiskDetail,
+    RiskLevel,
+    RiskState,
+    AdditionalInfo,
+    Id
+| extend AltAlertLink = strcat("https://entra.microsoft.com/#blade/Microsoft_AAD_IAM/RiskDetectionsBlade/riskState~/[]/userId/", UserId, "/riskLevel/[]/daysBack/90")// Someone wrote "90s" incorrectly in Defender XDR portal
+| join kind=leftouter (
+    SecurityAlert
+    | where ProviderName == "IPC" and ProductName == "Azure Active Directory Identity Protection" and AlertType == "AnomalousToken"
+    | summarize arg_max(TimeGenerated, *) by VendorOriginalId
+    | project
+        AlertName,
+        AlertSeverity,
+        Description,
+        AlertStatus = Status,
+        Entities,
+        ExtendedProperties,
+        VendorName,
+        ProviderName,
+        ProductName,
+        ProductComponentName,
+        RemediationSteps,
+        Tactics,
+        Techniques,
+        SubTechniques,
+        VendorOriginalId,
+        SystemAlertId,
+        CompromisedEntity,
+        AlertLink
+    ) on $left.Id == $right.VendorOriginalId
+| extend AlertLink = coalesce(AlertLink, AltAlertLink)
+| as _Events
 | lookup kind=leftouter (
-    union
-        (SigninLogs
-        | where TimeGenerated > ago(query_period)
-        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
-        | extend
-            DeviceDetail = tostring(DeviceDetail),
-            TimeReceived = _TimeReceived
-        ),
-        (AADNonInteractiveUserSignInLogs
-        | where TimeGenerated > ago(query_period)
-        | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
-        | extend TimeReceived = _TimeReceived
-        )
+    SigninLogs
+    | where TimeGenerated > ago(query_period)
+    //| where RiskEventTypes_V2 has "anomalousToken"
+    | where OriginalRequestId in (toscalar(_Events | summarize make_list(RequestId)))
+    | extend TimeReceived = _TimeReceived
     | summarize arg_max(TimeReceived, *) by OriginalRequestId
     | project
         TimeGenerated,
+        CreatedDateTime,
         Type,
-        UserPrincipalName,
-        UserDisplayName,
+        //UserDisplayName,
+        //UserPrincipalName,
+        //UserId,
+        AlternateSignInName,
+        //SignInIdentifier,
+        UserType,
         IPAddress,
+        AutonomousSystemNumber,
         Location,
+        NetworkLocationDetails,
         ResultType,
+        ResultSignature,
         ResultDescription,
         ClientAppUsed,
         AppDisplayName,
         ResourceDisplayName,
         DeviceDetail,
         UserAgent,
+        Status,
+        MfaDetail,
+        AuthenticationContextClassReferences,
         AuthenticationDetails,
-        ConditionalAccessStatus,
+        AuthenticationProcessingDetails,
+        AuthenticationProtocol,
         AuthenticationRequirement,
         AuthenticationRequirementPolicies,
-        RiskEventTypes,
-        RiskLevelDuringSignIn,
+        SessionLifetimePolicies,
+        //TokenIssuerType,
+        IncomingTokenType,
+        TokenProtectionStatusDetails,
+        ConditionalAccessStatus,
+        ConditionalAccessPolicies,
+        SignInLogs_RiskDetail = RiskDetail,
+        RiskEventTypes_V2,
         RiskLevelAggregated,
-        UserId,
-        OriginalRequestId,
-        CorrelationId
+        RiskLevelDuringSignIn,
+        SignInLogs_RiskState = RiskState,
+        HomeTenantId,
+        ResourceTenantId,
+        CrossTenantAccessType,
+        AppId,
+        ResourceIdentity,
+        UniqueTokenIdentifier,
+        SessionId,
+        OriginalRequestId//,
+        //CorrelationId
+    ) on $left.RequestId == $right.OriginalRequestId
+| where case(
+    // AlertStatus == "Resolved" and tostring(todynamic(ExtendedProperties)["State"]) == "Closed", false,
+    // RiskState == "dismissed" and RiskDetail == "aiConfirmedSigninSafe", false,
+    // RiskState == "remediated" and RiskDetail == "userChangedPasswordOnPremises", false,
+    SignInLogs_RiskState == "remediated" and SignInLogs_RiskDetail == "userPassedMFADrivenByRiskBasedPolicy", false,
+    true
     )
-    on OriginalRequestId
-// | extend
-//     DeviceDetail = todynamic(DeviceDetail),
-//     UserName = extract(@"([^\@]+)\@", 1, UserPrincipalName)
-// | extend ParsedDeviceName = extract_all(
-//     @'^(?P<UserName>.+)_(?P<App>AndroidForWork|AndroidEnterprise)_(?P<Month>[0-9]+)\/(?P<Day>[0-9]+)\/(?P<Year>[0-9]+)_(?P<Hour>[0-9]+\:[0-9]+\s[APM]+)$',
-//     dynamic(["UserName", "App", "Year", "Month", "Day"]),
-//     tostring(DeviceDetail.displayName)
-//     )[0]
-// | extend
-//     DeviceUserName = ParsedDeviceName[0],
-//     DeviceApp = ParsedDeviceName[1],
-//     DeviceRegistrationDate = make_datetime(toint(ParsedDeviceName[2]), toint(ParsedDeviceName[3]), toint(ParsedDeviceName[4]))
-| extend
-    Alert_State = column_ifexists("Alert_State", ""),
-    ["Alert_Detection Subcategory"] = column_ifexists("Alert_Detection Subcategory", "")
-| extend
-    BenignAlert = case(
-        // Remove cases where Identity Protection considers the alert solved
-        (Status == "Resolved" or Alert_State == "Closed"), true,
-        // // Remove cases where the device has been registered more than a week ago
-        // DeviceDetail.isCompliant == true and DeviceDetail.isManaged == true and UserName == DeviceUserName and DeviceApp in ("AndroidEnterprise", "AndroidForWork") and DeviceRegistrationDate < (TimeGenerated - 7d), true,
-        false
-    ),
-    // If a user is put at high risk, the alert severity should be High and the incident name should have the string "User at risk"
-    AlertSeverity = case(
-        RiskLevelAggregated in (disallowed_risks) or RiskLevelDuringSignIn in (disallowed_risks), "High",
-        AlertSeverity
-    ),
-    IncidentName = case(
-        RiskLevelAggregated in (disallowed_risks), strcat(AlertName, " - User at risk"),
-        AlertName
-    )
-// Remove benign cases where alert severity is not High
-| where not(BenignAlert and not(AlertSeverity in ("High")))
-//| project-away UserName, ParsedDeviceName, DeviceUserName, DeviceApp
-| project-reorder
-    TimeGenerated,
-    ProductName,
-    AlertName,
-    Description,
-    Alert_*,
-    Type,
-    UserPrincipalName,
-    UserDisplayName,
-    IPAddress,
-    Location,
-    ResultType,
-    ResultDescription,
-    ClientAppUsed,
-    AppDisplayName,
-    ResourceDisplayName,
-    DeviceDetail,
-    UserAgent,
-    AuthenticationDetails,
-    AlertSeverity,
-    RiskEventTypes,
-    RiskLevelDuringSignIn,
-    RiskLevelAggregated,
-    Entities,
-    UserId,
-    OriginalRequestId,
-    CorrelationId
