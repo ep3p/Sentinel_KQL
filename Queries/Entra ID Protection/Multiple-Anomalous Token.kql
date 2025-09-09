@@ -1,5 +1,10 @@
 let query_frequency = 5m;
 let query_period = 2d;
+let _ProxyASNs = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "VendorASN" and Notes has "[Proxy]"
+    | summarize make_list(Auxiliar)
+);
 AADUserRiskEvents
 | where TimeGenerated > ago(query_period)
 | where Source == "IdentityProtection" and RiskEventType == "anomalousToken"
@@ -115,6 +120,7 @@ AADUserRiskEvents
     // RiskState == "dismissed" and RiskDetail == "aiConfirmedSigninSafe", false,
     // RiskState == "remediated" and RiskDetail == "userChangedPasswordOnPremises", false,
     SignInLogs_RiskState == "remediated" and SignInLogs_RiskDetail == "userPassedMFADrivenByRiskBasedPolicy", false,
+    AutonomousSystemNumber in (_ProxyASNs) and tostring(DeviceDetail["isCompliant"]) == "true" and tostring(DeviceDetail["isManaged"]) == "true", false,
     true
     )
 | project
