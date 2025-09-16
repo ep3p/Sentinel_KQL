@@ -1,121 +1,222 @@
-let query_frequency = 1h;
-let query_period = 7d;
-let _HomeTenantDomains = toscalar(
-    _GetWatchlist("UUID-AADTenantIds")
-    | where Notes has "[HomeTenant]"
-    | summarize make_list(Domain)
-);
-let _UntrustedResultTypes = toscalar(
-    _GetWatchlist("ResultType-SignInLogsErrorCodes")
-    | where Notes has "[MFA]" and Notes has_any ("[Unconfigured]", "[NotCompliant]")
-    | summarize make_list(ResultType)
-);
-let _ImpossibleTravelAlerts = materialize(
-    SecurityAlert
-    | where TimeGenerated > ago(query_frequency)
-    | where ProductName has "Microsoft Cloud App Security" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Impossible travel activity"
-    | where CompromisedEntity has_any (_HomeTenantDomains)
-    | extend ExtendedProperties = todynamic(ExtendedProperties)
-    | project
-        Alert_TimeGenerated = TimeGenerated,
-        ProductName,
-        AlertName,
-        Description,
-        AlertSeverity,
-        Status,
-        Tactics,
-        Techniques,
-        Entities,
-        ExtendedProperties,
-        AlertLink
-    | lookup kind=leftouter
-        (AADUserRiskEvents
-        | where TimeGenerated > ago(query_period)
-        | where OperationName == "User Risk Detection" and Source == "MicrosoftCloudAppSecurity" and RiskEventType == "mcasImpossibleTravel"
-        | summarize arg_max(TimeGenerated, *) by Id
-        | mv-apply Auxiliar_AdditionalInfo = AdditionalInfo on (
-            where Auxiliar_AdditionalInfo["Key"] == "alertUrl"
-            | extend AlertLink = tostring(Auxiliar_AdditionalInfo["Value"])
-            )
-        | project
-            TimeGenerated,
-            UserDisplayName,
-            UserPrincipalName,
-            UserId,
-            AdditionalInfo,
-            OriginalRequestId = RequestId,
-            CorrelationId,
-            RiskDetail,
-            RiskLevel,
-            RiskState,
-            AlertLink
-        ) on AlertLink
-    | as _Alerts
-    | lookup kind=leftouter (
-        union
-            (SigninLogs
-            | where TimeGenerated > ago(query_period)
-            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
-            | extend
-                DeviceDetail = tostring(DeviceDetail),
-                TimeReceived = _TimeReceived
-            ),
-            (AADNonInteractiveUserSignInLogs
-            | where TimeGenerated > ago(query_period)
-            | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
-            | extend TimeReceived = _TimeReceived
-            )
-        | summarize
-            arg_max(TimeReceived, *),
-            MFASuccess_TimeGenerated = minif(TimeGenerated, ConditionalAccessStatus == "success" and AuthenticationRequirement == "multiFactorAuthentication")
-            by OriginalRequestId
-        | project
-            MFASuccess_TimeGenerated,
-            RiskEventTypes,
-            RiskLevelDuringSignIn,
-            RiskLevelAggregated,
-            OriginalRequestId
-        )
-        on OriginalRequestId
-);
-let _UntrustedUserIds = toscalar(
-    union
-        (_ImpossibleTravelAlerts
-        | join kind=innerunique (
-            SigninLogs
-            | where TimeGenerated > ago(query_period)
-            | where ResultType in (_UntrustedResultTypes)
-            | project UserId
-            )
-            on UserId
-        ),
-        (AuthenticationMethodChanges(query_period, toscalar(_ImpossibleTravelAlerts | summarize make_set(UserId)), false)
-        )
-    | summarize make_set(UserId)
-);
-_ImpossibleTravelAlerts
-| extend RecentlyConfiguredMFA = UserId in (_UntrustedUserIds)
-| extend BenignAlert = case(
-        // Remove cases where Defender for Cloud Apps considers the alert solved and the account had MFA configured long ago
-        RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed" and not(RecentlyConfiguredMFA), true,
-        false
+let query_frequency = 5m;
+let query_period = 2d;
+AADUserRiskEvents
+| where TimeGenerated > ago(query_period)
+| where Source == "MicrosoftCloudAppSecurity" and RiskEventType == "mcasImpossibleTravel"
+| summarize FirstTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by Id
+| where FirstTimeGenerated > ago(query_frequency)
+| mv-apply Auxiliar = AdditionalInfo on (
+    summarize AdditionalInfoBag = make_bag(bag_pack(tostring(Auxiliar["Key"]), Auxiliar["Value"]))
     )
-| where not(BenignAlert and AlertSeverity != "High")
+| extend VendorOriginalId = tostring(split(tostring(AdditionalInfoBag["alertUrl"]), "/")[-1])
 | project
-    Alert_TimeGenerated,
-    TimeGenerated,
-    ProductName,
-    AlertName,
-    Description,
-    AlertLink,
+    //TimeGenerated,
+    ActivityDateTime,
+    DetectedDateTime,
+    Source,
+    Activity,
+    DetectionTimingType,
     UserDisplayName,
     UserPrincipalName,
     UserId,
-    OriginalRequestId,
+    IpAddress,
+    RequestId,
     CorrelationId,
+    TokenIssuerType,
+    RiskEventType,
+    RiskDetail,
+    RiskLevel,
+    RiskState,
     AdditionalInfo,
-    ExtendedProperties,
-    Entities,
+    Id,
+    VendorOriginalId
+| extend AltAlertLink = strcat("https://entra.microsoft.com/#blade/Microsoft_AAD_IAM/RiskDetectionsBlade/riskState~/[]/userId/", UserId, "/riskLevel/[]/daysBack/90")// Someone wrote "90s" incorrectly in Defender XDR portal
+| join kind=leftouter (
+    SecurityAlert
+    | where ProviderName == "MCAS" and ProductName == "Microsoft Cloud App Security" and AlertType == "MCAS_ALERT_ANUBIS_DETECTION_VELOCITY"
+    | summarize arg_max(TimeGenerated, *) by VendorOriginalId
+    | project
+        AlertName,
+        AlertSeverity,
+        Description,
+        AlertStatus = Status,
+        Entities,
+        ExtendedProperties,
+        VendorName,
+        ProviderName,
+        ProductName,
+        ProductComponentName,
+        RemediationSteps,
+        Tactics,
+        Techniques,
+        SubTechniques,
+        VendorOriginalId,
+        SystemAlertId,
+        CompromisedEntity,
+        AlertLink
+    ) on VendorOriginalId
+| extend
+    AlertLink = coalesce(AlertLink, AltAlertLink),
+    ExtendedPropertiesDynamic = todynamic(ExtendedProperties)
+| extend
+    CloudApplications = split(ExtendedPropertiesDynamic["Cloud Applications"], ", "),
+    IPAddresses = split(ExtendedPropertiesDynamic["IP Addresses"], ", "),
+    Countries = split(ExtendedPropertiesDynamic["Countries"], ", ")
+| as _Events
+| lookup kind=leftouter (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period)
+    //| where RiskEventTypes_V2 has "mcasImpossibleTravel"
+    | where OriginalRequestId in (toscalar(_Events | summarize make_list(RequestId)))
+    | extend TimeReceived = _TimeReceived
+    | summarize arg_max(TimeReceived, *) by OriginalRequestId
+    | invoke UnifySignInLogs()
+    | project
+        TimeGenerated,
+        CreatedDateTime,
+        Type,
+        //UserDisplayName,
+        //UserPrincipalName,
+        //UserId,
+        AlternateSignInName,
+        SignInIdentifier,
+        UserType,
+        IPAddress,
+        AutonomousSystemNumber,
+        Location,
+        NetworkLocationDetails,
+        ResultType,
+        ResultSignature,
+        ResultDescription,
+        ClientAppUsed,
+        AppDisplayName,
+        ResourceDisplayName,
+        DeviceDetail,
+        UserAgent,
+        Status,
+        MfaDetail,
+        AuthenticationContextClassReferences,
+        AuthenticationDetails,
+        AuthenticationProcessingDetails,
+        AuthenticationProtocol,
+        AuthenticationRequirement,
+        AuthenticationRequirementPolicies,
+        SessionLifetimePolicies,
+        //TokenIssuerType,
+        IncomingTokenType,
+        TokenProtectionStatusDetails,
+        ConditionalAccessStatus,
+        ConditionalAccessPolicies,
+        SignInLogs_RiskDetail = RiskDetail,
+        RiskEventTypes,
+        RiskEventTypes_V2,
+        RiskLevelAggregated,
+        RiskLevelDuringSignIn,
+        SignInLogs_RiskState = RiskState,
+        HomeTenantId,
+        ResourceTenantId,
+        CrossTenantAccessType,
+        AppId,
+        ResourceIdentity,
+        UniqueTokenIdentifier,
+        SessionId,
+        OriginalRequestId//,
+        //CorrelationId
+    ) on $left.RequestId == $right.OriginalRequestId
+| where case(
+    // AlertStatus == "Resolved" and tostring(todynamic(ExtendedProperties)["State"]) == "Closed", false,
+    SignInLogs_RiskState == "dismissed" and SignInLogs_RiskDetail == "aiConfirmedSigninSafe", false,
+    SignInLogs_RiskState == "remediated" and SignInLogs_RiskDetail == "userPassedMFADrivenByRiskBasedPolicy", false,
+    true
+    )
+| project
+    //TimeGenerated,
+    ActivityDateTime,
+    DetectedDateTime,
+    Source,
+    Activity,
+    DetectionTimingType,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    IpAddress,
+    RequestId,
+    CorrelationId,
+    TokenIssuerType,
+    RiskEventType,
+    RiskDetail,
+    RiskLevel,
+    RiskState,
+    AdditionalInfo,
+    Id,
+    AlertName,
     AlertSeverity,
+    Description,
+    AlertStatus,
+    Entities,
+    ExtendedProperties,
+    VendorName,
+    ProviderName,
+    ProductName,
+    ProductComponentName,
+    RemediationSteps,
     Tactics,
-    Techniques
+    Techniques,
+    SubTechniques,
+    VendorOriginalId,
+    SystemAlertId,
+    CompromisedEntity,
+    AlertLink,
+    TimeGenerated,
+    CreatedDateTime,
+    Type,
+    //UserDisplayName,
+    //UserPrincipalName,
+    //UserId,
+    AlternateSignInName,
+    SignInIdentifier,
+    UserType,
+    IPAddress,
+    AutonomousSystemNumber,
+    Location,
+    NetworkLocationDetails,
+    CloudApplications,
+    IPAddresses,
+    Countries,
+    ResultType,
+    ResultSignature,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    Status,
+    MfaDetail,
+    AuthenticationContextClassReferences,
+    AuthenticationDetails,
+    AuthenticationProcessingDetails,
+    AuthenticationProtocol,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    SessionLifetimePolicies,
+    //TokenIssuerType,
+    IncomingTokenType,
+    TokenProtectionStatusDetails,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    SignInLogs_RiskDetail,
+    RiskEventTypes,
+    RiskEventTypes_V2,
+    RiskLevelAggregated,
+    RiskLevelDuringSignIn,
+    SignInLogs_RiskState,
+    HomeTenantId,
+    ResourceTenantId,
+    CrossTenantAccessType,
+    AppId,
+    ResourceIdentity,
+    UniqueTokenIdentifier,
+    SessionId//,
+    //OriginalRequestId,
+    //CorrelationId
