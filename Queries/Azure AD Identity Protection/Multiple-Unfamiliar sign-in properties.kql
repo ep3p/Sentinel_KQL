@@ -2,6 +2,10 @@ let query_frequency = 5m;
 let query_period = 2d;
 let office_365_id = "72782ba9-4490-4f03-8d82-562370ea3566";
 let office_home_id = "4765445b-32c6-49b0-83e6-1d93765276ca";
+let legacy_client_apps = dynamic(["Authenticated SMTP", "AutoDiscover", "Exchange ActiveSync", "Exchange Online PowerShell", "Exchange Web Services", "IMAP4", "MAPI Over HTTP", "Outlook Anywhere (RPC over HTTP)", "Outlook Service", "POP3", "Reporting Web Services", "Other clients"]);
+let legacy_auth_protocols = dynamic(["ropc"]);
+let legacy_user_agents = dynamic(["BAV2ROPC", "CBAinPROD", "CBAinTAR", "MSRPC"]);
+let suspicious_user_agents = dynamic(["fasthttp", "node-fetch", "python-requests"]);
 let _ExpectedASNs = toscalar(
     _GetWatchlist("Activity-ExpectedSignificantActivity")
     | where Activity == "CommonUserASN"
@@ -178,9 +182,21 @@ AADUserRiskEvents
     RiskState == "remediated" and RiskDetail == "userChangedPasswordOnPremises", false,
     RiskState == "remediated" and RiskDetail == "userPassedMFADrivenByRiskBasedPolicy", false,
     SignInLogs_RiskState == "remediated" and SignInLogs_RiskDetail == "userPassedMFADrivenByRiskBasedPolicy", false,
-    AutonomousSystemNumber in (_ExpectedASNs) and Location in (_CorporateGeolocations) and RiskLevel in ("low", "medium") and not((isempty(ResourceIdentity) and AppId == office_365_id) or ResourceIdentity == office_home_id or AppId in (_ShellApps)) and OperatingSystem in ("iOS", "Android", "Windows", "macOS"), false,
-    Location in (_CorporateGeolocations) and RiskLevel in ("low", "medium") and not((isempty(ResourceIdentity) and AppId == office_365_id) or ResourceIdentity == office_home_id or AppId in (_ShellApps)) and OperatingSystem in ("iOS", "Android", "Windows", "macOS") and HomeTenantId == ResourceTenantId and HomeTenantId == AppOwnerTenantId, false,
-    (isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses)) or (isempty(parse_ipv4(IPAddress)) and isnotempty(parse_ipv6(IPAddress)) and ipv6_is_in_any_range(IPAddress, _ExpectedIPAddresses)) and RiskLevel in ("low", "medium") and not((isempty(ResourceIdentity) and AppId == office_365_id) or ResourceIdentity == office_home_id or AppId in (_ShellApps)) and OperatingSystem in ("iOS", "Android", "Windows", "macOS"), false,
+    AutonomousSystemNumber in (_ExpectedASNs) and Location in (_CorporateGeolocations)
+        and not(UserAgent has_any (array_concat(legacy_user_agents, suspicious_user_agents)) or AuthenticationProtocol has_any (legacy_auth_protocols) or ClientAppUsed has_any (legacy_client_apps))
+        and not((isempty(ResourceIdentity) and AppId == office_365_id) or ResourceIdentity == office_home_id or AppId in (_ShellApps))
+        and RiskLevel in ("low", "medium")
+        and OperatingSystem in ("iOS", "Android", "Windows", "macOS"), false,
+    Location in (_CorporateGeolocations) and HomeTenantId == ResourceTenantId and HomeTenantId == AppOwnerTenantId
+        and not(UserAgent has_any (array_concat(legacy_user_agents, suspicious_user_agents)) or AuthenticationProtocol has_any (legacy_auth_protocols) or ClientAppUsed has_any (legacy_client_apps))
+        and not((isempty(ResourceIdentity) and AppId == office_365_id) or ResourceIdentity == office_home_id or AppId in (_ShellApps))
+        and RiskLevel in ("low", "medium")
+        and OperatingSystem in ("iOS", "Android", "Windows", "macOS"), false,
+    (isnotempty(parse_ipv4(IPAddress)) and ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses)) or (isempty(parse_ipv4(IPAddress)) and isnotempty(parse_ipv6(IPAddress)) and ipv6_is_in_any_range(IPAddress, _ExpectedIPAddresses))
+        and not(UserAgent has_any (array_concat(legacy_user_agents, suspicious_user_agents)) or AuthenticationProtocol has_any (legacy_auth_protocols) or ClientAppUsed has_any (legacy_client_apps))
+        and not((isempty(ResourceIdentity) and AppId == office_365_id) or ResourceIdentity == office_home_id or AppId in (_ShellApps))
+        and RiskLevel in ("low", "medium")
+        and OperatingSystem in ("iOS", "Android", "Windows", "macOS"), false,
     true
     )
 | project
