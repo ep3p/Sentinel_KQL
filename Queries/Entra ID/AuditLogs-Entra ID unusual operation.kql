@@ -3,6 +3,7 @@ AuditLogs
     OperationName has_any ("domain"), true,
     LoggedByService == "AAD Management UX" and Category == "Policy", true,
     LoggedByService == "Authentication Methods" and Category == "ApplicationManagement" and not(OperationName in ("PATCH UserAuthMethod.PatchSignInPreferencesAsync", "POST UserAuthMethod.SecurityInfoRegistrationCallback")), true,
+    InitiatedBy["user"]["displayName"] has_any ( "Office 365 Exchange Online", "Skype for Business Online", "Dataverse", "Office 365 SharePoint Online", "Microsoft Dynamics ERP") and not(LoggedByService == "Core Directory" and Category == "GroupManagement" and AADOperationType in ("Add", "Update", "Delete", "Assign", "Unassign")) and not(OperationName == "Set directory feature on tenant"), true,// https://dirkjanm.io/obtaining-global-admin-in-every-entra-id-tenant-with-actor-tokens/   
     false
     )
 | extend
