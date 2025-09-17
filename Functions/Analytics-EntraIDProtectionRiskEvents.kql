@@ -1,0 +1,400 @@
+// This query can help you to check Entra ID Protection risk events
+//
+// Click "Save as function", in Parameters write in the fields:
+// "timespan" "query_frequency" "90d"
+// "timespan" "query_period"    "90d"
+//
+// If you name the function "EntraIDProtectionRiskEvents", you can check the function with queries like the following:
+//
+// EntraIDProtectionRiskEvents()
+//
+// EntraIDProtectionRiskEvents(1h, 14d)
+//
+// EntraIDProtectionRiskEvents(90d, 90d)
+//
+// let query_frequency = 5m;
+// let query_period = 2d;
+//let Function = (query_frequency:timespan = 90d, query_period:timespan = 90d){
+let _SubstitutedDetections = toscalar(
+    _GetWatchlist("AlertName-SubstitutedDetections")
+    | where ProductName == "AADUserRiskEvents"
+    | summarize make_list(AlertName)
+);
+AADUserRiskEvents
+| where TimeGenerated > ago(query_period)
+| summarize
+    EventCount = count(),
+    (FirstTimeGenerated, FirstRiskState, FirstRiskDetail) = arg_min(TimeGenerated, RiskState, RiskDetail),
+    TimeGenerated = arg_max(TimeGenerated, *)
+    by Id
+| where TimeGenerated > ago(query_frequency)
+| where not(EventCount > 1 and FirstTimeGenerated < ago(query_frequency) and FirstRiskState == RiskState and FirstRiskDetail == RiskDetail)
+| extend FirstTimeGenerated = iff(FirstTimeGenerated == TimeGenerated, datetime(null), FirstTimeGenerated)
+| project
+    EventCount,
+    FirstTimeGenerated,
+    TimeGenerated,
+    ActivityDateTime,
+    DetectedDateTime,
+    Source,
+    Activity,
+    DetectionTimingType,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    IpAddress,
+    RequestId,
+    CorrelationId,
+    TokenIssuerType,
+    RiskEventType,
+    RiskLevel,
+    FirstRiskState,
+    FirstRiskDetail,
+    RiskState,
+    RiskDetail,
+    AdditionalInfo,
+    Id
+| mv-apply Auxiliar = AdditionalInfo on (
+    summarize AdditionalInfoBag = make_bag(bag_pack(tostring(Auxiliar["Key"]), Auxiliar["Value"]))
+    )
+| extend
+    VendorOriginalId = case(
+    Source == "IdentityProtection", Id,
+    Source == "MicrosoftCloudAppSecurity", tostring(split(tostring(AdditionalInfoBag["alertUrl"]), "/")[-1]),
+    Source == "Defender for Endpoint", substring(tostring(split(tostring(AdditionalInfoBag["alertUrl"]), "/")[-1]), 2),
+    Source == "Defender for Identity", substring(tostring(split(tostring(AdditionalInfoBag["alertUrl"]), "/")[-1]), 2),
+    "Unknown"),
+    AltAlertLink = strcat("https://entra.microsoft.com/#blade/Microsoft_AAD_IAM/RiskDetectionsBlade/riskState~/[]/userId/", UserId, "/riskLevel/[]/daysBack/90"),// Someone wrote "90s" incorrectly in Defender XDR portal
+    AltAlertName = case(
+        //RiskEventType == "adminConfirmedServicePrincipalCompromised", "",
+        //RiskEventType == "adminConfirmedUserCompromised", "",
+        RiskEventType == "anomalousServicePrincipalActivity", "Anomalous service principal activity",
+        RiskEventType == "anomalousToken", "Anomalous Token",
+        RiskEventType == "anomalousUserActivity", "Anomalous user activity",
+        RiskEventType == "anonymizedIPAddress", "Anonymous IP address",
+        RiskEventType == "attemptedPrtAccess", "Possible attempt to access Primary Refresh Token (PRT)",
+        RiskEventType == "attackerinTheMiddle", "Attacker in the Middle",
+        RiskEventType == "investigationsThreatIntelligence", "Microsoft Entra threat intelligence",
+        RiskEventType == "leakedCredentials", "Leaked credentials",
+        //RiskEventType == "maliciousApplication", "",
+        RiskEventType == "maliciousIPAddress", "Malicious IP address",// Sign-in from an IP address known to be malicious during or around the time of sign-in
+        RiskEventType == "mcasFinSuspiciousFileAccess", "Mass access to sensitive files",
+        RiskEventType == "mcasImpossibleTravel", "Impossible travel activity",
+        RiskEventType == "mcasSuspiciousInboxManipulationRules", "Suspicious inbox manipulation rule",
+        RiskEventType == "nationStateIP", "Verified threat actor IP",
+        RiskEventType == "newCountry", "Activity from infrequent country",
+        RiskEventType == "passwordSpray", "Password spray",
+        RiskEventType == "riskyIPAddress", "Activity from anonymous IP addresses", // AlertName will change according to anonymous proxy, Tor IP address, or botnet
+        RiskEventType == "suspectedKerberosSPNExposure", "Suspected Kerberos SPN exposure",
+        RiskEventType == "suspiciousAdditionsSensitiveGroup", "Suspicious additions to sensitive groups",
+        RiskEventType == "suspiciousAPITraffic", "Suspicious API Traffic",
+        //RiskEventType == "suspiciousApplication", "",
+        RiskEventType == "suspiciousBrowser", "Suspicious browser",
+        RiskEventType == "suspiciousInboxForwarding", "Suspicious inbox forwarding rule",
+        RiskEventType == "suspiciousSendingPatterns", "Suspicious sending patterns",
+        //RiskEventType == "suspiciousSignins", "",
+        RiskEventType == "tokenIssuerAnomaly", "Token issuer anomaly",
+        RiskEventType == "unfamiliarFeatures", "Unfamiliar sign-in properties",
+        RiskEventType == "unlikelyTravel", "Atypical travel",
+        RiskEventType == "userReportedSuspiciousActivity", "User reported suspicious activity",
+        "Unknown risk event"
+        ),
+    AltDescription = case(
+        // RiskEventType == "adminConfirmedServicePrincipalCompromised", "",
+        // RiskEventType == "adminConfirmedUserCompromised", "",
+        // RiskEventType == "anomalousServicePrincipalActivity", "",
+        RiskEventType == "anomalousToken", "Anomalous token indicates that there are abnormal characteristics in the token such as token duration and authentication from unfamiliar IP address",
+        // RiskEventType == "anomalousUserActivity", "",
+        RiskEventType == "anonymizedIPAddress", "Sign-in from an anonymous IP address (e.g. Tor browser, anonymizer VPNs)",
+        RiskEventType == "attemptedPrtAccess", "Possible attempt to access Primary Refresh Token (PRT) has been detected. A Primary Refresh Token (PRT) is a key artifact of Azure AD authentication on Windows 10, Windows Server 2016 and later versions, iOS, and Android devices. It is a JSON Web Token (JWT) that's specially issued to Microsoft first party token brokers to enable single sign-on (SSO) across the applications used on those devices. Attackers can attempt to access this resource to move laterally into organization or perform credential theft. For more information, read the Activity profile: Midnight Blizzard credential attacks Threat Analytics report: https://security.microsoft.com/threatanalytics3/e4aad043-a273-4f88-b65e-fdfc3996ec92/analystreport?",
+        // RiskEventType == "attackerinTheMiddle", "",
+        // RiskEventType == "investigationsThreatIntelligence", "",
+        RiskEventType == "leakedCredentials", "This risk event indicates that the user's valid credentials have been leaked",
+        // RiskEventType == "maliciousApplication", "",
+        RiskEventType == "maliciousIPAddress", "Sign-in from an IP address known to be malicious during or around the time of sign-in",
+        RiskEventType == "mcasFinSuspiciousFileAccess", "Mass access to sensitive files",
+        RiskEventType == "mcasImpossibleTravel", strcat("The user ", UserDisplayName, " (", UserPrincipalName, ") was involved in an impossible travel incident."),
+        RiskEventType == "mcasSuspiciousInboxManipulationRules", "A user's inbox rules were manipulated in a suspicious manner. An attacker might have gained access to a user's inbox and is manipulating rules to delete or move messages or folders to exfiltrate data from your organization.",
+        RiskEventType == "nationStateIP", "This risk detection type indicates sign-in activity that is consistent with known IP addresses associated with nation state actors or cyber crime groups, based on Microsoft Security Intelligence (MSTIC)",
+        RiskEventType == "newCountry", strcat("The user ", UserDisplayName, " (", UserPrincipalName, ") performed an activity from an infrequen country."),
+        RiskEventType == "passwordSpray", "Password spray attack detected",
+        RiskEventType == "riskyIPAddress", strcat("The anonymous IP address ", IpAddress, " was accessed by ", UserDisplayName, " (", UserPrincipalName, ")."),
+        RiskEventType == "suspectedKerberosSPNExposure", strcat(UserDisplayName, "sent a suspected kerberos Service Principal Name and exposed several accounts."),
+        RiskEventType == "suspiciousAdditionsSensitiveGroup", strcat(UserDisplayName, "added an object to a sensitive group."),
+        RiskEventType == "suspiciousAPITraffic", "This detection is to identify anomalous behavior by a user principal based on MS Graph and AAD Graph activity",
+        // RiskEventType == "suspiciousApplication", "",
+        // RiskEventType == "suspiciousBrowser", "",
+        RiskEventType == "suspiciousInboxForwarding", strcat("A suspicious inbox forwarding rule was set on the inbox of the user ", UserDisplayName, " (", UserPrincipalName, "). This may indicate that the user account is compromised, and that the mailbox is being used to exfiltrate information from your organization. "),
+        // RiskEventType == "suspiciousSendingPatterns", "",
+        // RiskEventType == "suspiciousSignins", "",
+        // RiskEventType == "tokenIssuerAnomaly", "",
+        RiskEventType == "unfamiliarFeatures", iff(
+            tostring(AdditionalInfoBag["riskReasons"][0]) == "NotSet",
+            "Sign-in with properties we have not seen recently for the given user",
+            strcat(
+                "The following properties of this sign-in are unfamiliar for the given user: ",
+                strcat_array(todynamic(replace_string(tostring(AdditionalInfoBag["riskReasons"]), "Unfamiliar", "")), ", "))
+            ),
+        RiskEventType == "unlikelyTravel", "Sign-in from an atypical location based on the user’s recent sign-ins",
+        // RiskEventType == "userReportedSuspiciousActivity", "",
+        "Unknown risk event description"
+        ),
+    AltProviderName = case(
+        Source == "IdentityProtection", "IPC",
+        Source == "MicrosoftCloudAppSecurity", "MCAS",
+        Source == "Defender for Endpoint", "MDATP",
+        Source == "Defender for Identity", "Azure Advanced Threat Protection",
+        ""
+        ),
+    AltProductName = case(
+        Source == "IdentityProtection", "Azure Active Directory Identity Protection",
+        Source == "MicrosoftCloudAppSecurity", "Microsoft Cloud App Security",
+        Source == "Defender for Endpoint", "Microsoft Defender Advanced Threat Protection",
+        Source == "Defender for Identity", "Azure Advanced Threat Protection",
+        ""
+        ),
+    AltAlertSeverity = strcat(toupper(substring(RiskLevel, 0, 1)), substring(RiskLevel, 1)),
+    //AltTactics = ,
+    AltTechniques = replace_regex(tostring(split(tostring(AdditionalInfoBag["mitreTechniques"]), ",")), @'(\")(T\d+)(\.\d+)(\")', @"\1\2\4"),
+    AltSubTechniques = replace_regex(tostring(split(tostring(AdditionalInfoBag["mitreTechniques"]), ",")), @'(\,)?(\"T\d+\")', @""),
+    AccountEntity = bag_pack("UserPrincipalName", UserPrincipalName, "AadUserId", UserId, "Type", "account"),
+    CloudLogonRequestEntity = bag_pack("RequestId", RequestId, "Type", "cloud-logon-request"),
+    IpEntity = bag_pack("Address", IpAddress, "Type", "ip"),
+    RelatedIpEntity = iff(isnotempty(tostring(AdditionalInfoBag["relatedLocation"]["clientIP"])), bag_pack("Address", tostring(AdditionalInfoBag["relatedLocation"]["clientIP"]), "Type", "ip") , dynamic(null))
+| extend AltEntities = array_concat(
+    iff(isnotempty(AccountEntity), pack_array(AccountEntity), dynamic(null)),
+    iff(isnotempty(CloudLogonRequestEntity), pack_array(CloudLogonRequestEntity), dynamic(null)),
+    iff(isnotempty(IpEntity), pack_array(IpEntity), dynamic(null)),
+    iff(isnotempty(RelatedIpEntity), pack_array(RelatedIpEntity), dynamic(null))
+    )
+| project-away AccountEntity, CloudLogonRequestEntity, IpEntity, RelatedIpEntity
+| mv-apply with_itemindex = Index_aux AltEntity = AltEntities on (
+    extend AltEntity = bag_merge(bag_pack("$id", tostring(Index_aux + 2)), AltEntity)
+    | summarize AltEntities = make_list(AltEntity)
+    )
+| join kind=leftouter (
+    SecurityAlert
+    | where TimeGenerated > ago(query_period)
+    // | where ProviderName in ("IPC", "MCAS", "Azure Advanced Threat Protection", "MDATP")
+    //      and ProductName in ("Azure Active Directory Identity Protection", "Microsoft Cloud App Security", "Azure Advanced Threat Protection", "Microsoft Defender Advanced Threat Protection")
+    | where isnotempty(VendorOriginalId)
+    | summarize arg_max(TimeGenerated, *) by VendorOriginalId
+    | project
+        AlertName,
+        AlertSeverity,
+        Description,
+        AlertStatus = Status,
+        Entities,
+        ExtendedProperties,
+        VendorName,
+        ProviderName,
+        ProductName,
+        ProductComponentName,
+        RemediationSteps,
+        Tactics,
+        Techniques,
+        SubTechniques,
+        VendorOriginalId,
+        SystemAlertId,
+        CompromisedEntity,
+        AlertLink,
+        ConfidenceLevel,
+        ConfidenceScore,
+        ExtendedLinks
+    ) on VendorOriginalId
+| project-away VendorOriginalId1
+| mv-apply Entity = todynamic(Entities) on (
+    where tostring(Entity["Type"]) == "cloud-logon-session"
+    | summarize SessionIds = make_set(tostring(Entity["SessionId"]))
+    )
+| extend
+    AlertLink = coalesce(AlertLink, AltAlertLink),
+    AlertName = coalesce(AlertName, AltAlertName),
+    Description = coalesce(Description, AltDescription),
+    ProviderName = coalesce(ProviderName, AltProviderName),
+    ProductName = coalesce(ProductName, AltProductName),
+    AlertSeverity = coalesce(AlertSeverity, AltAlertSeverity),
+    Techniques = coalesce(Techniques, iff(array_length(todynamic(AltTechniques)) == 0, "", AltTechniques)),
+    SubTechniques = coalesce(SubTechniques, iff(array_length(todynamic(AltSubTechniques)) == 0, "", AltSubTechniques)),
+    Entities = coalesce(Entities, tostring(AltEntities))
+| project-away AltAlertName, AltDescription, AltProductName, AltProviderName, AltAlertSeverity, AltTechniques, AltSubTechniques, AltEntities
+| as _Events
+| lookup kind=leftouter (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period)
+    // | where RiskEventTypes in ("", "[]") or not(RiskEventTypes_V2 in ("", "[]"))
+    | where OriginalRequestId in (toscalar(_Events | summarize make_list(RequestId)))
+    | extend TimeReceived = _TimeReceived
+    | summarize arg_max(TimeReceived, *) by OriginalRequestId
+    | invoke UnifySignInLogs()
+    | project
+        SignInLogs_TimeGenerated = TimeGenerated,
+        CreatedDateTime,
+        Type,
+        //UserDisplayName,
+        //UserPrincipalName,
+        //UserId,
+        AlternateSignInName,
+        SignInIdentifier,
+        UserType,
+        IPAddress,
+        AutonomousSystemNumber,
+        Location,
+        NetworkLocationDetails,
+        ResultType,
+        ResultSignature,
+        ResultDescription,
+        ClientAppUsed,
+        AppDisplayName,
+        ResourceDisplayName,
+        DeviceDetail,
+        UserAgent,
+        Status,
+        MfaDetail,
+        AuthenticationContextClassReferences,
+        AuthenticationDetails,
+        AuthenticationProcessingDetails,
+        AuthenticationProtocol,
+        AuthenticationRequirement,
+        AuthenticationRequirementPolicies,
+        SessionLifetimePolicies,
+        //TokenIssuerType,
+        IncomingTokenType,
+        TokenProtectionStatusDetails,
+        ConditionalAccessStatus,
+        ConditionalAccessPolicies,
+        SignInLogs_RiskDetail = RiskDetail,
+        RiskEventTypes,
+        RiskEventTypes_V2,
+        RiskLevelAggregated,
+        RiskLevelDuringSignIn,
+        SignInLogs_RiskState = RiskState,
+        HomeTenantId,
+        ResourceTenantId,
+        CrossTenantAccessType,
+        AppId,
+        ResourceIdentity,
+        UniqueTokenIdentifier,
+        SessionId,
+        OriginalRequestId//,
+        //CorrelationId
+    ) on $left.RequestId == $right.OriginalRequestId
+| where case(
+    RiskEventType in (_SubstitutedDetections), false,
+    Source in ("MicrosoftCloudAppSecurity", "Defender for Endpoint", "Defender for Identity"), false,
+    //AlertStatus == "Resolved" and tostring(todynamic(ExtendedProperties)["State"]) == "Closed", false,
+    //RiskState == "dismissed" and RiskDetail == "aiConfirmedSigninSafe", false,
+    RiskState == "remediated" and RiskDetail in ("userChangedPasswordOnPremises", "userPassedMFADrivenByRiskBasedPolicy"), false,
+    RiskState == "confirmedSafe" and RiskDetail == "adminConfirmedAccountSafe", false,
+    RiskState == "dismissed" and RiskDetail == "adminDismissedAllRiskForUser", false,
+    true
+    // Risk details
+    // "adminConfirmedAccountSafe",
+    // "adminConfirmedSigninCompromised",
+    // "adminConfirmedSigninSafe",
+    // "adminConfirmedUserCompromised",
+    // "adminDismissedAllRiskForUser",
+    // "adminGeneratedTemporaryPassword",
+    // "aiConfirmedSigninSafe",
+    // "hidden",
+    // "m365DAdminDismissedDetection",
+    // "unknownFutureValue",
+    // "userChangedPasswordOnPremises",
+    // "userPassedMFADrivenByRiskBasedPolicy",
+    // "userPerformedSecuredPasswordChange",
+    // "userPerformedSecuredPasswordReset"
+    )
+| project
+    EventCount,
+    FirstTimeGenerated,
+    TimeGenerated,
+    ActivityDateTime,
+    DetectedDateTime,
+    Source,
+    Activity,
+    DetectionTimingType,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    IpAddress,
+    RequestId,
+    CorrelationId,
+    SessionIds,
+    TokenIssuerType,
+    RiskEventType,
+    RiskLevel,
+    FirstRiskState,
+    FirstRiskDetail,
+    RiskState,
+    RiskDetail,
+    AdditionalInfo,
+    Id,
+    AlertName,
+    AlertSeverity,
+    Description,
+    AlertStatus,
+    Entities,
+    ExtendedProperties,
+    VendorName,
+    ProviderName,
+    ProductName,
+    ProductComponentName,
+    RemediationSteps,
+    Tactics,
+    Techniques,
+    SubTechniques,
+    VendorOriginalId,
+    SystemAlertId,
+    CompromisedEntity,
+    AlertLink,
+    SignInLogs_TimeGenerated,
+    CreatedDateTime,
+    Type,
+    //UserDisplayName,
+    //UserPrincipalName,
+    //UserId,
+    AlternateSignInName,
+    SignInIdentifier,
+    UserType,
+    IPAddress,
+    AutonomousSystemNumber,
+    Location,
+    NetworkLocationDetails,
+    ResultType,
+    ResultSignature,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    Status,
+    MfaDetail,
+    AuthenticationContextClassReferences,
+    AuthenticationDetails,
+    AuthenticationProcessingDetails,
+    AuthenticationProtocol,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    SessionLifetimePolicies,
+    //TokenIssuerType,
+    IncomingTokenType,
+    TokenProtectionStatusDetails,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    SignInLogs_RiskDetail,
+    RiskEventTypes_V2,
+    RiskLevelAggregated,
+    RiskLevelDuringSignIn,
+    SignInLogs_RiskState,
+    HomeTenantId,
+    ResourceTenantId,
+    CrossTenantAccessType,
+    AppId,
+    ResourceIdentity,
+    UniqueTokenIdentifier,
+    SessionId//,
+    //OriginalRequestId,
+    //CorrelationId
+//};
+//Function(query_frequency, query_period)
