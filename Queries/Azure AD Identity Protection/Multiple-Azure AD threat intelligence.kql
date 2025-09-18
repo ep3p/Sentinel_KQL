@@ -2,83 +2,204 @@ let query_frequency = 5m;
 let query_period = 2d;
 AADUserRiskEvents
 | where TimeGenerated > ago(query_period)
-| where OperationName == "User Risk Detection" and Source == "IdentityProtection" and RiskEventType == "investigationsThreatIntelligence"
-| summarize minTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by Id
-| where minTimeGenerated > ago(query_frequency)
+| where Source == "IdentityProtection" and RiskEventType == "investigationsThreatIntelligence"
+| summarize FirstTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by Id
+| where FirstTimeGenerated > ago(query_frequency)
 | project
     //TimeGenerated,
-    OperationName,
+    ActivityDateTime,
+    DetectedDateTime,
     Source,
     Activity,
+    DetectionTimingType,
     UserDisplayName,
     UserPrincipalName,
     UserId,
+    IpAddress,
+    RequestId,
     CorrelationId,
+    TokenIssuerType,
     RiskEventType,
-    RiskState,
     RiskDetail,
-    RiskLevel
+    RiskLevel,
+    RiskState,
+    AdditionalInfo,
+    Id
+| extend AltAlertLink = strcat("https://entra.microsoft.com/#blade/Microsoft_AAD_IAM/RiskDetectionsBlade/riskState~/[]/userId/", UserId, "/riskLevel/[]/daysBack/90")// Someone wrote "90s" incorrectly in Defender XDR portal
+| join kind=leftouter (
+    SecurityAlert
+    | where ProviderName == "IPC" and ProductName == "Azure Active Directory Identity Protection"// and AlertType == ?
+    | summarize arg_max(TimeGenerated, *) by VendorOriginalId
+    | project
+        AlertName,
+        AlertSeverity,
+        Description,
+        AlertStatus = Status,
+        Entities,
+        ExtendedProperties,
+        VendorName,
+        ProviderName,
+        ProductName,
+        ProductComponentName,
+        RemediationSteps,
+        Tactics,
+        Techniques,
+        SubTechniques,
+        VendorOriginalId,
+        SystemAlertId,
+        CompromisedEntity,
+        AlertLink
+    ) on $left.Id == $right.VendorOriginalId
+| extend AlertLink = coalesce(AlertLink, AltAlertLink)
 | as _Events
 | lookup kind=leftouter (
-    (SigninLogs
+    SigninLogs
     | where TimeGenerated > ago(query_period)
-    | where CorrelationId in (toscalar(_Events | summarize make_list(CorrelationId))) and not(RiskState == "none")// and RiskEventTypes_V2 has "azureADThreatIntel"
-    | extend
-        DeviceDetail = tostring(DeviceDetail),
-        TimeReceived = _TimeReceived
-    )
-    | summarize
-        arg_max(TimeReceived, *)
-        by OriginalRequestId
+    //| where RiskEventTypes_V2 has "azureADThreatIntel"
+    | where OriginalRequestId in (toscalar(_Events | summarize make_list(RequestId)))
+    | extend TimeReceived = _TimeReceived
+    | summarize arg_max(TimeReceived, *) by OriginalRequestId
     | project
         TimeGenerated,
+        CreatedDateTime,
         Type,
-        // UserPrincipalName,
-        // UserDisplayName,
+        //UserDisplayName,
+        //UserPrincipalName,
+        //UserId,
+        AlternateSignInName,
+        SignInIdentifier,
+        UserType,
         IPAddress,
         AutonomousSystemNumber,
         Location,
+        NetworkLocationDetails,
         ResultType,
+        ResultSignature,
         ResultDescription,
         ClientAppUsed,
         AppDisplayName,
         ResourceDisplayName,
         DeviceDetail,
         UserAgent,
-        AuthenticationProtocol,
+        Status,
+        MfaDetail,
+        AuthenticationContextClassReferences,
         AuthenticationDetails,
+        AuthenticationProcessingDetails,
+        AuthenticationProtocol,
+        AuthenticationRequirement,
+        AuthenticationRequirementPolicies,
+        SessionLifetimePolicies,
+        //TokenIssuerType,
+        IncomingTokenType,
+        TokenProtectionStatusDetails,
         ConditionalAccessStatus,
         ConditionalAccessPolicies,
-        UserId,
-        OriginalRequestId,
-        CorrelationId
-    ) on UserId, CorrelationId
+        SignInLogs_RiskDetail = RiskDetail,
+        RiskEventTypes_V2,
+        RiskLevelAggregated,
+        RiskLevelDuringSignIn,
+        SignInLogs_RiskState = RiskState,
+        HomeTenantId,
+        ResourceTenantId,
+        CrossTenantAccessType,
+        AppId,
+        ResourceIdentity,
+        UniqueTokenIdentifier,
+        SessionId,
+        OriginalRequestId//,
+        //CorrelationId
+    ) on $left.RequestId == $right.OriginalRequestId
+| where case(
+    //AlertStatus == "Resolved" and tostring(todynamic(ExtendedProperties)["State"]) == "Closed", false,
+    //RiskState == "dismissed" and RiskDetail == "aiConfirmedSigninSafe", false,
+    RiskState == "remediated" and RiskDetail == "userChangedPasswordOnPremises", false,
+    true
+    )
 | project
-    TimeGenerated,
-    OperationName,
+    //TimeGenerated,
+    ActivityDateTime,
+    DetectedDateTime,
     Source,
     Activity,
+    DetectionTimingType,
     UserDisplayName,
     UserPrincipalName,
+    UserId,
+    IpAddress,
+    RequestId,
+    CorrelationId,
+    TokenIssuerType,
     RiskEventType,
-    RiskState,
     RiskDetail,
     RiskLevel,
+    RiskState,
+    AdditionalInfo,
+    Id,
+    AlertName,
+    AlertSeverity,
+    Description,
+    AlertStatus,
+    Entities,
+    ExtendedProperties,
+    VendorName,
+    ProviderName,
+    ProductName,
+    ProductComponentName,
+    RemediationSteps,
+    Tactics,
+    Techniques,
+    SubTechniques,
+    VendorOriginalId,
+    SystemAlertId,
+    CompromisedEntity,
+    AlertLink,
+    TimeGenerated,
+    CreatedDateTime,
     Type,
+    //UserDisplayName,
+    //UserPrincipalName,
+    //UserId,
+    AlternateSignInName,
+    SignInIdentifier,
+    UserType,
     IPAddress,
     AutonomousSystemNumber,
     Location,
+    NetworkLocationDetails,
     ResultType,
+    ResultSignature,
     ResultDescription,
     ClientAppUsed,
     AppDisplayName,
     ResourceDisplayName,
     DeviceDetail,
     UserAgent,
-    AuthenticationProtocol,
+    Status,
+    MfaDetail,
+    AuthenticationContextClassReferences,
     AuthenticationDetails,
+    AuthenticationProcessingDetails,
+    AuthenticationProtocol,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    SessionLifetimePolicies,
+    //TokenIssuerType,
+    IncomingTokenType,
+    TokenProtectionStatusDetails,
     ConditionalAccessStatus,
     ConditionalAccessPolicies,
-    UserId,
-    OriginalRequestId,
-    CorrelationId
+    SignInLogs_RiskDetail,
+    RiskEventTypes_V2,
+    RiskLevelAggregated,
+    RiskLevelDuringSignIn,
+    SignInLogs_RiskState,
+    HomeTenantId,
+    ResourceTenantId,
+    CrossTenantAccessType,
+    AppId,
+    ResourceIdentity,
+    UniqueTokenIdentifier,
+    SessionId//,
+    //OriginalRequestId,
+    //CorrelationId
