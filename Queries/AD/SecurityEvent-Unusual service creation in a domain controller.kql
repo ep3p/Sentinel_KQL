@@ -5,11 +5,18 @@ let _DomainControllers = toscalar(
     | where Service == "DomainController"
     | summarize make_list(HostName)
 );
+let _ExpectedInstalledServiceRegex = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "InstalledService_Regex"
+    | summarize RegEx = make_set(strcat(ActorPrincipalName, SourceResource, Auxiliar))
+    | extend RegEx = strcat(@"^(", strcat_array(RegEx, "|"), @")$")
+);
 SecurityEvent
 | where TimeGenerated > ago(query_period)
 | where EventID == 4697 and Computer has_any (_DomainControllers)
 | summarize arg_min(TimeGenerated, *) by Computer, Account, ServiceAccount, ServiceFileName, ServiceStartType, ServiceType
 | where TimeGenerated > ago(query_frequency)
+| where not(strcat(ServiceAccount, ServiceFileName, ServiceName) matches regex _ExpectedInstalledServiceRegex)
 | project
     TimeGenerated,
     Computer,
