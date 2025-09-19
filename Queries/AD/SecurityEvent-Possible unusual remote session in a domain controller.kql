@@ -5,6 +5,12 @@ let _DomainControllers = toscalar(
     | where Service == "DomainController"
     | summarize make_list(HostName)
 );
+let _ExpectedRemoteSessionAccounts = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "DomainControllerRemoteSession"
+    | summarize make_list(ActorPrincipalName)
+);
+let _ExpectedIPs = dynamic([]);
 union
     (
     SecurityEvent
@@ -12,7 +18,8 @@ union
     | where EventID == 4673 and Computer has_any (_DomainControllers)// and Process has "svchost.exe"
     | summarize
         Count = count(),
-        arg_min(TimeGenerated, *) by Computer, Account, Process
+        arg_min(TimeGenerated, *)
+        by Computer, Account, Process
     | where TimeGenerated > ago(query_frequency)
     ),
     (
@@ -27,7 +34,8 @@ union
     | summarize
         Count = count(),
         ObjectNames = array_sort_asc(make_set(ObjectName, 50)),
-        arg_min(TimeGenerated, *) by Computer, Account, ObjectType
+        arg_min(TimeGenerated, *)
+        by Computer, Account, ObjectType
     | where TimeGenerated > ago(query_frequency)
     ),
     (
@@ -37,9 +45,24 @@ union
     | summarize
         Count = count(),
         NewProcessNames = array_sort_asc(make_set(NewProcessName, 50)),
-        arg_min(TimeGenerated, *) by Computer, TargetAccount
+        arg_min(TimeGenerated, *)
+        by Computer, Account, TargetAccount
     | where TimeGenerated > ago(query_frequency)
     )
+| join kind=leftouter (
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where Computer has_any (_DomainControllers) and EventID == 4624 and not(LogonType in (3))
+    | project
+        Logon_TimeGenerated = TimeGenerated,
+        Computer,
+        Account,
+        Logon_IpAddress = IpAddress,
+        TargetLogonId
+    ) on Computer, Account, $left.SubjectLogonId == $right.TargetLogonId
+| project-away *1
+| where not(Account in (_ExpectedRemoteSessionAccounts) and Logon_IpAddress in (_ExpectedIPs))
+| where not(EventID == 4688 and TargetAccount in (_ExpectedRemoteSessionAccounts))
 | sort by Activity asc, Computer asc, Account asc, TargetAccount asc, TimeGenerated asc
 | project
     TimeGenerated,
@@ -56,4 +79,7 @@ union
     ProcessName,
     PrivilegeList,
     SubjectLogonId,
+    TargetLogonId,
+    Logon_TimeGenerated,
+    Logon_IpAddress,
     EventData
