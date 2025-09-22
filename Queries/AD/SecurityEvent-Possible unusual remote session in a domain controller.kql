@@ -10,7 +10,11 @@ let _ExpectedRemoteSessionAccounts = toscalar(
     | where Activity == "DomainControllerRemoteSession"
     | summarize make_list(ActorPrincipalName)
 );
-let _ExpectedIPs = dynamic([]);
+let _ExpectedIPs = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Notes has "[PAM]"
+    | summarize make_list(IPAddress)
+);
 union
     (
     SecurityEvent
