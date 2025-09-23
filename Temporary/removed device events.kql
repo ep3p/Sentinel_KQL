@@ -1,0 +1,75 @@
+let query_period = 15d;
+union
+    (
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID in (4722, 4725) and TargetAccount endswith "$"
+    | extend DisabledInAD = EventID == 4725
+    | project
+        TimeGenerated,
+        Account,
+        Activity,
+        TargetDomainName,
+        TargetUserName = trim_end(@'\$', TargetUserName),
+        TargetSid,
+        EventData,
+        DisabledInAD
+    | summarize arg_max(TimeGenerated, DisabledInAD) by TargetUserName, TargetDomainName
+    )
+    ,
+    (
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID == 5136 and EventData has_all ('<Data Name="AttributeLDAPDisplayName">dNSTombstoned</Data>', '<Data Name="AttributeValue">TRUE</Data>')
+    | extend
+        TombstonedInAD = EventData has '<Data Name="OperationType">%%14674</Data>',
+        TargetUserName = tostring(extract(@'\"ObjectDN\"\>[Dd][Cc]\=([^\,]+)\,', 1, EventData))
+    | project
+        TimeGenerated,
+        Account,
+        Activity,
+        SubjectAccount,
+        TargetDomainName = SubjectDomainName,
+        TargetUserName,
+        EventData,
+        TombstonedInAD
+    | summarize arg_max(TimeGenerated, TombstonedInAD) by TargetUserName, TargetDomainName
+    ),
+    (
+    AuditLogs
+    | where TimeGenerated > ago(query_period)
+    | where OperationName in ("Add device", "Delete device") and Result == "success"
+    | extend
+        DeviceName = tostring(TargetResources[0]["displayName"]),
+        DeletedInEntraID = OperationName has "Delete device"
+    | project
+        TimeGenerated,
+        Identity,
+        OperationName,
+        Result,
+        DeviceName,
+        InitiatedBy,
+        AdditionalDetails,
+        TargetResources,
+        TargetUserName = toupper(DeviceName),
+        DeletedInEntraID
+    | summarize arg_max(TimeGenerated, DeletedInEntraID) by TargetUserName
+    )
+| summarize
+    ADTimeGenerated = minif(TimeGenerated, isnotempty(DisabledInAD) or isnotempty(TombstonedInAD)),
+    EntraIDTimeGenerated = minif(TimeGenerated, isnotempty(DeletedInEntraID)),
+    take_any(TargetDomainName),
+    take_anyif(DisabledInAD, isnotempty(DisabledInAD)),
+    take_anyif(TombstonedInAD, isnotempty(TombstonedInAD)),
+    take_anyif(DeletedInEntraID, isnotempty(DeletedInEntraID))
+    by TargetUserName
+| where DisabledInAD or DeletedInEntraID
+| sort by ADTimeGenerated desc, EntraIDTimeGenerated desc
+| project
+    TargetDomainName,
+    Computer = TargetUserName,
+    ADTimeGenerated,
+    DisabledInAD,
+    TombstonedInAD,
+    EntraIDTimeGenerated,
+    DeletedInEntraID
