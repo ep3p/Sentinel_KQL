@@ -116,7 +116,7 @@ AADUserRiskEvents
         RiskEventType == "mcasImpossibleTravel", strcat("The user ", UserDisplayName, " (", UserPrincipalName, ") was involved in an impossible travel incident."),
         RiskEventType == "mcasSuspiciousInboxManipulationRules", "A user's inbox rules were manipulated in a suspicious manner. An attacker might have gained access to a user's inbox and is manipulating rules to delete or move messages or folders to exfiltrate data from your organization.",
         RiskEventType == "nationStateIP", "This risk detection type indicates sign-in activity that is consistent with known IP addresses associated with nation state actors or cyber crime groups, based on Microsoft Security Intelligence (MSTIC)",
-        RiskEventType == "newCountry", strcat("The user ", UserDisplayName, " (", UserPrincipalName, ") performed an activity from an infrequen country."),
+        RiskEventType == "newCountry", strcat("The user ", UserDisplayName, " (", UserPrincipalName, ") performed an activity from an infrequent country."),
         RiskEventType == "passwordSpray", "Password spray attack detected",
         RiskEventType == "riskyIPAddress", strcat("The anonymous IP address ", IpAddress, " was accessed by ", UserDisplayName, " (", UserPrincipalName, ")."),
         RiskEventType == "suspectedKerberosSPNExposure", strcat(UserDisplayName, "sent a suspected kerberos Service Principal Name and exposed several accounts."),
