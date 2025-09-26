@@ -1,61 +1,72 @@
 let query_frequency = 5m;
 let query_period = 2d;
-let query_wait = 30m;
-SecurityAlert
+AADUserRiskEvents
 | where TimeGenerated > ago(query_period)
-| where ProductName has "Microsoft Cloud App Security" and ProviderName != "ASI Scheduled Alerts" and AlertName has "Suspicious inbox forwarding rule"
-| summarize arg_min(TimeGenerated, *) by VendorOriginalId
-| where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
-| extend ExtendedProperties = todynamic(ExtendedProperties)
+| where Source == "MicrosoftCloudAppSecurity" and RiskEventType == "suspiciousInboxForwarding"
+| summarize FirstTimeGenerated = min(TimeGenerated), arg_max(TimeGenerated, *) by Id
+| where FirstTimeGenerated > ago(query_frequency)
+| mv-apply Auxiliar = AdditionalInfo on (
+    summarize AdditionalInfoBag = make_bag(bag_pack(tostring(Auxiliar["Key"]), Auxiliar["Value"]))
+    )
+| extend VendorOriginalId = tostring(split(tostring(AdditionalInfoBag["alertUrl"]), "/")[-1])
 | project
-    Alert_TimeGenerated = TimeGenerated,
-    ProductName,
-    AlertName,
-    Description,
-    AlertSeverity,
-    Alert_Status = Status,
-    Tactics,
-    Techniques,
-    SubTechniques,
-    Entities,
-    ExtendedProperties,
-    AlertLink,
-    VendorOriginalId,
-    SystemAlertId
-| lookup kind=leftouter (
-    AADUserRiskEvents
-    | where TimeGenerated > ago(query_period)
-    | where OperationName == "User Risk Detection" and Source == "MicrosoftCloudAppSecurity" and RiskEventType == "suspiciousInboxForwarding"
-    | summarize arg_max(TimeGenerated, *) by Id
-    | mv-apply Auxiliar_AdditionalInfo = AdditionalInfo on (
-        where Auxiliar_AdditionalInfo["Key"] == "alertUrl"
-        | extend VendorOriginalId = tostring(split(tostring(Auxiliar_AdditionalInfo["Value"]), "/")[-1])
-        )
+    //TimeGenerated,
+    ActivityDateTime,
+    DetectedDateTime,
+    Source,
+    Activity,
+    DetectionTimingType,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    IpAddress,
+    RequestId,
+    CorrelationId,
+    TokenIssuerType,
+    RiskEventType,
+    RiskDetail,
+    RiskLevel,
+    RiskState,
+    AdditionalInfo,
+    Id,
+    VendorOriginalId
+| extend AltAlertLink = strcat("https://entra.microsoft.com/#blade/Microsoft_AAD_IAM/RiskDetectionsBlade/riskState~/[]/userId/", UserId, "/riskLevel/[]/daysBack/90")// Someone wrote "90s" incorrectly in Defender XDR portal
+| join kind=leftouter (
+    SecurityAlert
+    | where ProviderName == "MCAS" and ProductName == "Microsoft Cloud App Security"// and AlertType == "MCAS_ALERT_ANUBIS_???"
+    | summarize arg_max(TimeGenerated, *) by VendorOriginalId
     | project
-        //TimeGenerated,
-        UserDisplayName,
-        UserPrincipalName,
-        UserId,
-        OriginalRequestId = RequestId,
-        CorrelationId,
-        RiskDetail,
-        RiskLevel,
-        RiskState,
-        DetectionTimingType,
-        AdditionalInfo,
-        VendorOriginalId
+        AlertName,
+        AlertSeverity,
+        Description,
+        AlertStatus = Status,
+        Entities,
+        ExtendedProperties,
+        VendorName,
+        ProviderName,
+        ProductName,
+        ProductComponentName,
+        RemediationSteps,
+        Tactics,
+        Techniques,
+        SubTechniques,
+        VendorOriginalId,
+        SystemAlertId,
+        CompromisedEntity,
+        AlertLink
     ) on VendorOriginalId
-| as _Alerts
+| extend
+    AlertLink = coalesce(AlertLink, AltAlertLink),
+    ExtendedPropertiesDynamic = todynamic(ExtendedProperties)
+| as _Events
 | lookup kind=leftouter (
     union SigninLogs, AADNonInteractiveUserSignInLogs
     | where TimeGenerated > ago(query_period)
-    | where OriginalRequestId in (toscalar(_Alerts | summarize make_list(OriginalRequestId))) and not(RiskState == "none")
+    //| where RiskEventTypes_V2 has "suspiciousInboxForwarding"
+    | where OriginalRequestId in (toscalar(_Events | summarize make_list(RequestId)))
     | extend TimeReceived = _TimeReceived
+    | summarize arg_max(TimeReceived, *) by OriginalRequestId
     | invoke UnifySignInLogs()
-    | summarize
-        arg_max(TimeReceived, *),
-        MFASuccess_CreatedDateTime = minif(CreatedDateTime, ConditionalAccessStatus == "success" and AuthenticationRequirement == "multiFactorAuthentication")
-        by OriginalRequestId
     | project
         TimeGenerated,
         CreatedDateTime,
@@ -71,6 +82,7 @@ SecurityAlert
         Location,
         NetworkLocationDetails,
         ResultType,
+        ResultSignature,
         ResultDescription,
         ClientAppUsed,
         AppDisplayName,
@@ -86,28 +98,118 @@ SecurityAlert
         AuthenticationRequirement,
         AuthenticationRequirementPolicies,
         SessionLifetimePolicies,
-        TokenIssuerType,
+        //TokenIssuerType,
         IncomingTokenType,
         TokenProtectionStatusDetails,
         ConditionalAccessStatus,
         ConditionalAccessPolicies,
-        //RiskDetail,
+        SignInLogs_RiskDetail = RiskDetail,
         RiskEventTypes,
+        RiskEventTypes_V2,
         RiskLevelAggregated,
         RiskLevelDuringSignIn,
-        //RiskState,
+        SignInLogs_RiskState = RiskState,
         HomeTenantId,
         ResourceTenantId,
         CrossTenantAccessType,
         AppId,
         ResourceIdentity,
+        UniqueTokenIdentifier,
         SessionId,
-        OriginalRequestId,
-        //CorrelationId,
-        MFASuccess_CreatedDateTime
-    ) on OriginalRequestId
-| where case(
-    AlertSeverity == "High", true,
-    RiskDetail == "aiConfirmedSigninSafe" and RiskState == "dismissed", false,
-    true
-    )
+        OriginalRequestId//,
+        //CorrelationId
+    ) on $left.RequestId == $right.OriginalRequestId
+// | where case(
+//     // AlertStatus == "Resolved" and tostring(todynamic(ExtendedProperties)["State"]) == "Closed", false,
+//     SignInLogs_RiskState == "dismissed" and SignInLogs_RiskDetail == "aiConfirmedSigninSafe", false,
+//     SignInLogs_RiskState == "remediated" and SignInLogs_RiskDetail == "userPassedMFADrivenByRiskBasedPolicy", false,
+//     true
+//     )
+| project
+    //TimeGenerated,
+    ActivityDateTime,
+    DetectedDateTime,
+    Source,
+    Activity,
+    DetectionTimingType,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    IpAddress,
+    RequestId,
+    CorrelationId,
+    TokenIssuerType,
+    RiskEventType,
+    RiskDetail,
+    RiskLevel,
+    RiskState,
+    AdditionalInfo,
+    Id,
+    AlertName,
+    AlertSeverity,
+    Description,
+    AlertStatus,
+    Entities,
+    ExtendedProperties,
+    VendorName,
+    ProviderName,
+    ProductName,
+    ProductComponentName,
+    RemediationSteps,
+    Tactics,
+    Techniques,
+    SubTechniques,
+    VendorOriginalId,
+    SystemAlertId,
+    CompromisedEntity,
+    AlertLink,
+    TimeGenerated,
+    CreatedDateTime,
+    Type,
+    //UserDisplayName,
+    //UserPrincipalName,
+    //UserId,
+    AlternateSignInName,
+    SignInIdentifier,
+    UserType,
+    IPAddress,
+    AutonomousSystemNumber,
+    Location,
+    NetworkLocationDetails,
+    ResultType,
+    ResultSignature,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    Status,
+    MfaDetail,
+    AuthenticationContextClassReferences,
+    AuthenticationDetails,
+    AuthenticationProcessingDetails,
+    AuthenticationProtocol,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    SessionLifetimePolicies,
+    //TokenIssuerType,
+    IncomingTokenType,
+    TokenProtectionStatusDetails,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    SignInLogs_RiskDetail,
+    RiskEventTypes,
+    RiskEventTypes_V2,
+    RiskLevelAggregated,
+    RiskLevelDuringSignIn,
+    SignInLogs_RiskState,
+    HomeTenantId,
+    ResourceTenantId,
+    CrossTenantAccessType,
+    AppId,
+    ResourceIdentity,
+    UniqueTokenIdentifier,
+    SessionId//,
+    //OriginalRequestId,
+    //CorrelationId
