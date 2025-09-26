@@ -1,3 +1,4 @@
+https://learn.microsoft.com/en-us/defender-cloud-apps/anomaly-detection-policy
 let query_frequency = 5m;
 let query_period = 2d;
 let _HomeTenantDomains = toscalar(
