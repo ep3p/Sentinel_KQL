@@ -1,7 +1,6 @@
 Anomalies
 | where RuleName endswith "Anomalous Role Assignment" and RuleStatus != "Flighting"
-| extend
-    Query = ExtendedLinks[0]["DetailBladeInputs"]
+| extend Query = ExtendedLinks[0]["DetailBladeInputs"]
 | project
     TimeGenerated,
     RuleName,
