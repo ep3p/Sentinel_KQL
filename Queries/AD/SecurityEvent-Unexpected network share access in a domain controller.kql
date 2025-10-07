@@ -5,11 +5,23 @@ let _DomainControllers = toscalar(
     | where Service == "DomainController"
     | summarize make_list(HostName)
 );
+let _ExpectedRemoteSessionAccounts = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "DomainControllerRemoteSession" and Notes has "[NetworkShareAccess]"
+    | summarize make_list(ActorPrincipalName)
+);
+let _ExpectedIPs = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Notes has "[PAM]"
+    | summarize make_list(IPAddress)
+);
 SecurityEvent
 | where TimeGenerated > ago(query_period)
 | where EventID == 5140 and Computer has_any (_DomainControllers) and not(ShareName in (@"\\*\SYSVOL", @"\\*\IPC$", @"\\*\NETLOGON"))
 | summarize arg_min(TimeGenerated, *) by Computer, Account, IpAddress, ShareLocalPath, ShareName
 | where TimeGenerated > ago(query_frequency)
+| where not(AccountType == "Machine" and IpAddress in ("127.0.0.1", "::1") and split(Account, @"\")[-1] == strcat(split(Computer, ".")[0], "$"))
+| where not(Account in (_ExpectedRemoteSessionAccounts) and IpAddress in (_ExpectedIPs))
 | project
     TimeGenerated,
     Computer,
