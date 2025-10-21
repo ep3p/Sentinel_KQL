@@ -1,0 +1,79 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let query_wait = 1h;
+OfficeActivity
+| where OfficeWorkload == "Exchange" and AppId == "<<<>>>" and ClientAppId == "<<<>>>"
+| extend
+    UniqueTokenId = tostring(AppAccessContext["UniqueTokenId"]),
+    InternetMessageId = case(
+        Operation == "MailItemsAccessed", tostring(todynamic(Folders)[0]["FolderItems"][0]["InternetMessageId"]),
+        Operation == "MoveToDeletedItems", tostring(todynamic(AffectedItems)[0]["InternetMessageId"]),
+        Operation == "Create", tostring(todynamic(Item)["InternetMessageId"]),
+        Operation == "Send", tostring(todynamic(Item)["InternetMessageId"]),
+        ""
+    ),
+    Path = case(
+        Operation == "MailItemsAccessed", tostring(todynamic(Folders)[0]["Path"]),
+        Operation == "MoveToDeletedItems", tostring(todynamic(AffectedItems)[0]["Path"]),
+        Operation == "Create", tostring(todynamic(Item)["ParentFolder"]["Path"]),
+        Operation == "Send", tostring(todynamic(Item)["ParentFolder"]["Path"]),
+        ""
+    ),
+    ImmutableId = case(
+        Operation == "MailItemsAccessed", tostring(todynamic(Folders)[0]["FolderItems"][0]["ImmutableId"]),
+        Operation == "MoveToDeletedItems", tostring(todynamic(AffectedItems)[0]["ImmutableId"]),
+        Operation == "Create", tostring(todynamic(Item)["ImmutableId"]),
+        Operation == "Send", tostring(todynamic(Item)["ImmutableId"]),
+        ""
+    ),
+    Attachments = case(
+        Operation == "Send", tostring(todynamic(Item)["Attachments"]),
+        ""
+    ),
+    Subject = case(
+        Operation == "MoveToDeletedItems", tostring(todynamic(AffectedItems)[0]["Subject"]),
+        Operation == "Create", tostring(todynamic(Item)["Subject"]),
+        Operation == "Send", tostring(todynamic(Item)["Subject"]),
+        ""
+    )
+| summarize
+    StartTime = min(TimeGenerated),
+    take_any(MailboxOwnerUPN),
+    Operations = make_bag(bag_pack(Operation, bag_pack_columns(InternetMessageId, Path, ImmutableId, Attachments, Subject)))
+    by MailboxGuid, ResultStatus, UniqueTokenId
+| where StartTime < ago(query_wait)
+| extend ExpectedFlow = case(
+    // Remove Simulated Phish
+    isnotempty(UniqueTokenId) and ResultStatus == "Succeeded"
+    and bag_keys(Operations) has_all ("MailItemsAccessed", "MoveToDeletedItems", "Send") //, "Create")
+    and Operations["MailItemsAccessed"]["InternetMessageId"] has "<<<>>>" and Operations["MoveToDeletedItems"]["InternetMessageId"] has "<<<>>>"
+    // and substring(tostring(Operations["Create"]["ImmutableId"]), 0, 58) == substring(tostring(Operations["Send"]["ImmutableId"]), 0, 58)
+    and substring(tostring(Operations["Send"]["ImmutableId"]), 0, 54) == substring(tostring(Operations["MailItemsAccessed"]["ImmutableId"]), 0, 54)
+    and Operations["Send"]["Subject"] startswith "Simulated Phish: "// and Operations["Create"]["Subject"] startswith "FW: "
+    and Operations["Send"]["Attachments"] has "Headers.txt ",
+    true,
+    // Expected flow for other phishing reports
+    isnotempty(UniqueTokenId) and ResultStatus == "Succeeded"
+    and bag_keys(Operations) has_all ("MailItemsAccessed", "Send")
+    and not(Operations["MailItemsAccessed"]["InternetMessageId"] has_all ("<<<>>>", "<<<>>>"))
+    //and substring(tostring(Operations["Create"]["ImmutableId"]), 0, 57) == substring(tostring(Operations["Send"]["ImmutableId"]), 0, 57)
+    and substring(tostring(Operations["Send"]["ImmutableId"]), 0, 54) == substring(tostring(Operations["MailItemsAccessed"]["ImmutableId"]), 0, 54)
+    and Operations["Send"]["Subject"] startswith "Potential Phish: "// and Operations["Create"]["Subject"] startswith "FW: "
+    and Operations["Send"]["Attachments"] has "Headers.txt ",
+    true,
+    false
+    )
+| extend
+    Path = tostring(Operations["MailItemsAccessed"]["Path"]),
+    InternetMessageId = tostring(Operations["MailItemsAccessed"]["InternetMessageId"]),
+    Subject = trim_start(@"FW\: ", tostring(Operations["Create"]["Subject"]))
+| project StartTime, MailboxOwnerUPN, MailboxGuid, UniqueTokenId, ExpectedFlow, ResultStatus, Operations, Path, InternetMessageId, Subject
+| sort by StartTime desc
+| extend RowNumber = row_number()
+| summarize
+    LastStartTime = max(StartTime),
+    FailuresInLastFive = countif(not(ExpectedFlow) and RowNumber <= 5),
+    FailuresInLastTen = countif(not(ExpectedFlow) and RowNumber <= 10),
+    FailuresInLastTwenty = countif(not(ExpectedFlow) and RowNumber <= 20),
+    FailuresInLastFifty = countif(not(ExpectedFlow) and RowNumber <= 50)
+| where LastStartTime > ago(query_frequency + query_wait) and FailuresInLastTen >= 9
