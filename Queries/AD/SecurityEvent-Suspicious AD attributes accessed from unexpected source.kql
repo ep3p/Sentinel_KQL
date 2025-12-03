@@ -1,5 +1,6 @@
 let query_frequency = 1h;
 let query_period = 14d;
+let object_threshold = 5;
 let _Dictionary =
     _GetWatchlist("Value-WindowsEventsDictionary")
     | project Value = tostring(Value), Translation
@@ -25,7 +26,7 @@ let _Identities =
 SecurityEvent
 | where TimeGenerated > ago(2 * query_frequency)
 | where EventID == 4662
-    and (AccessMask == "0x100" or AccessList == "%%7688" or Properties has "%%7688")
+    and (AccessMask in ("0x100", "0x10") or AccessList in ("%%7688", "%%7684") or Properties has_any ("%%7688", "%%7684"))
     and not(Account in (_ExpectedAccounts))
     and (Properties has_all (
             "612cb747-c0e8-4f92-9221-fdd5f15b550d", // unixUserPassword
@@ -55,7 +56,7 @@ SecurityEvent
     Properties = make_set_if(Properties, isnotempty(Properties), 50),
     take_any(Activity, OperationType, AccountType, SubjectUserName, AccessList, EventOriginId)
     by Computer, Account, AccessMask, ObjectType
-| where ObjectNameCount > 10
+| where ObjectNameCount > object_threshold
 | where not(ObjectNameCount < 100 and ObjectType has_any ("bf967aba-0de6-11d0-a285-00aa003049e2", "bf967a86-0de6-11d0-a285-00aa003049e2")) // User Computer
 | lookup kind=leftouter _Identities on SubjectUserName
 | project-away SubjectUserName
