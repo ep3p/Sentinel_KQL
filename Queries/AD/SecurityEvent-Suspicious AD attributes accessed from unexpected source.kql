@@ -41,7 +41,9 @@ SecurityEvent
         or Properties has_any (
             "7b8b558a-93a5-4af7-adca-c017e67f1057", // ms-DS-Group-Managed-Service-Account
             "ea715d30-8f53-40d0-bd1e-6109186d782c", // ms-FVE-RecoveryInformation
-            "43061ac1-c8ad-4ccc-b785-2bfac20fc60a"  // ms-FVE-RecoveryPassword
+            "43061ac1-c8ad-4ccc-b785-2bfac20fc60a", // ms-FVE-RecoveryPassword
+            "800d94d7-b7a1-42a1-b14d-7cae1423d07f", // ms-DS-Allowed-To-Delegate-To
+            "3f78c3e5-f79a-46bd-a0b8-9d18116ddc79"  // ms-DS-Allowed-To-Act-On-Behalf-Of-Other-Identity
         ))
 | summarize
     StartTime = min(TimeGenerated),
