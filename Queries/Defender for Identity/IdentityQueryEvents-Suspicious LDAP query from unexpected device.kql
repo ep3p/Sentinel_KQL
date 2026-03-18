@@ -54,6 +54,7 @@ IdentityQueryEvents
     DeviceName = tostring(DeviceNames[0]),
     DeviceNames,
     IPAddress,
+    AccountUsedToPerformQuery = AccountName,
     ActionType,
     Count,
     Protocol,
