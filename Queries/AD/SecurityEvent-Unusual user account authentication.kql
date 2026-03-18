@@ -1,0 +1,33 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _DomainControllers = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Service == "DomainController"
+    | summarize make_list(HostName)
+);
+SecurityEvent
+| where TimeGenerated > ago (query_period)
+| where EventID == 4624 and AccountType == "User" and Computer has_any (_DomainControllers)
+| summarize arg_min(TimeGenerated, *) by
+    LogonTypeName,
+    AuthenticationPackageName,
+    LmPackageName,
+    EmptyIpAddress = IpAddress in ("-", ""),
+    EmptyWorkstationName = WorkstationName in ("-", ""),
+    ElevatedToken,
+    IsAnonymousLogon = TargetAccount ==  @"NT AUTHORITY\ANONYMOUS LOGON"
+| where TimeGenerated > ago(query_frequency)
+| project
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    Activity,
+    LogonTypeName,
+    AuthenticationPackageName,
+    LmPackageName,
+    KeyLength,
+    EmptyIpAddress,
+    EmptyWorkstationName,
+    ElevatedToken,
+    IsAnonymousLogon
