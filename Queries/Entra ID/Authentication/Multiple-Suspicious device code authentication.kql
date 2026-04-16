@@ -1,0 +1,106 @@
+// In case you have not blocked yet Device Code
+let query_frequency = 5m;
+let query_period = 2d;
+let query_wait = 10m;
+union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs
+| where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
+| where AuthenticationProtocol == "deviceCode" and ResultType == 0
+| join kind=rightsemi (
+    union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs, ADFSSignInLogs
+    | where TimeGenerated > ago(query_period + query_wait)
+    ) on CorrelationId, UserId
+| summarize
+    IPAddresses = make_set_if(IPAddress, not(Type == "ADFSSignInLogs")),
+    ADFSIPAddresses = make_set_if(IPAddress, Type == "ADFSSignInLogs" and isnotempty(parse_ipv4(IPAddress)) and not(ipv4_is_private(IPAddress))),
+    Locations = make_set_if(Location, isnotempty(Location)),
+    AutonomousSystemNumbers = make_set_if(AutonomousSystemNumber, isnotempty(AutonomousSystemNumber)),
+    UserAgents = make_set_if(UserAgent, isnotempty(UserAgent)),
+    SessionIds = make_set_if(SessionId, isnotempty(SessionId)),
+    OriginalRequestId = take_anyif(OriginalRequestId, AuthenticationProtocol == "deviceCode" and ResultType == 0)
+    by CorrelationId, UserId
+| extend IPAddresses = set_union(IPAddresses, ADFSIPAddresses)
+| as _Auxiliar
+| mv-expand SessionId = iff(array_length(SessionIds) > 0, SessionIds, dynamic([""])) to typeof(string)
+| join kind=leftouter (
+    union SigninLogs, AADNonInteractiveUserSignInLogs// ADFSSignInLogs does not have a SessionId column
+    | where TimeGenerated between (ago(query_period + query_wait) .. ago(query_frequency + query_wait))
+    | where (isnotempty(SessionId) and SessionId in (toscalar(_Auxiliar | summarize make_set(SessionIds)))) and not(CorrelationId in (toscalar(_Auxiliar | summarize make_set(CorrelationId))))
+    | summarize
+        SessionPreviousIPAddresses = make_set(IPAddress),
+        SessionPreviousAutonomousSystemNumbers = make_set_if(AutonomousSystemNumber, isnotempty(AutonomousSystemNumber)),
+        SessionPreviousUserAgents = array_sort_asc(make_set_if(UserAgent, isnotempty(UserAgent)))
+        by UserId, SessionId
+    ) on UserId, SessionId
+| project-away UserId1, SessionId1
+| extend
+    NewIPAddresses = set_difference(IPAddresses, SessionPreviousIPAddresses),
+    NewAutonomousSystemNumbers = set_difference(AutonomousSystemNumbers, SessionPreviousAutonomousSystemNumbers),
+    NewUserAgents = array_sort_asc(set_difference(UserAgents, SessionPreviousUserAgents))
+| join kind=leftouter (
+    SigninLogs
+    | where TimeGenerated > ago(query_period + query_wait)
+    | where OriginalRequestId in (toscalar(_Auxiliar | summarize make_set(OriginalRequestId)))
+    | summarize arg_max(TimeGenerated, *) by OriginalRequestId, UserId
+    ) on UserId, OriginalRequestId
+| project-away UserId1, OriginalRequestId1, CorrelationId1, SessionId1
+| where case(
+    array_length(Locations) > 1, true,
+    array_length(NewAutonomousSystemNumbers) > 0 and array_length(SessionPreviousAutonomousSystemNumbers) > 0 , true,
+    array_length(NewIPAddresses) > 0 and array_length(SessionPreviousIPAddresses) > 0 , true,
+    //array_length(NewUserAgents) > 0 and array_length(SessionPreviousUserAgents) > 0 , true,
+    // Maybe you could check when the Location or the AutonomousSystemNumber is unexpected (if they are not in a Watchlist)
+    // Maybe you could check if the app/resource is not an expected one, for example if it is not Microsoft Azure CLI/04b07795-8ddb-461a-bbee-02f9e1bf7b46, or if it is Microsoft Office/d3590ed6-52b3-4102-aeff-aad2292ab01c
+    false
+    )
+| project
+    TimeGenerated,
+    CreatedDateTime,
+    Type,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    AlternateSignInName,
+    SignInIdentifier,
+    UserType,
+    Locations,
+    NewIPAddresses,
+    SessionPreviousIPAddresses,
+    NewAutonomousSystemNumbers,
+    SessionPreviousAutonomousSystemNumbers,
+    NewUserAgents,
+    SessionPreviousUserAgents,
+    SessionIds,
+    AuthenticationProtocol,
+    ResultType,
+    ResultSignature,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    Status,
+    MfaDetail,
+    AuthenticationContextClassReferences,
+    AuthenticationDetails,
+    AuthenticationProcessingDetails,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    SessionLifetimePolicies,
+    TokenIssuerType,
+    IncomingTokenType,
+    TokenProtectionStatusDetails,
+    ConditionalAccessStatus,
+    ConditionalAccessPolicies,
+    RiskDetail,
+    RiskEventTypes_V2,
+    RiskLevelAggregated,
+    RiskLevelDuringSignIn,
+    RiskState,
+    HomeTenantId,
+    ResourceTenantId,
+    CrossTenantAccessType,
+    AppId,
+    ResourceIdentity,
+    UniqueTokenIdentifier,
+    OriginalRequestId,
+    CorrelationId
