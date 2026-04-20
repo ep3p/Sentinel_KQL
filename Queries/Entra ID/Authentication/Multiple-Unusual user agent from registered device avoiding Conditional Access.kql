@@ -1,0 +1,68 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let _SuccessResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has_all ("[Success]", "[Complete]") and isnotempty(ResultDescription)
+    | summarize make_list(ResultType)
+);
+union SigninLogs, AADNonInteractiveUserSignInLogs
+| where TimeGenerated > ago(query_period)
+| where ResultType in (_SuccessResultTypes) and (DeviceDetail_dynamic has "trustType" or DeviceDetail_string has "trustType") and AADTenantId == ResourceTenantId
+| extend DeviceDetail = coalesce(DeviceDetail_dynamic, todynamic(DeviceDetail_string))
+| where isnotempty(DeviceDetail["operatingSystem"]) and isnotempty(DeviceDetail["browser"])
+| extend
+    OperatingSystemFamily = extract(@"^(\D+?)(\s*[Dot\.0-9]+)?$", 1, tostring(DeviceDetail["operatingSystem"])),
+    BrowserFamily = extract(@"^(\D+?)(\s*[v\.0-9]+)?$", 1, tostring(DeviceDetail["browser"]))
+| summarize arg_min(TimeGenerated, *) by OperatingSystemFamily, BrowserFamily
+| where TimeGenerated > ago(query_frequency)
+| where ConditionalAccessStatus == "notApplied"
+| project
+    TimeGenerated,
+    CreatedDateTime,
+    Type,
+    UserDisplayName,
+    UserPrincipalName,
+    UserId,
+    AlternateSignInName,
+    SignInIdentifier,
+    UserType,
+    IPAddress,
+    AutonomousSystemNumber,
+    Location,
+    NetworkLocationDetails,
+    ResultType,
+    ResultSignature,
+    ResultDescription,
+    ClientAppUsed,
+    AppDisplayName,
+    ResourceDisplayName,
+    DeviceDetail,
+    UserAgent,
+    Status = coalesce(tostring(Status_dynamic), Status_string),
+    MfaDetail = coalesce(tostring(MfaDetail_dynamic), MfaDetail_string),
+    AuthenticationContextClassReferences,
+    AuthenticationDetails,
+    AuthenticationProcessingDetails,
+    AuthenticationProtocol,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    SessionLifetimePolicies,
+    TokenIssuerType,
+    IncomingTokenType,
+    TokenProtectionStatusDetails = coalesce(tostring(TokenProtectionStatusDetails_dynamic), TokenProtectionStatusDetails_string),
+    ConditionalAccessStatus,
+    // ConditionalAccessPolicies = coalesce(tostring(ConditionalAccessPolicies_dynamic), ConditionalAccessPolicies_string),
+    SignInLogs_RiskDetail = RiskDetail,
+    RiskEventTypes_V2,
+    RiskLevelAggregated,
+    RiskLevelDuringSignIn,
+    SignInLogs_RiskState = RiskState,
+    HomeTenantId,
+    ResourceTenantId,
+    CrossTenantAccessType,
+    AppId,
+    ResourceIdentity,
+    UniqueTokenIdentifier,
+    SessionId,
+    OriginalRequestId,
+    CorrelationId
