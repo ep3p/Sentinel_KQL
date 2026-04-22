@@ -1,0 +1,57 @@
+AuditLogs
+| where OperationName == "Update device" and Result == "success"
+| mv-apply modifiedProperty = TargetResources[0]["modifiedProperties"] on (
+    summarize modifiedProperties = make_bag(bag_pack(tostring(modifiedProperty["displayName"]), bag_pack("oldValue", translate(@'["\]', "", tostring(modifiedProperty["oldValue"])), "newValue", translate(@'["\]', "", tostring(modifiedProperty["newValue"])))))
+    )
+| where isnotempty(tostring(modifiedProperties["CloudDeviceOSType"]["oldValue"])) or isnotempty(tostring(modifiedProperties["DeviceOSType"]["oldValue"]))
+| extend
+    CloudDeviceOSTypeOldValue = tolower(tostring(modifiedProperties["CloudDeviceOSType"]["oldValue"])),
+    CloudDeviceOSTypeNewValue = tolower(tostring(modifiedProperties["CloudDeviceOSType"]["newValue"])),
+    DeviceOSTypeOldValue = tolower(tostring(modifiedProperties["DeviceOSType"]["oldValue"])),
+    DeviceOSTypeNewValue = tolower(tostring(modifiedProperties["DeviceOSType"]["newValue"])),
+    DeviceObjectId = tostring(TargetResources[0]["id"]),
+    DeviceId = tostring(modifiedProperties["TargetId.DeviceId"]["newValue"]),
+    AuxiliarDeviceDisplayName = tostring(TargetResources[0]["displayName"])
+| summarize
+    StartTime = arg_min(TimeGenerated, *),
+    (EndTime, DeviceDisplayName) = arg_max(TimeGenerated, AuxiliarDeviceDisplayName),
+    OSTypeOldValues = array_sort_asc(make_set(pack_array(CloudDeviceOSTypeOldValue, DeviceOSTypeOldValue))),
+    OSTypeNewValues = array_sort_asc(make_set(pack_array(CloudDeviceOSTypeNewValue, DeviceOSTypeNewValue))),
+    CorrelationIds = make_set(CorrelationId)
+    by DeviceObjectId, DeviceId
+| where not(array_length(OSTypeOldValues) == 1 and OSTypeOldValues[0] == "unknown")
+| extend
+    OSTypeOldValuesReplaced = tostring(set_union(todynamic(replace_strings(tostring(OSTypeOldValues),
+        dynamic(["macmdm",  "iphone",   "ipad", "androidaosp",  "androidenterprise",    "androidforwork"]),
+        dynamic(["macos",   "ios",      "ios",  "android",      "android",              "android"])
+    )), dynamic([]))),
+    OSTypeNewValuesReplaced = tostring(set_union(todynamic(replace_strings(tostring(OSTypeNewValues),
+        dynamic(["macmdm",  "iphone",   "ipad", "androidaosp",  "androidenterprise",    "androidforwork"]),
+        dynamic(["macos",   "ios",      "ios",  "android",      "android",              "android"])
+    )), dynamic([])))
+| where not(OSTypeOldValuesReplaced == OSTypeNewValuesReplaced)
+| extend
+    Initiator = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["displayName"]), tostring(InitiatedBy["user"]["userPrincipalName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| project
+    StartTime,
+    EndTime,
+    LoggedByService,
+    Category,
+    AADOperationType,
+    Initiator,
+    IPAddress,
+    OperationName,
+    Result,
+    DeviceDisplayName,
+    DeviceId,
+    DeviceObjectId,
+    OSTypeOldValues,
+    OSTypeNewValues,
+    AdditionalDetails,
+    Identity,
+    InitiatorId,
+    InitiatedBy,
+    TargetResources,
+    CorrelationIds
