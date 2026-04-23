@@ -1,0 +1,107 @@
+let query_frequency = 4h;
+let query_period = 8h;
+let threshold = 4;
+union
+    (
+    AuditLogs
+    | where TimeGenerated > ago(query_period)
+    | where OperationName == "Add device" and Result == "success"
+    | mv-apply modifiedProperty = TargetResources[0]["modifiedProperties"] on (
+        summarize modifiedProperties = make_bag(bag_pack(tostring(modifiedProperty["displayName"]), translate(@'["\]', "", tostring(modifiedProperty["newValue"]))))
+        )
+    | extend
+        DeviceDisplayName = tostring(TargetResources[0]["displayName"]),
+        DeviceOSType = tostring(modifiedProperties["DeviceOSType"]),
+        DeviceObjectId = tostring(TargetResources[0]["id"]),
+        DeviceId = tostring(modifiedProperties["DeviceId"]),
+        UserId = extract(@"USER\-HWID\:([^\:\,]+)", 1, tostring(modifiedProperties["DevicePhysicalIds"]))
+    ),
+    (
+    AuditLogs
+    | where TimeGenerated > ago(query_period)
+    | where OperationName == "Register device" and Result == "success"
+    | mv-apply AdditionalDetail = AdditionalDetails on (
+        summarize ParsedAdditionalDetails = make_bag(bag_pack(tostring(AdditionalDetail["key"]), tostring(AdditionalDetail["value"])))
+        )
+    | extend
+        DeviceDisplayName = tostring(TargetResources[0]["displayName"]),
+        DeviceOSType = tostring(ParsedAdditionalDetails["Device OS"]),
+        IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"]),
+        DeviceId = tostring(ParsedAdditionalDetails["Device Id"]),
+        UserId = iif(isnotempty(InitiatedBy["app"]), tostring(InitiatedBy["app"]["servicePrincipalId"]), tostring(InitiatedBy["user"]["id"]))
+    )
+| summarize
+    StartTime = min(TimeGenerated),
+    OperationNames = array_sort_asc(make_set(OperationName)),
+    UserId = take_any(UserId),
+    IPAddress = take_any(IPAddress),
+    DeviceDisplayName = take_any(DeviceDisplayName),
+    DeviceOSType = take_any(DeviceOSType),
+    DeviceObjectId = take_any(DeviceObjectId),
+    TargetResources = make_bag(bag_pack(OperationName, TargetResources)),
+    CorrelationIds = make_set(CorrelationId)
+    by DeviceId//, UserId
+| join kind=leftouter (
+    IntuneOperationalLogs
+    | where TimeGenerated > ago(query_period)
+    | where OperationName == "Enrollment"
+    | extend Properties = todynamic(Properties)
+    | project
+        EnrollmentTimeGenerated = TimeGenerated,
+        EnrollmentResult = Result,
+        FailureReason = tostring(Properties["FailureReason"]),
+        DeviceId = tostring(Properties["AADDeviceId"]),
+        UserId = tostring(Properties["IntuneUserId"]),
+        IntuneDeviceId = tostring(Properties["IntuneDeviceId"]),
+        //EnrollmentDeviceOSType = tostring(Properties["Os"]),
+        EnrollmentProperties = Properties
+    ) on DeviceId//, UserId
+| project-away DeviceId1, UserId1
+| extend OperationNames = iff(isnotempty(EnrollmentTimeGenerated), set_union(OperationNames, dynamic(["Enrollment"])), OperationNames)
+| where isnotempty(UserId)
+// | where isnotempty(EnrollmentTimeGenerated)
+| as _Events
+| join kind=leftsemi (
+    _Events
+    | extend
+        Type = "AuditLogs",
+        TimeGenerated = StartTime
+    | evaluate activity_counts_metrics(Type, TimeGenerated, ago(query_period), now(), query_frequency, UserId)
+    | summarize
+        arg_min(PreviousTimeGenerated = TimeGenerated, PreviousCount = ["count"]),
+        arg_max(CurrentTimeGenerated = TimeGenerated, CurrentCount = ["count"])
+        by UserId
+    | where CurrentTimeGenerated > ago(query_period)
+    | extend PreviousCount = iff(PreviousTimeGenerated == CurrentTimeGenerated, 0, PreviousCount)
+    | where (not(PreviousCount > threshold) and CurrentCount > threshold)
+        or ((CurrentCount - PreviousCount) > threshold)
+    ) on UserId
+| join kind=leftouter (
+    IdentityInfo
+    | where TimeGenerated > ago(14d)
+    | summarize arg_max(TimeGenerated, AccountUPN, JobTitle) by AccountObjectId, AccountSID
+    | project
+        AccountObjectId,
+        UserPrincipalName = AccountUPN,
+        JobTitle
+    ) on $left.UserId == $right.AccountObjectId
+| project-away AccountObjectId
+| sort by UserId, StartTime asc
+| project
+    StartTime,
+    UserId,
+    UserPrincipalName,
+    JobTitle,
+    IPAddress,
+    DeviceDisplayName,
+    DeviceOSType,
+    DeviceId,
+    OperationNames,
+    EnrollmentTimeGenerated,
+    EnrollmentResult,
+    FailureReason,
+    EnrollmentProperties,
+    TargetResources,
+    IntuneDeviceId,
+    DeviceObjectId,
+    CorrelationIds
