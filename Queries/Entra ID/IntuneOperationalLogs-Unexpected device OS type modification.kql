@@ -1,0 +1,54 @@
+let query_frequency = 1h;
+let query_period = 14d;
+IntuneOperationalLogs
+| where TimeGenerated > ago(query_period)
+| extend Properties = todynamic(Properties)
+| extend
+    DeviceId = tostring(Properties["AADDeviceId"]),
+    DeviceName = tostring(Properties["DeviceName"]),
+    DeviceHostName = tostring(Properties["DeviceHostName"]),
+    DeviceNetBiosName = tostring(Properties["DeviceNetBiosName"]),
+    Os = tostring(Properties["Os"]),
+    OsVersion = tostring(Properties["OsVersion"]),
+    DeviceOperatingSystem = tostring(Properties["DeviceOperatingSystem"]),
+    UserId = tostring(Properties["IntuneUserId"]),
+    UserPrincipalName = iff(
+        isnotempty(Properties["UserName"]) and isnotempty(Properties["UPNSuffix"]),
+        strcat(tostring(Properties["UserName"]), "@", Properties["UPNSuffix"]),
+        ""
+        ),
+    IntuneDeviceId = tostring(Properties["IntuneDeviceId"])
+| where not(IntuneDeviceId == "00000000-0000-0000-0000-000000000000")
+| extend
+    OsType = coalesce(
+        tolower(Os),
+        replace_strings(
+            tolower(tostring(split(DeviceOperatingSystem, " ")[0])),
+            dynamic(["macmdm",  "iphone",   "ipad", "androidaosp",  "androidenterprise",    "androidforwork"]),
+            dynamic(["macos",   "ios",      "ios",  "android",      "android",              "android"])
+            )
+        )
+| where not(OsType == "unknown")
+| sort by TimeGenerated asc
+| summarize
+    StarTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    DeviceNames = array_sort_asc(make_set(set_difference(pack_array(DeviceName, DeviceHostName, DeviceNetBiosName), dynamic([""])))),
+    OperatingSystemTypes = array_sort_asc(make_set(OsType)),
+    take_any(DeviceId),
+    take_any(UserId),
+    take_any(UserPrincipalName),
+    Properties = make_list(bag_pack(OperationName, Properties))
+    by IntuneDeviceId
+| where array_length(OperatingSystemTypes) > 1
+| where EndTime > ago(query_frequency)
+| project
+    StarTime,
+    EndTime,
+    UserId,
+    UserPrincipalName,
+    DeviceId,
+    DeviceNames,
+    OperatingSystemTypes,
+    Properties,
+    IntuneDeviceId
