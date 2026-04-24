@@ -1,0 +1,39 @@
+let query_frequency = 1h;
+let query_period = 14d;
+DeviceNetworkInfo
+| where TimeGenerated > ago(query_period)
+| where isnotempty(DeviceName) and not(NetworkAdapterStatus == "Unknown")
+// | where not(NetworkAdapterType in ("Wwanpp", "Wireless80211"))
+| where isnotempty(NetworkAdapterVendor) // VMware, Inc.  PCS Systemtechnik GmbH
+| summarize arg_min(TimeGenerated, *) by DeviceId, NetworkAdapterType, NetworkAdapterVendor
+| join kind=inner (
+    DeviceInfo
+    | where TimeGenerated > ago(query_period)
+    | where isempty(MergedToDeviceId) and isnotempty(JoinType)
+    | summarize arg_max(TimeGenerated, *) by DeviceId
+    | project-away TimeGenerated
+    ) on DeviceId
+| project-away *1
+| as _Auxiliar
+| summarize arg_min(TimeGenerated, *) by JoinType, OSPlatform, NetworkAdapterType, NetworkAdapterVendor
+| where TimeGenerated > ago(query_frequency)
+| join kind=rightsemi _Auxiliar on JoinType, OSPlatform, NetworkAdapterType, NetworkAdapterVendor
+| project
+    TimeGenerated,
+    DeviceName,
+    OSPlatform,
+    NetworkAdapterType,
+    NetworkAdapterVendor,
+    JoinType,
+    PublicIP,
+    IPAddresses,
+    LoggedOnUsers,
+    DeviceType,
+    OnboardingStatus,
+    DeviceId,
+    AadDeviceId,
+    CloudPlatforms,
+    AzureResourceId,
+    AwsResourceName,
+    GcpFullResourceName,
+    MergedDeviceIds
