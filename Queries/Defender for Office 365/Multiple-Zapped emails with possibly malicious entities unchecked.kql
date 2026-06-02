@@ -1,0 +1,153 @@
+let query_frequency = 5m;
+let query_period = 2d;
+EmailPostDeliveryEvents
+| where TimeGenerated > ago(query_frequency)
+| where DetectionMethods has_any ("Phish", "Malware")
+| as _Auxiliar
+| project NetworkMessageId, ThreatTypes, DetectionMethods
+| join kind=inner (
+    EmailEvents
+    | where TimeGenerated > ago(query_period)
+    | where NetworkMessageId in (toscalar(_Auxiliar | summarize make_set(NetworkMessageId)))
+    | project-away ThreatTypes, DetectionMethods
+    ) on NetworkMessageId
+| project-away NetworkMessageId1
+| as _RetroactiveEmails
+| union (
+    EmailEvents
+    | where TimeGenerated > ago(query_period)
+    | where DetectionMethods has_any ("Phish", "Malware") and not(DeliveryAction == "Blocked")
+    | where not(NetworkMessageId in (toscalar(_RetroactiveEmails | summarize make_set(NetworkMessageId))))
+    )
+| where not(OrgLevelPolicy in ("Phishing simulation", "SecOps Mailbox"))
+| summarize arg_max(TimeGenerated, *) by NetworkMessageId, ReportId
+| mv-apply Phish = todynamic(DetectionMethods)["Phish"] to typeof(string), Malware = todynamic(DetectionMethods)["Malware"] to typeof(string) on (
+    where not(Phish has_any ("Spoof", "impersonation", "Unknown", "filter", "detonation reputation", "Fingerprint")) or isnotempty(Malware)
+    )
+| project-away Phish, Malware
+| as _Emails
+| join kind=leftouter (
+    EmailAttachmentInfo
+    | where TimeGenerated > ago(query_period)
+    | where NetworkMessageId in (toscalar(_Emails | summarize make_set(NetworkMessageId)))
+    | sort by FileType asc, FileName asc
+    | summarize
+        AttachedFiles = make_set(bag_pack_columns(FileName, FileType))
+        by NetworkMessageId
+    ) on NetworkMessageId
+| project-away NetworkMessageId1
+| join kind=leftouter (
+    EmailUrlInfo
+    | where TimeGenerated > ago(query_period)
+    | where NetworkMessageId in (toscalar(_Emails | summarize make_set(NetworkMessageId)))
+    | where not(UrlLocation == "Header" and Url contains "unsub")
+    | sort by Url asc
+    | summarize
+        Urls = make_set(bag_pack_columns(Url, UrlLocation)),
+        UrlLocations = array_sort_asc(make_set(UrlLocation))
+        by NetworkMessageId
+    ) on NetworkMessageId
+| project-away NetworkMessageId1
+| join kind=leftouter (
+    UrlClickEvents
+    | where TimeGenerated > ago(query_period)
+    | where NetworkMessageId in (toscalar(_Emails | summarize make_set(NetworkMessageId)))
+    | where isnotempty(Url)
+    | sort by Url asc
+    | summarize
+        Clicks = make_set(bag_pack_columns(Url, ActionType, AccountUpn, IPAddress, ThreatTypes, DetectionMethods)),
+        ClickActionTypes = array_sort_asc(make_set(ActionType)),
+        AllowedClickUrls = array_sort_asc(make_set_if(Url, ActionType == "ClickAllowed"))
+        by NetworkMessageId
+    ) on NetworkMessageId
+| project-away NetworkMessageId1
+| join kind=leftouter (
+    AlertEvidence
+    | where TimeGenerated > ago(query_period)
+    | where NetworkMessageId in (toscalar(_Emails | summarize make_set(NetworkMessageId)))
+    | distinct NetworkMessageId, AlertId
+    | join kind=inner (
+        AlertEvidence
+        | where TimeGenerated > ago(query_period)
+        | where isnotempty(RemoteUrl)
+        | project
+            AlertId,
+            Title,
+            RemoteUrl,
+            //AdditionalFields,
+            SourceEntityType = tostring(todynamic(AdditionalFields)["SourceEntityType"]),
+            LastVerdict = tostring(todynamic(AdditionalFields)["LastVerdict"])
+        ) on AlertId
+    | project-away AlertId1
+    | summarize
+        AlertIds = make_set(AlertId)
+        by NetworkMessageId, RemoteUrl, SourceEntityType, LastVerdict, Title
+    | summarize
+        Alerts = make_bag(bag_pack(Title, AlertIds))
+        by NetworkMessageId, RemoteUrl, SourceEntityType, LastVerdict
+    | summarize
+        AlertedUrls = make_set(bag_pack(RemoteUrl, Alerts)),
+        MaliciousUrls = array_sort_asc(make_set_if(RemoteUrl, SourceEntityType == "MaliciousUrl" or LastVerdict == "Malicious" or bag_keys(Alerts) has_any ("malicious URL")))
+        by NetworkMessageId
+    ) on NetworkMessageId
+| project-away NetworkMessageId1
+| where not(
+    isempty(AttachedFiles) and AttachmentCount == 0
+    and (isempty(ClickActionTypes) or (array_length(ClickActionTypes) == 1 and tostring(ClickActionTypes[0]) == "ClickBlocked"))
+    and array_length(UrlLocations) == 1 and tostring(UrlLocations[0]) == "Body"
+    and not(DeliveryAction == "Blocked"))
+| extend Severity = case(
+    isempty(AttachedFiles) and array_length(Urls) == 1 and array_length(ClickActionTypes) == 1 and tostring(ClickActionTypes[0]) == "ClickAllowed", "High",
+    "Medium"
+    )
+| project
+    TimeGenerated,
+    Timestamp,
+    NetworkMessageId,
+    InternetMessageId,
+    EmailDirection,
+    EmailClusterId,
+    SenderMailFromAddress,
+    SenderFromAddress,
+    SenderDisplayName,
+    SenderObjectId,
+    SenderIPv4,
+    SenderIPv6,
+    To,
+    Cc,
+    DistributionList,
+    RecipientEmailAddress,
+    RecipientObjectId,
+    Subject,
+    AuthenticationDetails,
+    ExchangeTransportRule,
+    OrgLevelPolicy,
+    OrgLevelAction,
+    EmailActionPolicy,
+    EmailAction,
+    UserLevelPolicy,
+    UserLevelAction,
+    DeliveryAction,
+    DeliveryLocation,
+    IsFirstContact,
+    EmailLanguage,
+    ThreatTypes,
+    DetectionMethods,
+    ConfidenceLevel,
+    ThreatNames,
+    EmailSize,
+    AttachmentCount,
+    AttachedFiles,
+    UrlCount,
+    Urls,
+    UrlLocations,
+    Clicks,
+    ClickActionTypes,
+    AllowedClickUrls,
+    AlertedUrls,
+    MaliciousUrls,
+    ReportId,
+    SenderFromDomain,
+    SenderMailFromDomain,
+    RecipientDomain,
+    Severity
