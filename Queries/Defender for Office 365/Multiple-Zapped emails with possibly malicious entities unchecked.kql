@@ -96,7 +96,7 @@ EmailPostDeliveryEvents
     and (isempty(ClickActionTypes) or (array_length(ClickActionTypes) == 1 and tostring(ClickActionTypes[0]) == "ClickBlocked"))
     and array_length(UrlLocations) == 1 and tostring(UrlLocations[0]) == "Body"
     and not(DeliveryAction == "Blocked"))
-| extend Severity = case(
+| extend AlertSeverity = case(
     isempty(AttachedFiles) and array_length(Urls) == 1 and array_length(ClickActionTypes) == 1 and tostring(ClickActionTypes[0]) == "ClickAllowed", "High",
     "Medium"
     )
@@ -150,4 +150,4 @@ EmailPostDeliveryEvents
     SenderFromDomain,
     SenderMailFromDomain,
     RecipientDomain,
-    Severity
+    AlertSeverity
