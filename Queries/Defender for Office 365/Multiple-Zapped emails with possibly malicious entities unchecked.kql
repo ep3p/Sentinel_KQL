@@ -4,7 +4,7 @@ EmailPostDeliveryEvents
 | where TimeGenerated > ago(query_frequency)
 | where DetectionMethods has_any ("Phish", "Malware")
 | as _Auxiliar
-| project NetworkMessageId, ThreatTypes, DetectionMethods
+| project NetworkMessageId, ThreatTypes, DetectionMethods, ActionType
 | join kind=inner (
     EmailEvents
     | where TimeGenerated > ago(query_period)
@@ -22,7 +22,7 @@ EmailPostDeliveryEvents
 | where not(OrgLevelPolicy in ("Phishing simulation", "SecOps Mailbox"))
 | summarize arg_max(TimeGenerated, *) by NetworkMessageId, ReportId
 | mv-apply Phish = todynamic(DetectionMethods)["Phish"] to typeof(string), Malware = todynamic(DetectionMethods)["Malware"] to typeof(string) on (
-    where not(Phish has_any ("Spoof", "impersonation", "Unknown", "filter", "detonation reputation", "Fingerprint")) or isnotempty(Malware)
+    where not(Phish has_any ("Spoof", "impersonation", "Unknown", "filter", "detonation reputation", "Fingerprint")) or isnotempty(Malware) or ActionType in ("Phish ZAP", "Malware ZAP")
     )
 | project-away Phish, Malware
 | as _Emails
