@@ -1,5 +1,5 @@
-let query_frequency = 5m;
-let query_period = 2d;
+let query_frequency = 1h;
+let query_period = 14d;
 EmailPostDeliveryEvents
 | where TimeGenerated > ago(query_frequency)
 | where DetectionMethods has_any ("Phish", "Malware")
