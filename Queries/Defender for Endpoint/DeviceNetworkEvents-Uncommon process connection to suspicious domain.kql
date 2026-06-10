@@ -4,6 +4,7 @@ let suspicious_domains = dynamic([
 	@"d\d[a-z0-9]{12}\.cloudfront.net",
 	@"[\-\w]+\-[a-f0-9]{3,5}\.kxcdn\.com",
 	@"[\-\w]+\-[a-z0-9]{16}\.\w\d\d\.azurefd\.net",
+    @"[\-\w]+\.[a-z0-9]+\.cloudapp\.azure\.com",
 	@"portswigger\.net",
 	@"oastify\.com",
 	@"whatismyip\.com",
