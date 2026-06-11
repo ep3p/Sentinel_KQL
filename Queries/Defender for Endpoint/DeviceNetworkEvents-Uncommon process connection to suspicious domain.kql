@@ -22,7 +22,7 @@ DeviceNetworkEvents
     RemoteUrlsSample = array_sort_asc(make_set(RemoteUrl, 100))
     by InitiatingProcessVersionInfoCompanyName, InitiatingProcessVersionInfoProductName, InitiatingProcessVersionInfoOriginalFileName, InitiatingProcessVersionInfoInternalFileName, InitiatingProcessVersionInfoFileDescription
 | where StartTime > ago(query_frequency)
-| invoke FileProfile("InitiatingProcessSHA1")
+| invoke FileProfile("InitiatingProcessSHA1", 1000)
 | where not(GlobalPrevalence > 1000 and GlobalFirstSeen < ago(query_frequency) and SignatureState == "SignedValid")
 | project
     StartTime,
