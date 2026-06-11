@@ -1,0 +1,80 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let suspicious_domains = dynamic([
+	@"d\d[a-z0-9]{12}\.cloudfront.net",
+	@"[\-\w]+\-[a-f0-9]{3,5}\.kxcdn\.com",
+	@"[\-\w]+\-[a-z0-9]{16}\.\w\d\d\.azurefd\.net",
+    @"[\-\w]+\.[a-z0-9]+\.cloudapp\.azure\.com",
+	@"portswigger\.net",
+	@"oastify\.com",
+	@"whatismyip\.com",
+	@"whatismyip\.net",
+	@"whatismyipaddress\.com"
+]);
+//let excluded_urls = dynamic(["uhf-exp-fd-gbcrdgggfbggh0g3.b02.azurefd.net"]);
+DeviceNetworkEvents
+| where Timestamp > ago(query_period)
+| where RemoteUrl matches regex strcat_array(suspicious_domains, "|") // and not(InitiatingProcessAccountSid in ("S-1-5-18", "S-1-5-20"))
+//| where not(RemoteUrl has_any (excluded_urls))
+| where not(InitiatingProcessUniqueId == 0)
+| project DeviceId, DeviceName, LocalIP, ActionType, RemoteIP, RemotePort, RemoteUrl, Protocol, InitiatingProcessUniqueId
+| as _AuxiliarEvents
+| join kind=inner (
+    DeviceImageLoadEvents
+    | where Timestamp > ago(query_period)
+    | where not(InitiatingProcessUniqueId == 0) and (isnotempty(SHA1) or isnotempty(SHA256) or isnotempty(MD5)) and DeviceId in (toscalar(_AuxiliarEvents | summarize make_set(DeviceId)))
+    | project-away DeviceName, ActionType
+    ) on DeviceId, InitiatingProcessUniqueId
+| project-away DeviceId1, InitiatingProcessUniqueId1
+| summarize
+    StartTime = arg_min(Timestamp, *),
+    EndTime = max(Timestamp),
+    DeviceNamesSample = array_sort_asc(make_set(DeviceName, 100)),
+    RemoteUrlsSample = array_sort_asc(make_set(RemoteUrl, 100))
+    by SHA1, SHA256, MD5
+| where StartTime > ago(query_frequency)
+| invoke FileProfile("SHA1", 1000)
+| where not(GlobalPrevalence > 10000)
+| where not(GlobalPrevalence > 1000 and GlobalFirstSeen < ago(query_frequency) and SignatureState == "SignedValid")
+| project
+    StartTime,
+    EndTime,
+    DeviceNamesSample,
+    RemoteUrlsSample,
+    Timestamp = StartTime,
+    DeviceId,
+    DeviceName,
+    LocalIP,
+    ActionType,
+    RemoteIP,
+    RemotePort,
+    RemoteUrl,
+    Protocol,
+    FileName,
+    FolderPath,
+    SHA1,
+    SHA256,
+    MD5,
+    FileSize,
+    GlobalPrevalence,
+    GlobalFirstSeen,
+    GlobalLastSeen,
+    SignatureState,
+    InitiatingProcessAccountName,
+    InitiatingProcessAccountSid,
+    InitiatingProcessAccountUpn,
+    InitiatingProcessAccountObjectId,
+    InitiatingProcessFileName,
+    InitiatingProcessFolderPath,
+    InitiatingProcessCommandLine,
+    InitiatingProcessCreationTime,
+    IsInitiatingProcessRemoteSession,
+    InitiatingProcessParentFileName,
+    InitiatingProcessVersionInfoCompanyName,
+    InitiatingProcessVersionInfoProductName,
+    InitiatingProcessVersionInfoOriginalFileName,
+    InitiatingProcessVersionInfoInternalFileName,
+    InitiatingProcessVersionInfoFileDescription,
+    InitiatingProcessVersionInfoProductVersion,
+    InitiatingProcessUniqueId,
+    ReportId
