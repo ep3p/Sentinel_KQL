@@ -12,6 +12,8 @@ let suspicious_domains = dynamic([
 	@"whatismyipaddress\.com"
 ]);
 //let excluded_urls = dynamic(["uhf-exp-fd-gbcrdgggfbggh0g3.b02.azurefd.net"]);
+let excluded_company_names = dynamic([""]);
+let excluded_original_names = dynamic([""]);
 DeviceNetworkEvents
 | where Timestamp > ago(query_period)
 | where RemoteUrl matches regex strcat_array(suspicious_domains, "|") // and not(InitiatingProcessAccountSid in ("S-1-5-18", "S-1-5-20"))
@@ -35,7 +37,9 @@ DeviceNetworkEvents
 | where StartTime > ago(query_frequency)
 | invoke FileProfile("SHA1", 1000)
 | where not(GlobalPrevalence > 10000)
+| where not(GlobalPrevalence > 1000 and GlobalFirstSeen < ago(query_period))
 | where not(GlobalPrevalence > 1000 and GlobalFirstSeen < ago(query_frequency) and SignatureState == "SignedValid")
+| where not(GlobalPrevalence > 500 and InitiatingProcessVersionInfoCompanyName in (excluded_company_names) and InitiatingProcessVersionInfoOriginalFileName in (excluded_original_names))
 | project
     StartTime,
     EndTime,
