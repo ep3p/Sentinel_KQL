@@ -1,0 +1,47 @@
+let query_frequency = 5m;
+let query_period = 10m;
+let _DomainControllers = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Service == "DomainController"
+    | summarize make_list(HostName)
+);
+let _ExpectedWorkstationNames = toscalar(
+    _GetWatchlist("Service-PrivateCorporateServices")
+    | where Notes has "[PAM]"
+    | summarize make_list(HostName)
+);
+SecurityEvent
+| where TimeGenerated > ago(query_period)
+| where EventID in (4624, 4625) and Computer has_any (_DomainControllers) and AuthenticationPackageName == "NTLM" and LogonType == "3" and not(AccountType == "Machine") and (ElevatedToken == "%%1842" or WorkstationName in ("-", ""))
+| where not(Status == "0x80090317" and Account == @"\")
+| where not(WorkstationName has_any (_ExpectedWorkstationNames) or WorkstationName has_any (_DomainControllers))
+| project-away PrivilegeList
+| join kind=leftouter (
+    SecurityEvent
+    | where TimeGenerated > ago(query_period)
+    | where EventID == 4672 and Computer has_any (_DomainControllers)
+    | project Computer, Account, SubjectLogonId, PrivilegeList
+    ) on Computer, Account, $left.TargetLogonId == $right.SubjectLogonId
+| project-away Computer1, Account1, SubjectLogonId1
+| where isnotempty(PrivilegeList) or WorkstationName in ("-", "")
+| summarize arg_min(TimeGenerated, *) by Computer, Account, Activity, ElevatedToken, PrivilegeList, WorkstationName, FailureReason, Status, SubStatus
+| where TimeGenerated > ago(query_frequency)
+| project
+    TimeGenerated,
+    Computer,
+    Account,
+    AccountType,
+    Activity,
+    LogonTypeName,
+    LogonProcessName,
+    AuthenticationPackageName,
+    LmPackageName,
+    KeyLength,
+    TargetLogonId,
+    IpAddress,
+    WorkstationName,
+    PrivilegeList,
+    ElevatedToken,
+    FailureReason,
+    Status,
+    SubStatus
