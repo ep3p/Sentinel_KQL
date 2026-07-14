@@ -10,4 +10,4 @@ union *
     union *
     | where TimeGenerated > ago(query_period)
     | summarize percentiles(IngestionDelay = ingestion_time() - TimeGenerated, 50, 80, 95, 99) by Type
-) on Type
+    ) on Type
