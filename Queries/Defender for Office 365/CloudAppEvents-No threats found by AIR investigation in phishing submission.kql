@@ -1,0 +1,18 @@
+CloudAppEvents
+| where ActionType == "AirInvestigationData"
+| extend
+    Status = tostring(RawEventData["Status"]),
+    InvestigationId = tostring(RawEventData["InvestigationId"]),
+    InvestigationType = tostring(RawEventData["InvestigationType"]),
+    InvestigationName = tostring(RawEventData["InvestigationName"]),
+    Data = todynamic(tostring(RawEventData["Data"]))
+| where InvestigationType == "SubmissionInvestigation" and InvestigationName has "User reported message as malicious" and Status == "No threats found"
+| extend
+    AlertType = tostring(Data["AlertType"]),
+    AlertId = strcat("fa", tostring(Data["ProviderAlertId"])),
+    InternetMessageId = tostring(Data["Entities"][0]["InternetMessageId"]),
+    NetworkMessageId = tostring(Data["Entities"][0]["NetworkMessageId"]),
+    SenderFromAddress = tostring(Data["Entities"][0]["Sender"]),
+    RecipientEmailAddress = tostring(Data["Entities"][0]["Recipient"]),
+    Subject = tostring(Data["Entities"][0]["Subject"])
+| where AlertType == "b26a5770-0c38-434a-9380-3a3c2c27bbb3" and  isnotempty(NetworkMessageId) and isnotempty(SenderFromAddress) and isnotempty(RecipientEmailAddress) and isnotempty(Subject)
