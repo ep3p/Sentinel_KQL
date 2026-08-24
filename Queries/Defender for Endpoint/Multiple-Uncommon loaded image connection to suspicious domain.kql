@@ -1,15 +1,16 @@
 let query_frequency = 1h;
 let query_period = 14d;
 let suspicious_domains = dynamic([
-	@"d\d[a-z0-9]{12}\.cloudfront\.net",
-	@"[\-\w]+\-[a-f0-9]{3,5}\.kxcdn\.com",
-	@"[\-\w]+\-[a-z0-9]{16}\.\w\d\d\.azurefd\.net",
+    @"d\d[a-z0-9]{12}\.cloudfront\.net",
+    @"[\-\w]+\-[a-f0-9]{3,5}\.kxcdn\.com",
+    @"[\-\w]+\-[a-z0-9]{16}\.\w\d\d\.azurefd\.net",
     @"[\-\w]+\.[a-z0-9]+\.cloudapp\.azure\.com",
-	@"portswigger\.net",
-	@"oastify\.com",
-	@"whatismyip\.com",
-	@"whatismyip\.net",
-	@"whatismyipaddress\.com"
+    @"[a-z0-9]{10}\.execute\-api\.[a-z]{2}\-[a-z]+\-\d\.amazonaws\.com",
+    @"portswigger\.net",
+    @"oastify\.com",
+    @"whatismyip\.com",
+    @"whatismyip\.net",
+    @"whatismyipaddress\.com"
 ]);
 //let excluded_urls = dynamic(["uhf-exp-fd-gbcrdgggfbggh0g3.b02.azurefd.net"]);
 let excluded_company_names = dynamic([""]);
