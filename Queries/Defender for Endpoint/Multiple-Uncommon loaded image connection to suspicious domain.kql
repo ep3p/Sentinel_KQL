@@ -12,9 +12,12 @@ let suspicious_domains = dynamic([
     @"whatismyip\.net",
     @"whatismyipaddress\.com"
 ]);
-//let excluded_urls = dynamic(["uhf-exp-fd-gbcrdgggfbggh0g3.b02.azurefd.net"]);
-let excluded_company_names = dynamic([""]);
-let excluded_original_names = dynamic([""]);
+let excluded_urls = dynamic([
+    "uhf-exp-fd-gbcrdgggfbggh0g3.b02.azurefd.net",
+    "vs-exp-afd-prod-endpoint-e3b9a0c0h0e8d6fd.b02.azurefd.net"
+]);
+let excluded_company_names = dynamic([]);
+let excluded_original_names = dynamic([]);
 DeviceNetworkEvents
 | where Timestamp > ago(query_period)
 | where RemoteUrl matches regex strcat_array(suspicious_domains, "|") // and not(InitiatingProcessAccountSid in ("S-1-5-18", "S-1-5-20"))
@@ -41,6 +44,7 @@ DeviceNetworkEvents
 | where not(GlobalPrevalence > 1000 and GlobalFirstSeen < ago(query_period))
 | where not(GlobalPrevalence > 1000 and GlobalFirstSeen < ago(query_frequency) and SignatureState == "SignedValid")
 | where not(GlobalPrevalence > 500 and InitiatingProcessVersionInfoCompanyName in (excluded_company_names) and InitiatingProcessVersionInfoOriginalFileName in (excluded_original_names))
+| where not(GlobalFirstSeen < ago(5 * 365d))
 | project
     StartTime,
     EndTime,
