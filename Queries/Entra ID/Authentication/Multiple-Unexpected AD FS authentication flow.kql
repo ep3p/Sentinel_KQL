@@ -1,0 +1,67 @@
+let query_frequency = 5m;
+let query_period = 2d;
+let query_wait = 30m;
+let _ExpectedADFSIPAddress = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "ADFSAuthenticationAddress"
+    | summarize make_list(SourceAddress)
+);
+let _ExpectedProxyIPAddress = toscalar(
+    _GetWatchlist("IP-Vendors")
+    | where Notes has "[Proxy]"
+    | summarize make_list(IPAddress)
+);
+ADFSSignInLogs
+| where TimeGenerated between (ago(query_frequency + query_wait) .. ago(query_wait))
+| where ResultType == 0 and isnotempty(IPAddress)
+| mv-apply AuthenticationProcessingDetail = todynamic(AuthenticationProcessingDetails) on (
+    where AuthenticationProcessingDetail has "IP Addresses Involved in Auth Flow"
+    | extend IPAddressesInvolved = split(tostring(AuthenticationProcessingDetail["value"]), ",")
+    )
+| project-away AuthenticationProcessingDetail
+| where not(array_length(IPAddressesInvolved) == 1) and not(IPAddress in (_ExpectedADFSIPAddress))
+| summarize Auxiliar = arg_max(array_length(IPAddressesInvolved), IPAddressesInvolved) by UserId, CorrelationId
+| project-away Auxiliar
+| join kind = inner (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period + query_wait)
+    | where isnotempty(CorrelationId) and isnotempty(SessionId)
+    | project UserId, CorrelationId, SessionId
+    ) on UserId, CorrelationId
+| project-away *1
+| join kind = inner (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period + query_wait)
+    | where isnotempty(SessionId)
+    ) on UserId, SessionId
+| project-away *1
+| summarize
+    arg_min(CreatedDateTime, *),
+    AccesedApps = array_sort_asc(make_set_if(AppDisplayName, ResultType == 0, 50)),
+    AccessedResources = array_sort_asc(make_set_if(ResourceDisplayName, ResultType == 0, 50)),
+    SessionIds = make_set(SessionId),
+    CorrelationIds = make_set(CorrelationId)
+    by UserId, IPAddress, HomeTenantId, ResourceTenantId
+| where not(ipv4_is_in_any_range(IPAddress, _ExpectedProxyIPAddress))
+| project
+    TimeGenerated,
+    CreatedDateTime,
+    UserPrincipalName,
+    UserDisplayName,
+    SessionIds,
+    IPAddressesInvolved,
+    IPAddress,
+    Location,
+    NetworkLocationDetails,
+    AutonomousSystemNumber,
+    AuthenticationDetails,
+    ClientAppUsed,
+    DeviceDetail = coalesce(tostring(DeviceDetail_dynamic), DeviceDetail_string),
+    UserAgent,
+    Category,
+    AccesedApps,
+    AccessedResources,
+    HomeTenantId,
+    ResourceTenantId,
+    CorrelationIds,
+    UserId
