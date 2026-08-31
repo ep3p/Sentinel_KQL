@@ -127,7 +127,7 @@ EventID,Field,Value,Hexadecimal,Translation,Notes
 ,,"%%2099",0x080000,"Exclude Authorization Information - Enabled",
 ,,"%%2100",0x100000,"Undefined UserAccountControl Bit 20 - Enabled",
 ,,"%%2101",0x200000,"Protect Kerberos Service Tickets with AES Keys - Enabled",
-,,"%%2307",,""
+,,"%%2307",,"Account locked out.",
 ,,"%%4352",,"Device Access Bit 0",
 ,,"%%4353",,"Device Access Bit 1",
 ,,"%%4354",,"Device Access Bit 2",
