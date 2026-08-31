@@ -128,6 +128,7 @@ EventID,Field,Value,Hexadecimal,Translation,Notes
 ,,"%%2100",0x100000,"Undefined UserAccountControl Bit 20 - Enabled",
 ,,"%%2101",0x200000,"Protect Kerberos Service Tickets with AES Keys - Enabled",
 ,,"%%2307",,"Account locked out.",
+,,"%%2313",,"Unknown user name or bad password.",
 ,,"%%4352",,"Device Access Bit 0",
 ,,"%%4353",,"Device Access Bit 1",
 ,,"%%4354",,"Device Access Bit 2",
@@ -341,7 +342,7 @@ EventID,Field,Value,Hexadecimal,Translation,Notes
 4625,Status,0xC000005E,,"There are currently no logon servers available to service the logon request",
 4625,Status,0xC0000064,,"User logon with misspelled or bad user account",
 4625,Status,0xC000006A,,"User logon with misspelled or bad password",
-4625,Status,0xC000006D,,"The cause is either a bad username or authentication information",
+4625,Status,0xC000006D,,"The cause is either a bad username or authentication information",%%2313
 4625,Status,0xC000006E,,"Indicates a referenced user name and authentication information are valid, but some user account restriction has prevented successful authentication (such as time-of-day restrictions).",
 4625,Status,0xC000006F,,"User logon outside authorized hours",
 4625,Status,0xC0000070,,"User logon from unauthorized workstation",
