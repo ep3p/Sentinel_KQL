@@ -127,6 +127,7 @@ EventID,Field,Value,Hexadecimal,Translation,Notes
 ,,"%%2099",0x080000,"Exclude Authorization Information - Enabled",
 ,,"%%2100",0x100000,"Undefined UserAccountControl Bit 20 - Enabled",
 ,,"%%2101",0x200000,"Protect Kerberos Service Tickets with AES Keys - Enabled",
+,,"%%2307",,""
 ,,"%%4352",,"Device Access Bit 0",
 ,,"%%4353",,"Device Access Bit 1",
 ,,"%%4354",,"Device Access Bit 2",
@@ -354,7 +355,7 @@ EventID,Field,Value,Hexadecimal,Translation,Notes
 4625,Status,0xC0000193,,"User logon with expired account",
 4625,Status,0xC0000224,,"User is required to change password at next logon",
 4625,Status,0xC0000225,,"Evidently a bug in Windows and not a risk",
-4625,Status,0xC0000234,,"User logon with account locked",
+4625,Status,0xC0000234,,"User logon with account locked",%%2307
 4625,Status,0xC00002EE,,"Failure Reason: An Error occurred during Logon",
 4625,Status,0xC0000413,,"Logon Failure: The machine you are logging on to is protected by an authentication firewall. The specified account is not allowed to authenticate to the machine.",
 ,"Audit Policy Subcategory","0cce9213-69ae-11d9-bed3-505054503030",,"IPsec Driver",
