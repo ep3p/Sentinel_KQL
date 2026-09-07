@@ -1,0 +1,53 @@
+// Even if "Software OATH tokens" method is disabled, it might be possible to register it, generating an anomalous signal
+union
+    (
+    AuditLogs
+    // | where LoggedByService == "Authentication Methods" and Category == "PolicyManagement" and AADOperationType == "ServiceApi"
+    | where OperationName has "POST UserAuthMethod.SoftwareOathProofupRegistration"
+    ),
+    (
+    AuditLogs
+    // | where LoggedByService == "Core Directory" and Category == "UserManagement"
+    // | where OperationName == "Update user"
+    | where TargetResources has "StrongAuthenticationPhoneAppDetail"
+    | mv-expand TargetResource = TargetResources
+    | mv-expand modifiedProperty = TargetResource["modifiedProperties"]
+    | where modifiedProperty["displayName"] == "StrongAuthenticationPhoneAppDetail"
+    | mv-apply newValue = todynamic(tostring(modifiedProperty["newValue"])), oldValue = todynamic(tostring(modifiedProperty["oldValue"])) on (
+        summarize
+            NewValueBag = make_bag_if(bag_pack(tostring(newValue["Id"]), newValue), isnotempty(newValue)),
+            OldValueBag = make_bag_if(bag_pack(tostring(oldValue["Id"]), oldValue), isnotempty(oldValue))
+        | extend AddedAuthenticationMethod = bag_remove_keys(NewValueBag, bag_keys(OldValueBag))
+        | where array_length(bag_keys(AddedAuthenticationMethod)) > 0
+        )
+    | mv-expand AddedAuthenticationMethod = todynamic(tostring(AddedAuthenticationMethod))
+    | extend AddedAuthenticationMethod = AddedAuthenticationMethod[tostring(bag_keys(AddedAuthenticationMethod)[0])]
+    | where AddedAuthenticationMethod["AuthenticationType"] == 2
+        or tostring(AddedAuthenticationMethod["DeviceName"]) == "NO_DEVICE"
+        or tostring(AddedAuthenticationMethod["DeviceToken"]) == "NO_DEVICE_TOKEN"
+        or tostring(AddedAuthenticationMethod["PhoneAppVersion"]) == "NO_PHONE_APP_VERSION"
+        or not(tostring(AddedAuthenticationMethod["HashFunction"]) in ("", "hmacsha256"))// or == "hmacsha1"
+        or not(tolong(AddedAuthenticationMethod["NotificationType"]) in (2, 3, 4))
+    )
+| extend
+    Initiator = iif(isnotempty(InitiatedBy["user"]), tostring(InitiatedBy["user"]["userPrincipalName"]), tostring(InitiatedBy["app"]["displayName"])),
+    InitiatorId = iif(isnotempty(InitiatedBy["user"]), tostring(InitiatedBy["user"]["id"]), tostring(InitiatedBy["app"]["servicePrincipalId"])),
+    IPAddress = tostring(InitiatedBy[tostring(bag_keys(InitiatedBy)[0])]["ipAddress"])
+| project
+    TimeGenerated,
+    LoggedByService,
+    Category,
+    AADOperationType,
+    Initiator,
+    Identity,
+    IPAddress,
+    OperationName,
+    Result,
+    ResultDescription,
+    AddedAuthenticationMethod,
+    OldAuthenticationMethods = OldValueBag,
+    AdditionalDetails,
+    InitiatorId,
+    InitiatedBy,
+    TargetResources,
+    CorrelationId
