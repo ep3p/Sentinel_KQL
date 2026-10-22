@@ -1,0 +1,136 @@
+let query_frequency = 1h;
+let query_period = 14d;
+let query_wait = 30m;
+let _ExpectedIPAddresses = toscalar(
+    union _GetWatchlist("IP-CorporateCollaborators"), _GetWatchlist("IP-Vendors")
+    | summarize make_list(IPAddress)
+);
+let _CorporateGeolocations = toscalar(
+    _GetWatchlist("Activity-ExpectedSignificantActivity")
+    | where Activity == "CorporateGeolocation"
+    | summarize make_list(Auxiliar)
+);
+let _PartialSuccessResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where Notes has_any ("[Success]", "[Expired]")
+    | summarize make_list(ResultType)
+);
+let _NotCompleteSuccessResultTypes = toscalar(
+    _GetWatchlist("ResultType-SignInLogsErrorCodes")
+    | where isnotempty(ResultDescription) and not(Notes has_all ("[Success]", "[Complete]"))
+    | summarize make_list(ResultType)
+);
+SigninLogs
+| where TimeGenerated > ago(query_period)
+| where isempty(CrossTenantAccessType) or CrossTenantAccessType == "none"
+| summarize hint.strategy=shuffle arg_min(CreatedDateTime, *) by UserId, SessionId
+| where TimeGenerated between (ago(query_frequency + query_wait) ..  ago(query_wait))
+| where not(ipv4_is_in_any_range(IPAddress, _ExpectedIPAddresses))
+| where AppId in (
+    "19db86c3-b2b9-44cc-b339-36da233a3be2",// My Signins
+    "4765445b-32c6-49b0-83e6-1d93765276ca",// OfficeHome
+    "72782ba9-4490-4f03-8d82-562370ea3566",// Office 365
+    "7eadcef8-456d-4611-9480-4fff72b8b9e2",// Microsoft Account Controls V2
+    "8c59ead7-d703-4a27-9e55-c96a0054c8d2")// My Profile
+    or ConditionalAccessAudiences has_any ("19db86c3-b2b9-44cc-b339-36da233a3be2", "72782ba9-4490-4f03-8d82-562370ea3566", "8c59ead7-d703-4a27-9e55-c96a0054c8d2")
+| summarize AuxiliarColumn = arg_max(toint(isnotempty(SessionId)), *) by UserId, CorrelationId
+| project-away AuxiliarColumn
+| as _Auxiliar
+| join hint.strategy=shuffle kind=leftouter (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated between (ago(query_period) .. ago(query_frequency + query_wait))
+    | where UserId in (toscalar(_Auxiliar | summarize make_set(UserId)))
+    | where ResultType in (_PartialSuccessResultTypes)
+    | extend DeviceId = tostring(coalesce(DeviceDetail_dynamic, todynamic(DeviceDetail_string))["deviceId"])
+    | summarize
+        PreviousDeviceIds = make_set_if(DeviceId, isnotempty(DeviceId)),
+        PreviousIPAddresses = make_set_if(IPAddress, isnotempty(IPAddress)),
+        PreviousAutonomousSystemNumbers = make_set_if(AutonomousSystemNumber, isnotempty(AutonomousSystemNumber))
+        by UserId
+    ) on UserId
+| project-away UserId1
+| extend
+    UnseenDevice = isempty(tostring(DeviceDetail["deviceId"])) or array_length(set_intersect(pack_array(tostring(DeviceDetail["deviceId"])), PreviousDeviceIds)) == 0,
+    UnseenIPAddress = (isnotempty(IPAddress) and array_length(set_intersect(pack_array(IPAddress), PreviousIPAddresses)) == 0) or isempty(PreviousIPAddresses),
+    UnseenAutonomousSystemNumber = (isnotempty(AutonomousSystemNumber) and array_length(set_intersect(pack_array(AutonomousSystemNumber), PreviousAutonomousSystemNumbers)) == 0) or isempty(PreviousAutonomousSystemNumbers)
+| project-away Previous*
+| where UnseenDevice and UnseenIPAddress
+| join hint.strategy=shuffle kind=leftouter (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated between (ago(query_period) .. ago(query_frequency + query_wait))
+    | where IPAddress in (toscalar(_Auxiliar | summarize make_set(IPAddress))) and not(UserId in (toscalar(_Auxiliar | summarize make_set(UserId))))
+    | where ResultType in (_PartialSuccessResultTypes)
+    | summarize OtherPreviousUsersFromIPAddress = array_sort_asc(make_set_if(UserPrincipalName, UserPrincipalName != UserId)) by IPAddress
+    ) on IPAddress
+| project-away IPAddress1
+| where not(isnotempty(OtherPreviousUsersFromIPAddress) and array_length(OtherPreviousUsersFromIPAddress) > 2)
+| join hint.strategy=shuffle kind=leftouter (
+    union SigninLogs, AADNonInteractiveUserSignInLogs
+    | where TimeGenerated > ago(query_period)
+    | where SessionId in (toscalar(_Auxiliar | summarize make_set_if(SessionId, isnotempty(SessionId))))
+    | summarize
+        SessionIdLaterUsedFromIPAddress = make_set_if(IPAddress, isnotempty(IPAddress)),
+        SessionIdLaterUsedFromAutonomousSystemNumber = make_set_if(AutonomousSystemNumber, isnotempty(AutonomousSystemNumber))
+        by UserId, SessionId
+    ) on UserId, SessionId
+| project-away UserId1, SessionId1
+| extend
+    SessionIdLaterUsedFromIPAddress = set_difference(SessionIdLaterUsedFromIPAddress, pack_array(IPAddress)),
+    SessionIdLaterUsedFromAutonomousSystemNumber = set_difference(SessionIdLaterUsedFromAutonomousSystemNumber, pack_array(AutonomousSystemNumber))
+| extend
+    AlertSeverity = case(
+        // Expected Password Spray
+        AppId == "4765445b-32c6-49b0-83e6-1d93765276ca" and ResourceIdentity == "4765445b-32c6-49b0-83e6-1d93765276ca" and ResultType == "50126", "Informational",
+        AppId == "4765445b-32c6-49b0-83e6-1d93765276ca" and ResourceIdentity == "4765445b-32c6-49b0-83e6-1d93765276ca" and Location in (_CorporateGeolocations), "Low",
+        AppId in ("19db86c3-b2b9-44cc-b339-36da233a3be2", "7eadcef8-456d-4611-9480-4fff72b8b9e2") and (not(ResultType in (_NotCompleteSuccessResultTypes)) or not(Location in (_CorporateGeolocations))) and (UnseenAutonomousSystemNumber and array_length(SessionIdLaterUsedFromAutonomousSystemNumber) > 0), "High",
+        AppId in ("19db86c3-b2b9-44cc-b339-36da233a3be2", "7eadcef8-456d-4611-9480-4fff72b8b9e2") and (not(ResultType in (_NotCompleteSuccessResultTypes)) or not(Location in (_CorporateGeolocations))) and (UnseenAutonomousSystemNumber or array_length(SessionIdLaterUsedFromAutonomousSystemNumber) > 0), "Medium",
+        "Medium"
+    )
+| project
+    TimeGenerated,
+    CreatedDateTime,
+    Type,
+    SessionId,
+    CorrelationId,
+    UserPrincipalName,
+    AlternateSignInName,
+    UserDisplayName,
+    UserType,
+    ResultType,
+    ResultSignature,
+    ResultDescription,
+    UnseenDevice,
+    UnseenIPAddress,
+    OtherPreviousUsersFromIPAddress,
+    SessionIdLaterUsedFromIPAddress,
+    UnseenAutonomousSystemNumber,
+    SessionIdLaterUsedFromAutonomousSystemNumber,
+    IPAddress,
+    AutonomousSystemNumber,
+    Location,
+    NetworkLocationDetails,
+    AppDisplayName,
+    AppId,
+    ResourceDisplayName,
+    ResourceIdentity,
+    Status,
+    MfaDetail,
+    AuthenticationDetails,
+    AuthenticationRequirement,
+    AuthenticationRequirementPolicies,
+    AuthenticationAppDeviceDetails,
+    ConditionalAccessPolicies,
+    ConditionalAccessStatus,
+    ClientAppUsed,
+    UserAgent,
+    DeviceDetail,
+    RiskDetail,
+    RiskEventTypes,
+    RiskEventTypes_V2,
+    RiskLevelAggregated,
+    RiskLevelDuringSignIn,
+    RiskState,
+    ConditionalAccessAudiences,
+    OriginalRequestId,
+    UserId,
+    AlertSeverity
